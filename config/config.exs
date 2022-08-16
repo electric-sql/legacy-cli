@@ -12,7 +12,7 @@ if config_env() == :dev do
       ],
       pre_push: [
         tasks: [
-          {:cmd, "mix dialyzer"},
+          # {:cmd, "mix dialyzer"},
           {:cmd, "mix test"}
         ]
       ]
