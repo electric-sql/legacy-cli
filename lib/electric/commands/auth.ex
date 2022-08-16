@@ -29,7 +29,7 @@ defmodule Electric.Commands.Auth do
             password: [
               value_name: "**********",
               short: "-p",
-              long: "--pwd",
+              long: "--password",
               help: "Your password",
               parser: :string,
               required: false
@@ -84,15 +84,15 @@ defmodule Electric.Commands.Auth do
     path = "/auth/login"
 
     payload = %{
-      credentials: %{
+      data: %{
         email: email,
         password: password
       }
     }
 
     case Client.post_json(path, payload) do
-      {:ok, %Req.Response{status: 200, body: body}} ->
-        handle_login_response(body)
+      {:ok, %Req.Response{status: 200, body: %{"data" => data}}} ->
+        handle_login_response(data)
 
       {:ok, %Req.Response{}} ->
         {:error, "invalid credentials"}
@@ -102,12 +102,8 @@ defmodule Electric.Commands.Auth do
     end
   end
 
-  defp handle_login_response(body) do
-    IO.inspect({:body, body})
-
-    %{"credentials" => %{"email" => email, "token" => token}} = body["json"]
-
-    case Session.set(email, token) do
+  defp handle_login_response(%{"email" => email} = data) do
+    case Session.set(data) do
       :ok ->
         {:success, "Logged in successfully as #{email}"}
 

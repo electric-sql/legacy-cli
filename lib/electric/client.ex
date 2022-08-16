@@ -5,10 +5,10 @@ defmodule Electric.Client do
 
   @default_base_url (case Mix.env() do
                        :prod ->
-                         "https://console.electric-sql.com/api/v1"
+                         "https://console.electric-sql.com/api/v1/"
 
                        _ ->
-                         "http://localhost:4000/api/v1"
+                         "http://localhost:4000/api/v1/"
                      end)
 
   @base_url System.get_env("ELECTRIC_BASE_URL", @default_base_url)
@@ -17,9 +17,14 @@ defmodule Electric.Client do
     Req.new(base_url: @base_url)
   end
 
+  def post_json("/" <> path, payload) do
+    post_json(path, payload)
+  end
+
   def post_json(path, payload) do
     base_req()
     |> Req.request(method: :post, url: path, json: payload)
-    |> IO.inspect()
+
+    # |> IO.inspect()
   end
 end

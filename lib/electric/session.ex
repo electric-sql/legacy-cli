@@ -26,15 +26,16 @@ defmodule Electric.Session do
   end
 
   defmodule Credentials do
-    @enforce_keys [:email, :token]
+    @derive Jason.Encoder
+    @enforce_keys [:id, :email, :token, :refresh_token]
     defstruct [
+      :id,
       :email,
-      :token
+      :token,
+      :refresh_token
     ]
 
-    def new(%{} = attrs) do
-      struct(__MODULE__, attrs)
-    end
+    use ExConstructor
   end
 
   @doc """
@@ -61,8 +62,8 @@ defmodule Electric.Session do
 
   Returns `:ok` or `{:error, reason}`.
   """
-  def set(email, token) when is_binary(email) and is_binary(token) do
-    creds = %Credentials{email: email, token: token}
+  def set(data) do
+    creds = Credentials.new(data)
     contents = Jason.encode!(creds)
 
     file_path()

@@ -41,6 +41,7 @@ defmodule Electric.MixProject do
       {:bakeware, "~> 0.2.4", runtime: false},
       {:dialyxir, "~> 1.0", only: :dev, runtime: false},
       {:ex_doc, "~> 0.28", only: :dev, runtime: false},
+      {:exconstructor, "~> 1.2.6"},
       {:git_hooks, "== 0.6.5", only: :dev, runtime: false},
       {:jason, "~> 1.3.0"},
       {:optimus, [git: "git@github.com:thruflo/optimus.git"]},
