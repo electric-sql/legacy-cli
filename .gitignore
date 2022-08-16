@@ -27,4 +27,4 @@ electric-*.tar
 
 # Release artefacts
 /dist/
-electric
+/electric

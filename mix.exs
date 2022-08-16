@@ -5,29 +5,52 @@ defmodule Electric.MixProject do
 
   def project do
     [
-      app: :electric,
+      app: :electric_sql_cli,
       version: "0.1.0",
       elixir: "~> 1.13",
       start_permanent: Mix.env() == :prod,
-      build_embedded: Mix.env == :prod,
+      build_embedded: Mix.env() == :prod,
       deps: deps(),
+      aliases: aliases(),
       releases: releases()
     ]
   end
 
   # Run "mix help compile.app" to learn about applications.
   def application do
+    Mix.env()
+    |> application()
+  end
+
+  defp application(:prod) do
     [
       extra_applications: [:logger],
-      mod: {Electric.Main, []}
+      mod: {Electric, []}
+    ]
+  end
+
+  defp application(_) do
+    [
+      extra_applications: [:logger]
     ]
   end
 
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
+      {:bakeware, "~> 0.2.4", runtime: false},
+      {:dialyxir, "~> 1.0", only: :dev, runtime: false},
+      {:ex_doc, "~> 0.28", only: :dev, runtime: false},
+      {:git_hooks, "== 0.6.5", only: :dev, runtime: false},
+      {:jason, "~> 1.3.0"},
       {:optimus, [git: "git@github.com:thruflo/optimus.git"]},
-      {:bakeware, "~> 0.2.4", runtime: false}
+      {:req, "~> 0.3.0"}
+    ]
+  end
+
+  defp aliases do
+    [
+      dev: "run dev.exs"
     ]
   end
 
