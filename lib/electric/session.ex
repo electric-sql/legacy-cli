@@ -2,6 +2,7 @@ defmodule Electric.Session do
   @moduledoc """
   Manages session token on the user's local filesystem.
   """
+  use Memoize
 
   # Credentials are stored in a `.session-creds` file inside a
   # `.electric-sql` config folder in the user's home directory.
@@ -43,7 +44,7 @@ defmodule Electric.Session do
 
   Returns `%Credentials{}` or `nil`.
   """
-  def get do
+  defmemo get do
     path = file_path()
 
     case File.read(path) do
@@ -63,11 +64,20 @@ defmodule Electric.Session do
   Returns `:ok` or `{:error, reason}`.
   """
   def set(data) do
+    path = file_path()
+
     creds = Credentials.new(data)
     contents = Jason.encode!(creds)
 
-    file_path()
-    |> File.write(contents)
+    case File.write(path, contents) do
+      :ok ->
+        Memoize.invalidate(__MODULE__, :get)
+
+        :ok
+
+      err ->
+        err
+    end
   end
 
   @doc """
@@ -78,6 +88,14 @@ defmodule Electric.Session do
   def clear do
     path = file_path()
 
-    File.rm(path)
+    case File.rm(path) do
+      :ok ->
+        Memoize.invalidate(__MODULE__, :get)
+
+        :ok
+
+      err ->
+        err
+    end
   end
 end

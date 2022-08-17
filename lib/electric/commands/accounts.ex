@@ -23,8 +23,16 @@ defmodule Electric.Commands.Accounts do
     ]
   end
 
-  # flags: %{}, options: %{}, unknown: []}
   def list(_cmd) do
-    throw(:NotImplemented)
+    case Client.get("accounts") do
+      {:ok, %Req.Response{status: 200, body: %{"data" => data}}} ->
+        {:results, data}
+
+      {:ok, %Req.Response{}} ->
+        {:error, "invalid credentials"}
+
+      {:error, _exception} ->
+        {:error, "failed to connect"}
+    end
   end
 end

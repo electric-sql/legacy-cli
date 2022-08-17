@@ -44,6 +44,7 @@ defmodule Electric.MixProject do
       {:exconstructor, "~> 1.2.6"},
       {:git_hooks, "== 0.6.5", only: :dev, runtime: false},
       {:jason, "~> 1.3.0"},
+      {:memoize, "~> 1.4"},
       {:optimus, [git: "git@github.com:thruflo/optimus.git"]},
       {:req, "~> 0.3.0"}
     ]

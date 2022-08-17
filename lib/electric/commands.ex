@@ -10,6 +10,7 @@ defmodule Electric.Commands do
       alias Electric.Client
       alias Electric.Password
       alias Electric.Session
+      alias Electric.Util
     end
   end
 end

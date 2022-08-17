@@ -90,7 +90,7 @@ defmodule Electric.Commands.Auth do
       }
     }
 
-    case Client.post_json(path, payload) do
+    case Client.post(path, payload) do
       {:ok, %Req.Response{status: 200, body: %{"data" => data}}} ->
         handle_login_response(data)
 
@@ -103,7 +103,10 @@ defmodule Electric.Commands.Auth do
   end
 
   defp handle_login_response(%{"email" => email} = data) do
-    case Session.set(data) do
+    data
+    |> Util.rename_map_key("refreshToken", "refresh_token")
+    |> Session.set()
+    |> case do
       :ok ->
         {:success, "Logged in successfully as #{email}"}
 

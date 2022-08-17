@@ -74,6 +74,20 @@ defmodule Electric do
     |> Optimus.parse!(["--help"], &halt/1)
   end
 
+  defp handle_command({:result, data}) do
+    data
+    |> IO.inspect()
+
+    {:result, data}
+  end
+
+  defp handle_command({:results, data}) do
+    data
+    |> IO.inspect()
+
+    {:results, data}
+  end
+
   defp handle_command({:success, message}) when is_binary(message) do
     message
     |> format_success()

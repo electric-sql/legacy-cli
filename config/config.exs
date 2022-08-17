@@ -1,6 +1,9 @@
 import Config
 
 if config_env() == :dev do
+  config :electric_sql_cli,
+    base_url: "http://localhost:4000/api/v1/"
+
   # Git hooks for analysis and formatting.
   config :git_hooks,
     auto_install: true,
