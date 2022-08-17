@@ -14,24 +14,39 @@ You need [Elixir](https://elixir-lang.org/install.html) then run:
 mix deps.get
 ```
 
+## Test
+
+Run tests using:
+
+```sh
+mix test
+```
+
 ## Develop
 
-Build:
+You can run the command locally using:
+
+```sh
+mix dev
+```
+
+Arguments are passed directly to the CLI, e.g.:
+
+```sh
+# equivalent to `electric auth whoami`
+mix dev auth whoami
+```
+
+Alternatively, you can build the executable:
 
 ```sh
 ./build.sh
 ```
 
-Run:
+And run it:
 
 ```sh
 ./electric
-```
-
-Test:
-
-```sh
-mix test
 ```
 
 ## Release
