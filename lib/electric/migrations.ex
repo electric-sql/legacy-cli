@@ -1,4 +1,4 @@
-defmodule Electric.Contexts.Migrations do
+defmodule Electric.Migrations do
   @moduledoc """
   The `Migrations` context.
 
@@ -45,22 +45,6 @@ VALUES
 END;
 """
 
-  def spec do
-    [
-      name: "migrations",
-      about: "Manage migrations",
-      subcommands: [
-        list: [
-          name: "deploy",
-          about: "deploy current migrations",
-          args: [
-            # ...
-          ]
-        ]
-      ]
-    ]
-  end
-
   def get_template() do
     @trigger_template
   end
@@ -68,13 +52,9 @@ END;
   @doc """
 Takes a folder which contains sql migration files and adds the SQLite triggers for any newly created tables
 """
-  def deploy(_cmd) do # flags: %{}, options: %{}, unknown: []}
-
-    # not sure how the path will come in, in options?
-    path = "test/tmp/migrations"
-    sql_file_paths = add_triggers_to_folder(path, @trigger_template)
+  def deploy_migrations(migrations_folder) do
+    sql_file_paths = add_triggers_to_folder(migrations_folder, @trigger_template)
     send_migrations_to_api(sql_file_paths)
-
   end
 
  # ---------- below are private functions but defp is useless for unit testing!

@@ -12,7 +12,7 @@ defmodule MigrationsTest do
             value TEXT PRIMARY KEY
             );
             """
-      assert Electric.Contexts.Migrations.created_table_names(sql) == ["fish"]
+      assert Electric.Migrations.created_table_names(sql) == ["fish"]
     end
 
     test "find create without is exists" do
@@ -21,7 +21,7 @@ defmodule MigrationsTest do
             value TEXT PRIMARY KEY
             );
             """
-      assert Electric.Contexts.Migrations.created_table_names(sql) == ["fish"]
+      assert Electric.Migrations.created_table_names(sql) == ["fish"]
     end
 
     test "find multiple creates" do
@@ -36,13 +36,13 @@ defmodule MigrationsTest do
             value TEXT PRIMARY KEY
             );
             """
-      assert Electric.Contexts.Migrations.created_table_names(sql) == ["fish", "cats"]
+      assert Electric.Migrations.created_table_names(sql) == ["fish", "cats"]
     end
   end
 
   describe "template the triggers" do
     test "template a single name" do
-      assert Electric.Contexts.Migrations.trigger_templated("fish", @trigger_template) == "ADD A TRIGGER FOR fish;"
+      assert Electric.Migrations.trigger_templated("fish", @trigger_template) == "ADD A TRIGGER FOR fish;"
     end
   end
 
@@ -62,7 +62,7 @@ defmodule MigrationsTest do
             ADD A TRIGGER FOR fish;
             """
 
-      assert Electric.Contexts.Migrations.add_triggers_to_sql(sql, @trigger_template) == expected
+      assert Electric.Migrations.add_triggers_to_sql(sql, @trigger_template) == expected
     end
 
         test "add a realistic trigger" do
@@ -114,7 +114,7 @@ VALUES
 END;
 """
 
-      templated = Electric.Contexts.Migrations.add_triggers_to_sql(sql, Electric.Contexts.Migrations.get_template())
+      templated = Electric.Migrations.add_triggers_to_sql(sql, Electric.Migrations.get_template())
 #      IO.puts templated
 
       assert templated == expected
@@ -133,8 +133,8 @@ END;
             );
             ADD A TRIGGER FOR fish;
             """
-      sql = Electric.Contexts.Migrations.add_triggers_to_sql(sql, @trigger_template)
-      assert Electric.Contexts.Migrations.add_triggers_to_sql(sql, @trigger_template) == expected
+      sql = Electric.Migrations.add_triggers_to_sql(sql, @trigger_template)
+      assert Electric.Migrations.add_triggers_to_sql(sql, @trigger_template) == expected
     end
   end
 end
@@ -156,7 +156,7 @@ defmodule MigrationsFileTest do
       path = "test/support/migration.sql"
       tmp_path = "tmp/migration.sql"
       File.copy(path, tmp_path)
-      Electric.Contexts.Migrations.add_triggers_to_file(tmp_path, @trigger_template)
+      Electric.Migrations.add_triggers_to_file(tmp_path, @trigger_template)
       expected = """
             CREATE TABLE IF NOT EXISTS items (
               value TEXT PRIMARY KEY
@@ -172,7 +172,7 @@ defmodule MigrationsFileTest do
       tmp_path = "tmp/migrations/migration.sql"
       File.mkdir("tmp/migrations")
       File.copy(path, tmp_path)
-      Electric.Contexts.Migrations.add_triggers_to_folder("tmp/migrations", @trigger_template)
+      Electric.Migrations.add_triggers_to_folder("tmp/migrations", @trigger_template)
       expected = """
             CREATE TABLE IF NOT EXISTS items (
               value TEXT PRIMARY KEY
@@ -188,8 +188,8 @@ defmodule MigrationsFileTest do
       tmp_path = "tmp/migrations/migration.sql"
       File.mkdir("tmp/migrations")
       File.copy(path, tmp_path)
-      Electric.Contexts.Migrations.add_triggers_to_folder("tmp/migrations", @trigger_template)
-      Electric.Contexts.Migrations.add_triggers_to_folder("tmp/migrations", @trigger_template)
+      Electric.Migrations.add_triggers_to_folder("tmp/migrations", @trigger_template)
+      Electric.Migrations.add_triggers_to_folder("tmp/migrations", @trigger_template)
       expected = """
             CREATE TABLE IF NOT EXISTS items (
               value TEXT PRIMARY KEY
