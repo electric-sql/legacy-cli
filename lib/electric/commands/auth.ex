@@ -118,12 +118,24 @@ defmodule Electric.Commands.Auth do
   # *** Logout ***
 
   def logout(_cmd) do
-    throw(:NotImplemented)
+    case Session.clear() do
+      :ok ->
+        {:success, "Logged out successfully"}
+
+      _ ->
+        {:error, "failed to clear authentication token"}
+    end
   end
 
   # *** Whoami ***
 
   def whoami(_cmd) do
-    throw(:NotImplemented)
+    case Session.get() do
+      %Session.Credentials{email: email} ->
+        {:result, "You are #{email}"}
+
+      nil ->
+        {:error, "you're not logged in"}
+    end
   end
 end

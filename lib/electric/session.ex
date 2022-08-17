@@ -50,7 +50,7 @@ defmodule Electric.Session do
     case File.read(path) do
       {:ok, contents} ->
         contents
-        |> Jason.decode!(keys: :atoms!)
+        |> Jason.decode!()
         |> Credentials.new()
 
       {:error, _reason} ->
