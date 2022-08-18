@@ -16,4 +16,9 @@ defmodule Electric.Util do
     map
     |> Map.put(new_key, value)
   end
+
+  def format_success(message) do
+    [:green, :bright, message, :reset]
+    |> IO.ANSI.format()
+  end
 end

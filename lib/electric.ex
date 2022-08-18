@@ -7,6 +7,7 @@ defmodule Electric do
   require Logger
 
   alias Electric.Commands
+  alias Electric.Util
 
   @env Mix.env()
 
@@ -83,21 +84,23 @@ defmodule Electric do
 
   defp handle_command({:result, data}) do
     data
-    |> IO.inspect()
+    |> Jason.encode_to_iodata!(pretty: true)
+    |> IO.puts()
 
     {:result, data}
   end
 
   defp handle_command({:results, data}) do
     data
-    |> IO.inspect()
+    |> Jason.encode_to_iodata!(pretty: true)
+    |> IO.puts()
 
     {:results, data}
   end
 
   defp handle_command({:success, message}) when is_binary(message) do
     message
-    |> format_success()
+    |> Util.format_success()
     |> IO.puts()
 
     {:success, message}
@@ -120,11 +123,6 @@ defmodule Electric do
       :test -> {:halt, val}
       _ -> System.halt(0)
     end
-  end
-
-  defp format_success(message) do
-    [:green, :bright, message, :reset]
-    |> IO.ANSI.format()
   end
 
   @doc """
