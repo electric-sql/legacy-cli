@@ -140,7 +140,12 @@ defmodule Electric.Commands.Migrations do
   def list(%{args: %{database_id: database_id}}) do
     path = "databases/#{database_id}/migrations"
 
-    case Client.get(path) do
+    result =
+      Progress.run("Listing migrations", false, fn ->
+        Client.get(path)
+      end)
+
+    case result do
       {:ok, %Req.Response{status: 200, body: %{"data" => data}}} ->
         {:results, data}
 
@@ -179,7 +184,12 @@ defmodule Electric.Commands.Migrations do
     data = :NotImplemented
     IO.inspect({:deploy, data, dist_dir})
 
-    case Client.post(path, data) do
+    result =
+      Progress.run("Syncing migrations", false, fn ->
+        Client.post(path, data)
+      end)
+
+    case result do
       {:ok, %Req.Response{status: 200, body: %{"data" => data}}} ->
         {:results, data}
 
