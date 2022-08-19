@@ -4,6 +4,15 @@ defmodule Electric.Commands.Apps do
   """
   use Electric, :command
 
+  @app_id [
+    app_id: [
+      value_name: "APP_ID",
+      help: "App ID (e.g.: from `electric apps list`)",
+      required: true,
+      parser: :string
+    ]
+  ]
+
   def spec do
     [
       name: "apps",
@@ -38,14 +47,24 @@ defmodule Electric.Commands.Apps do
           """,
           flags: default_flags()
         ],
-        open: [
-          name: "open",
-          about: """
-          Open application in your browser.
+        # open: [
+        #   name: "open",
+        #   about: """
+        #   Open application in your browser.
 
-          Open the management console web page for the application in
-          your default browser.
+        #   Open the management console web page for the application in
+        #   your default browser.
+        #   """,
+        #   flags: default_flags()
+        # ],
+        show: [
+          name: "show",
+          about: """
+          Show an application.
+
+          Show informatiom about a specific application.
           """,
+          args: @app_id,
           flags: default_flags()
         ]
         # resume
@@ -64,13 +83,46 @@ defmodule Electric.Commands.Apps do
     throw(:NotImplemented)
   end
 
-  # flags: %{}, options: %{}, unknown: []}
   def list(_cmd) do
-    throw(:NotImplemented)
+    result =
+      Progress.run("Listing apps", false, fn ->
+        Client.get("apps")
+      end)
+
+    case result do
+      {:ok, %Req.Response{status: 200, body: %{"data" => data}}} ->
+        {:results, data}
+
+      {:ok, %Req.Response{}} ->
+        {:error, "invalid credentials"}
+
+      {:error, _exception} ->
+        {:error, "failed to connect"}
+    end
   end
 
-  # flags: %{}, options: %{}, unknown: []}
-  def open(_cmd) do
-    throw(:NotImplemented)
+  # # flags: %{}, options: %{}, unknown: []}
+  # def open(_cmd) do
+  #   throw(:NotImplemented)
+  # end
+
+  def show(%{args: %{app_id: app_id}}) do
+    path = "apps/#{app_id}"
+
+    result =
+      Progress.run("Getting app", false, fn ->
+        Client.get(path)
+      end)
+
+    case result do
+      {:ok, %Req.Response{status: 200, body: %{"data" => data}}} ->
+        {:result, data}
+
+      {:ok, %Req.Response{}} ->
+        {:error, "invalid credentials"}
+
+      {:error, _exception} ->
+        {:error, "failed to connect"}
+    end
   end
 end
