@@ -1,9 +1,7 @@
 defmodule Electric.Migrations do
   @moduledoc """
   The `Migrations` context.
-
   Munges sql migrations and uploads them to the server
-
   """
 
   @migration_file_name "migration.sql"
@@ -13,10 +11,8 @@ defmodule Electric.Migrations do
   @manifest_file_name "manifest.json"
   @bundle_file_name "manifest.bundle.json"
   @js_bundle_file_name "manifest.bundle.js"
-
   @trigger_template EEx.compile_file("lib/electric/triggers.eex")
   @bundle_template EEx.compile_file("lib/electric/bundle_js.eex")
-
 
   @doc """
 Takes a folder which contains sql migration files and adds the SQLite triggers for any newly created tables
