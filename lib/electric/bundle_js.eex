@@ -1,0 +1,3 @@
+const _migrations = <%= migrations %>;
+
+export const migrations = _migrations;

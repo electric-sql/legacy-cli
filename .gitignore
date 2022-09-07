@@ -28,3 +28,6 @@ electric-*.tar
 # Release artefacts
 /dist/
 /electric
+
+# JetBrains project files
+.idea/

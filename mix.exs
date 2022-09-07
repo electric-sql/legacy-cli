@@ -24,14 +24,14 @@ defmodule Electric.MixProject do
 
   defp application(:prod) do
     [
-      extra_applications: [:logger],
+      extra_applications: [:logger, :eex],
       mod: {Electric, []}
     ]
   end
 
   defp application(_) do
     [
-      extra_applications: [:logger]
+      extra_applications: [:logger, :eex]
     ]
   end
 
@@ -47,7 +47,9 @@ defmodule Electric.MixProject do
       {:jason, "~> 1.3.0"},
       {:memoize, "~> 1.4"},
       {:optimus, [git: "git@github.com:thruflo/optimus.git"]},
-      {:req, "~> 0.3.0"}
+      {:req, "~> 0.3.0"},
+      {:exqlite, "~> 0.11.3"},
+      {:uuid, "~> 1.1.8"}
     ]
   end
 
