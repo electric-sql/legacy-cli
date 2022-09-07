@@ -62,7 +62,9 @@ defmodule Electric.Commands.Auth do
   def login(%{args: %{email: email}, options: %{password: password}}) do
     case handle_password(password) do
       {:ok, password} ->
-        perform_login(email, password)
+        Progress.run("Authenticating", fn ->
+          perform_login(email, password)
+        end)
 
       _ ->
         {:error, "failed to read password"}
@@ -90,7 +92,7 @@ defmodule Electric.Commands.Auth do
       }
     }
 
-    case Client.post_json(path, payload) do
+    case Client.post(path, payload) do
       {:ok, %Req.Response{status: 200, body: %{"data" => data}}} ->
         handle_login_response(data)
 
@@ -103,7 +105,10 @@ defmodule Electric.Commands.Auth do
   end
 
   defp handle_login_response(%{"email" => email} = data) do
-    case Session.set(data) do
+    data
+    |> Util.rename_map_key("refreshToken", "refresh_token")
+    |> Session.set()
+    |> case do
       :ok ->
         {:success, "Logged in successfully as #{email}"}
 
@@ -115,12 +120,24 @@ defmodule Electric.Commands.Auth do
   # *** Logout ***
 
   def logout(_cmd) do
-    throw(:NotImplemented)
+    case Session.clear() do
+      :ok ->
+        {:success, "Logged out successfully"}
+
+      _ ->
+        {:error, "failed to clear authentication token"}
+    end
   end
 
   # *** Whoami ***
 
   def whoami(_cmd) do
-    throw(:NotImplemented)
+    case Session.get() do
+      %Session.Credentials{email: email} ->
+        {:result, "You are #{email}"}
+
+      nil ->
+        {:error, "you're not logged in"}
+    end
   end
 end

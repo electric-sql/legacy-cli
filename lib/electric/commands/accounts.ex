@@ -14,8 +14,7 @@ defmodule Electric.Commands.Accounts do
           about: """
           List your accounts.
 
-          List all the accounts that the currently logged-in user
-          is a member of.
+          List all the accounts that you're a member of.
           """,
           flags: default_flags()
         ]
@@ -23,8 +22,21 @@ defmodule Electric.Commands.Accounts do
     ]
   end
 
-  # flags: %{}, options: %{}, unknown: []}
   def list(_cmd) do
-    throw(:NotImplemented)
+    result =
+      Progress.run("Listing accounts", false, fn ->
+        Client.get("accounts")
+      end)
+
+    case result do
+      {:ok, %Req.Response{status: 200, body: %{"data" => data}}} ->
+        {:results, data}
+
+      {:ok, %Req.Response{}} ->
+        {:error, "invalid credentials"}
+
+      {:error, _exception} ->
+        {:error, "failed to connect"}
+    end
   end
 end

@@ -39,11 +39,13 @@ defmodule Electric.MixProject do
   defp deps do
     [
       {:bakeware, "~> 0.2.4", runtime: false},
+      {:cli_spinners, [git: "git@github.com:thruflo/elixir_cli_spinners.git"]},
       {:dialyxir, "~> 1.0", only: :dev, runtime: false},
       {:ex_doc, "~> 0.28", only: :dev, runtime: false},
       {:exconstructor, "~> 1.2.6"},
       {:git_hooks, "== 0.6.5", only: :dev, runtime: false},
       {:jason, "~> 1.3.0"},
+      {:memoize, "~> 1.4"},
       {:optimus, [git: "git@github.com:thruflo/optimus.git"]},
       {:req, "~> 0.3.0"},
       {:exqlite, "~> 0.11.3"},
