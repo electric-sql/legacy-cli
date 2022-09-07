@@ -62,7 +62,7 @@ defmodule MigrationsTest do
             );
             """
       expected = """
-            CREATE TABLE IF NOT EXISTS main.fish (
+            CREATE TABLE IF NOT EXISTS fish (
             value TEXT PRIMARY KEY
             );
             --ADD A TRIGGER FOR main.fish;
@@ -475,6 +475,157 @@ defmodule MigrationsFileTest do
      Path.join(["tmp", UUID.uuid4()])
   end
 
+
+  describe "api tests" do
+    test "tests can init" do
+
+      temp = temp_folder()
+      migrations_path = Path.join([temp, "migrations"])
+      {:ok, _msg} = Electric.Migrations.init_migrations(dir: temp)
+      assert File.exists?(migrations_path)
+
+    end
+
+    test "init and then modify and then build" do
+      temp = temp_folder()
+      migrations_path = Path.join([temp, "migrations"])
+      {:ok, _msg} = Electric.Migrations.init_migrations(dir: temp)
+      assert File.exists?(migrations_path)
+
+      sql_file_paths = Path.join([migrations_path, "*", "migration.sql"]) |> Path.wildcard()
+      my_new_migration = List.first(sql_file_paths)
+      migration_folder = Path.dirname(my_new_migration)
+
+      new_content = """
+      CREATE TABLE IF NOT EXISTS items (
+        value TEXT PRIMARY KEY
+      );
+      """
+
+      File.write!(my_new_migration, new_content, [:append])
+      {:ok, _msg} = Electric.Migrations.build_migrations(migrations: migrations_path)
+      assert File.exists?(Path.join([migration_folder, "satellite.sql"]))
+    end
+
+    test "init and then modify and then add and then build" do
+      temp = temp_folder()
+      migrations_path = Path.join([temp, "migrations"])
+      {:ok, _msg} = Electric.Migrations.init_migrations(dir: temp)
+      assert File.exists?(migrations_path)
+
+      sql_file_paths = Path.join([migrations_path, "*", "migration.sql"]) |> Path.wildcard()
+      my_new_migration = List.first(sql_file_paths)
+#      migration_folder = Path.dirname(my_new_migration)
+
+      new_content = """
+      CREATE TABLE IF NOT EXISTS items (
+        value TEXT PRIMARY KEY
+      );
+      """
+
+      File.write!(my_new_migration, new_content, [:append])
+
+      Process.sleep(1000)
+
+      {:ok, _msg} = Electric.Migrations.new_migration("another", migrations: migrations_path)
+
+      cats_content = """
+      CREATE TABLE IF NOT EXISTS cats (
+        value TEXT PRIMARY KEY
+      );
+      """
+
+      sql_file_paths = Path.join([migrations_path, "*", "migration.sql"]) |> Path.wildcard()
+      assert length(sql_file_paths) == 2
+      second_migration = List.last(sql_file_paths)
+      second_migration_folder = Path.dirname(second_migration)
+
+      File.write!(second_migration, cats_content, [:append])
+
+      {:ok, _msg} = Electric.Migrations.build_migrations(migrations: migrations_path)
+      assert File.exists?(Path.join([second_migration_folder, "satellite.sql"]))
+    end
+
+    test "test can build with manifest" do
+      temp = temp_folder()
+      migrations_path = Path.join([temp, "migrations"])
+      {:ok, _msg} = Electric.Migrations.init_migrations(dir: temp)
+      assert File.exists?(migrations_path)
+
+      sql_file_paths = Path.join([migrations_path, "*", "migration.sql"]) |> Path.wildcard()
+      my_new_migration = List.first(sql_file_paths)
+#      migration_folder = Path.dirname(my_new_migration)
+
+      new_content = """
+      CREATE TABLE IF NOT EXISTS items (
+        value TEXT PRIMARY KEY
+      );
+      """
+
+      File.write!(my_new_migration, new_content, [:append])
+
+      Process.sleep(1000)
+
+      {:ok, _msg} = Electric.Migrations.new_migration("another", migrations: migrations_path, manifest: true)
+
+      cats_content = """
+      CREATE TABLE IF NOT EXISTS cats (
+        value TEXT PRIMARY KEY
+      );
+      """
+
+      sql_file_paths = Path.join([migrations_path, "*", "migration.sql"]) |> Path.wildcard()
+      assert length(sql_file_paths) == 2
+      second_migration = List.last(sql_file_paths)
+#      second_migration_folder = Path.dirname(second_migration)
+
+      File.write!(second_migration, cats_content, [:append])
+
+      {:ok, _msg} = Electric.Migrations.build_migrations(migrations: migrations_path, manifest: true)
+      assert File.exists?(Path.join([migrations_path, "manifest.json"]))
+    end
+
+    test "test can build with bundle" do
+      temp = temp_folder()
+      migrations_path = Path.join([temp, "migrations"])
+      {:ok, _msg} = Electric.Migrations.init_migrations(dir: temp)
+      assert File.exists?(migrations_path)
+
+      sql_file_paths = Path.join([migrations_path, "*", "migration.sql"]) |> Path.wildcard()
+      my_new_migration = List.first(sql_file_paths)
+#      migration_folder = Path.dirname(my_new_migration)
+
+      new_content = """
+      CREATE TABLE IF NOT EXISTS items (
+        value TEXT PRIMARY KEY
+      );
+      """
+
+      File.write!(my_new_migration, new_content, [:append])
+
+      Process.sleep(1000)
+
+      {:ok, _msg} = Electric.Migrations.new_migration("another", migrations: migrations_path, js_bundle: true)
+
+      cats_content = """
+      CREATE TABLE IF NOT EXISTS cats (
+        value TEXT PRIMARY KEY
+      );
+      """
+
+      sql_file_paths = Path.join([migrations_path, "*", "migration.sql"]) |> Path.wildcard()
+      assert length(sql_file_paths) == 2
+      second_migration = List.last(sql_file_paths)
+#      second_migration_folder = Path.dirname(second_migration)
+
+      File.write!(second_migration, cats_content, [:append])
+
+      {:ok, _msg} = Electric.Migrations.build_migrations(migrations: migrations_path, js_bundle: true)
+      assert File.exists?(Path.join([migrations_path, "manifest.bundle.js"]))
+    end
+  end
+
+
   describe "adds_triggers to sql files" do
     test "add a trigger to a sql file" do
       path = "test/support/migration.sql"
@@ -493,14 +644,14 @@ defmodule MigrationsFileTest do
 
       {:ok, migration} = File.read(migration_file_path)
 
-      Electric.Migrations.add_triggers_to_migration_folder(migration_folder, [migration], @trigger_template)
+      Electric.Migrations.add_triggers_to_migration_folder([migration_folder], [migration], @trigger_template)
 
       expected = """
       /*
       ElectricDB Migration
-      {"metadata": {"name": "#{migration_name}", "sha256": "dbaef4e408811b090f22375599cc14553b806c61d3d0788a1f36a2bc2c956a20"}}
+      {"metadata": {"name": "#{migration_name}", "sha256": "7aeaa635b94e7def04a4f9dc5ac730353d4c45cf65aa2574cee58e1154d3ed43"}}
       */
-      CREATE TABLE IF NOT EXISTS main.items (
+      CREATE TABLE IF NOT EXISTS items (
         value TEXT PRIMARY KEY
       );
       --ADD A TRIGGER FOR main.items;
@@ -524,14 +675,14 @@ defmodule MigrationsFileTest do
 
       dst_file_path = Path.join([migration_folder, "satellite.sql"])
 
-      Electric.Migrations.add_triggers(migrations_folder, @trigger_template)
+      Electric.Migrations.build_migrations(migrations: migrations_folder, template: @trigger_template)
 
       expected = """
       /*
       ElectricDB Migration
-      {"metadata": {"name": "#{migration_name}", "sha256": "dbaef4e408811b090f22375599cc14553b806c61d3d0788a1f36a2bc2c956a20"}}
+      {"metadata": {"name": "#{migration_name}", "sha256": "7aeaa635b94e7def04a4f9dc5ac730353d4c45cf65aa2574cee58e1154d3ed43"}}
       */
-      CREATE TABLE IF NOT EXISTS main.items (
+      CREATE TABLE IF NOT EXISTS items (
         value TEXT PRIMARY KEY
       );
       --ADD A TRIGGER FOR main.items;
@@ -597,7 +748,7 @@ defmodule MigrationsFileTest do
 
       bundle_path =  Path.join([migrations_folder, "manifest.bundle.json"])
 
-      Electric.Migrations.add_triggers(migrations_folder, @trigger_template)
+      Electric.Migrations.build_migrations(migrations: migrations_folder, template: @trigger_template)
       Electric.Migrations.write_bundle(migrations_folder)
 
       bundle = Jason.decode!(File.read!(bundle_path))
@@ -606,11 +757,11 @@ defmodule MigrationsFileTest do
       expected =  %{
          "migrations" => [
            %{
-             "body" => "/*\nElectricDB Migration\n{\"metadata\": {\"name\": \"#{migration_name}\", \"sha256\": \"dbaef4e408811b090f22375599cc14553b806c61d3d0788a1f36a2bc2c956a20\"}}\n*/\nCREATE TABLE IF NOT EXISTS main.items (\n  value TEXT PRIMARY KEY\n);\n--ADD A TRIGGER FOR main.items;\n",
+             "body" => "/*\nElectricDB Migration\n{\"metadata\": {\"name\": \"#{migration_name}\", \"sha256\": \"7aeaa635b94e7def04a4f9dc5ac730353d4c45cf65aa2574cee58e1154d3ed43\"}}\n*/\nCREATE TABLE IF NOT EXISTS items (\n  value TEXT PRIMARY KEY\n);\n--ADD A TRIGGER FOR main.items;\n",
              "name" => migration_name
            },
            %{
-             "body" => "/*\nElectricDB Migration\n{\"metadata\": {\"name\": \"#{migration_name_2}\", \"sha256\": \"46d68acde8a4fdef52ac0dfa6d4555acece4404b8a79270458fb67267eb645c5\"}}\n*/\nCREATE TABLE IF NOT EXISTS main.cat (\n  value TEXT PRIMARY KEY\n);\n--ADD A TRIGGER FOR main.cat;\n\n--ADD A TRIGGER FOR main.items;\n",
+             "body" => "/*\nElectricDB Migration\n{\"metadata\": {\"name\": \"#{migration_name_2}\", \"sha256\": \"91353ac3e9e6a4c724e99908e5d7d29267144a0b397fc7c33c5ab35ca292ecb9\"}}\n*/\nCREATE TABLE IF NOT EXISTS cat (\n  value TEXT PRIMARY KEY\n);\n--ADD A TRIGGER FOR main.cat;\n\n--ADD A TRIGGER FOR main.items;\n",
              "name" => migration_name_2
            }
          ]
@@ -647,7 +798,9 @@ defmodule MigrationsFileTest do
 
       bundle_path =  Path.join([migrations_folder, "manifest.bundle.js"])
 
-      Electric.Migrations.add_triggers(migrations_folder, @trigger_template)
+      _result = Electric.Migrations.build_migrations(migrations: migrations_folder, template: @trigger_template)
+#      IO.puts("wtf")
+#      IO.inspect(result)
       Electric.Migrations.write_js_bundle(migrations_folder)
 
 #      bundle = File.read!(bundle_path)

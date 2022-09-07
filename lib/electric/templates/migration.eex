@@ -1,0 +1,4 @@
+/*
+ElectricDB Migration
+{"metadata": {"title": "<%= title %>", "name": "<%= name %>"}}
+*/

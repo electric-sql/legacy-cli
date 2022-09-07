@@ -11,34 +11,117 @@ defmodule Electric.Migrations do
   @manifest_file_name "manifest.json"
   @bundle_file_name "manifest.bundle.json"
   @js_bundle_file_name "manifest.bundle.js"
-  @trigger_template EEx.compile_file("lib/electric/triggers.eex")
-  @bundle_template EEx.compile_file("lib/electric/bundle_js.eex")
+  @migration_template EEx.compile_file("lib/electric/templates/migration.eex")
+  @satellite_template EEx.compile_file("lib/electric/templates/triggers.eex")
+  @bundle_template EEx.compile_file("lib/electric/templates/bundle_js.eex")
+
+
 
   @doc """
-Takes a folder which contains sql migration files and adds the SQLite triggers for any newly created tables
-"""
-  def build_migrations(_src_folder) do
+  Creates the migrations folder and adds in initial migration to it.
+  optional argument:
+  - :dir where to create the migration rather than the current working directory
+  """
+  def init_migrations(opts \\ []) do
+    migrations_folder = case root_directory = Keyword.get(opts, :dir) do
+      nil -> "migrations"
+      _ -> Path.join(root_directory, "migrations")
+    end
+
+    if File.exists?(migrations_folder) do
+      {:error, "Migrations folder at #{migrations_folder} already exists."}
+    else
+      File.mkdir_p!(migrations_folder)
+      case add_migration(migrations_folder, "init") do
+        {:ok, _} -> {:ok, "Your migrations folder with an initial migration has been created"}
+        {:error, msg} -> {:error, msg}
+      end
+    end
+  end
+
+  @doc """
+  Adds a new migration to the existing set of migrations.
+  optional arguments:
+  - :migrations a folder of migrations to add too if not using one in the cwd, must be called "migrations"
+  """
+  def new_migration(migration_name, opts \\ []) do
+    case check_migrations_folder(opts) do
+      {:ok, migrations_folder} ->
+        add_migration(migrations_folder, migration_name)
+      {:error, msg} -> {:error, msg}
+    end
+  end
+
+  @doc """
+  For every migration in the migrations folder creates a new file called satellite.sql, which is a copy of migration.sql
+  but with all the triggers added for the schema up to this point
+  optional arguments:
+  - :migrations a folder of migrations to add too if not using one in the cwd, must be called "migrations"
+  - :manifest will also create a file called manifest.json in the migrations folder listing all migrations
+  - :js_bundle will also create a manifest.bundle.js file in the migrations folder which exports a js object containing all the migrations
+  """
+  def build_migrations(opts \\ []) do
+    case check_migrations_folder(opts) do
+      {:ok, migrations_folder} ->
+        template = Keyword.get(opts, :template, @satellite_template)
+        ordered_migration_paths(migrations_folder) |> add_triggers_to_migrations(template)
+        if Keyword.get(opts, :manifest) != nil do
+          write_manifest(migrations_folder)
+        end
+        if Keyword.get(opts, :js_bundle) != nil do
+          write_js_bundle(migrations_folder)
+        end
+        {:ok, "Migrations built"}
+      {:error, msg} -> {:error, msg}
+    end
+  end
+
+  @doc """
+  Does nothing yet
+  """
+  def sync_migrations(_db, opts \\ []) do
 
   end
 
-  def send_migrations_to_api(_sql_file_paths) do
-    throw :NotImplemented
+
+  defp check_migrations_folder(opts \\ []) do
+#    IO.inspect(opts)
+    migrations_folder = Keyword.get(opts, :migrations, "migrations")
+#    IO.inspect(migrations_folder)
+    if !File.exists?(migrations_folder) do
+      {:error, "Couldn't find the migrations folder at #{migrations_folder}"}
+    else
+      if Path.basename(migrations_folder) == "migrations" do
+        {:ok, migrations_folder}
+      else
+        {:error, "The migrations folder must be called \"migrations\""}
+      end
+    end
+  end
+
+  defp add_migration(migrations_folder, migration_title) do
+    name = String.downcase(migration_title) |> String.replace(~r/[\/\*"\\\[\]:\;\|,\.]/, "_") |> String.slice(0..40)
+    ts = System.os_time(:second)
+    migration_name = "#{ts}_#{name}"
+    migration_folder = Path.join(migrations_folder, migration_name)
+    File.mkdir_p!(migration_folder)
+
+    {body, _bindings} = Code.eval_quoted(@migration_template,
+      title: migration_title,
+      name: migration_name)
+
+    migration_file_path = Path.join([migration_folder, @migration_file_name])
+    File.write!(migration_file_path, body)
+    {:ok, "Migration file created at #{migration_file_path}"}
   end
 
   def get_template() do
-    @trigger_template
+    @satellite_template
   end
 
-  @doc """
-  Takes a folder which contains sql migration files and adds the SQLite triggers for any newly created tables.
-  """
-  def add_triggers(src_folder, template) do
-    ordered_migration_paths(src_folder) |> add_triggers_to_migrations(template)
-  end
 
-  @doc """
-  Writes a json manifest file in the migrations root folder listing all the migration names
-  """
+
+  @doc false
   def write_manifest(src_folder) do
     manifest_path = Path.join(src_folder, @manifest_file_name)
     migration_names = for migration_folder <- ordered_migration_paths(src_folder) do
@@ -51,9 +134,7 @@ Takes a folder which contains sql migration files and adds the SQLite triggers f
     File.write(manifest_path, manifest)
   end
 
-  @doc """
-  Writes a json bundle file in the migrations root folder listing all the migrations and giving their content
-  """
+  @doc false
   def write_bundle(src_folder) do
     migrations = create_bundle(src_folder)
     bundle_path = Path.join(src_folder, @bundle_file_name)
@@ -63,10 +144,7 @@ Takes a folder which contains sql migration files and adds the SQLite triggers f
     File.write(bundle_path, migrations)
   end
 
-  @doc """
-  Writes a js bundle file in the migrations root folder listing all the migrations and giving their content.
-  Exports the migrations bundle as a js object called "migrations"
-  """
+  @doc false
   def write_js_bundle(src_folder) do
     migrations = create_bundle(src_folder)
     {result, _bindings} = Code.eval_quoted(@bundle_template, migrations: migrations)
@@ -107,23 +185,40 @@ Takes a folder which contains sql migration files and adds the SQLite triggers f
   defp get_metadata(file_path) do
     case File.read(file_path) do
         {:ok, body} ->
-          regex = ~r/ElectricDB Migration[\s]*(.*?)[\s]*\*/
-          matches = Regex.run(regex, body)
-          case Jason.decode(List.last(matches)) do
-            {:ok, metadata} -> metadata
-            {:error, reason} -> {:error, reason}
-          end
+          get_body_metadata(body)
         {:error, reason} -> {:error, reason}
     end
   end
 
-  defp file_header(hash, name) do
-    """
-    /*
-    ElectricDB Migration
-    {"metadata": {"name": "#{name}", "sha256": "#{hash}"}}
-    */
-    """
+  defp get_body_metadata(body) do
+    regex = ~r/ElectricDB Migration[\s]*(.*?)[\s]*\*/
+    matches = Regex.run(regex, body)
+    if matches == nil do
+      {:error, "no header"}
+    else
+       case Jason.decode(List.last(matches)) do
+        {:ok, metadata} -> metadata
+        {:error, reason} -> {:error, reason}
+      end
+    end
+  end
+
+  defp file_header(hash, name, title) do
+
+    case title do
+      nil ->"""
+        /*
+        ElectricDB Migration
+        {"metadata": {"name": "#{name}", "sha256": "#{hash}"}}
+        */
+        """
+      _ ->"""
+        /*
+        ElectricDB Migration
+        {"metadata": {"title": "#{title}", "name": "#{name}", "sha256": "#{hash}"}}
+        */
+        """
+    end
   end
 
   defp add_triggers_to_migrations(ordered_migration_paths, template) do
@@ -143,8 +238,9 @@ Takes a folder which contains sql migration files and adds the SQLite triggers f
       # needs to fail early so has to start at the first migration and go through
       for {migration_folder_path, i} <- Enum.with_index(ordered_migration_paths) do
         subset_of_migrations = Enum.take(ordered_migrations, i + 1)
+        subset_of_migration_folders = Enum.take(ordered_migration_paths, i + 1)
         # this is using a migration file path and all the migrations up to, an including this migration
-        case add_triggers_to_migration_folder(migration_folder_path, subset_of_migrations, template) do
+        case add_triggers_to_migration_folder(subset_of_migration_folders, subset_of_migrations, template) do
           :ok -> :ok
           {:error, reason} -> throw({:error, reason})
         end
@@ -155,42 +251,44 @@ Takes a folder which contains sql migration files and adds the SQLite triggers f
   end
 
   @doc false
-  def add_triggers_to_migration_folder(migration_folder_path, ordered_migrations, template) do
+  def add_triggers_to_migration_folder(ordered_folder_paths, ordered_migrations, template) do
+
+    migration_folder_path = List.last(ordered_folder_paths)
     migration_name = Path.basename(migration_folder_path)
 #    migration_file_path = Path.join(migration_folder_path, @migration_file_name)
     satellite_file_path = Path.join(migration_folder_path, @satellite_file_name)
 #    postgres_file_path = Path.join(migration_folder_path, @postgre_file_name)
-    publish_lock_file_path = Path.join(migration_folder_path, @publish_lock_file_name)
 
     with_triggers = add_triggers_to_last_migration(ordered_migrations, template)
-    hash = calc_hash(with_triggers)
 
-    # firstly check to see if this source migration file has already been published
-    if File.exists?(publish_lock_file_path) do
+    migration_fingerprint = if length(ordered_migrations) > 1 do
+        previous_satellite_migration_file_path = Path.join(Enum.at(ordered_folder_paths, -2), @satellite_file_name)
+        previous_metadata = get_metadata(previous_satellite_migration_file_path)
+        "#{with_triggers}#{previous_metadata["sha256"]}"
+      else
+        with_triggers
+    end
+
+    hash = calc_hash(migration_fingerprint)
+
+    if File.exists?(satellite_file_path) do
       metadata = get_metadata(satellite_file_path)
       if metadata["sha256"] == hash do
         # if matches then its a happy no-op
         :ok
       else
-        # If a published file has been modified this is an error state and so fail. TODO Need to think what remedy is for dev
-        {:error, "Migration #{migration_name} has already been published and cannot be changed"}
+        {:error, "Built migration #{migration_name} already exists locally use \"migrations build -f\" to overwrite it"}
       end
     else
-      # otherwise check for the unpublished, but already decorated one
-      if File.exists?(satellite_file_path) do
-        metadata = get_metadata(satellite_file_path)
-        if metadata["sha256"] == hash do
-          # if matches then its a happy no-op
-          :ok
-        else
-          # if it exists but doesnt match fail and offer the dev to force it. TODO Need to think what remedy is for dev
-          {:error, "Migration #{migration_name} already exists locally if you would like to overwrite it ..."}
-        end
-      else
-        # if neither file already exists go ahead and write it
-        header = file_header(hash, migration_name)
-        File.write(satellite_file_path, header <> with_triggers)
+      # if neither file already exists go ahead and write it
+      header = case get_body_metadata(List.last(ordered_migrations)) do
+        {:error, reason} ->
+          file_header(hash, migration_name, nil)
+        existing_metadata ->
+          file_header(hash, migration_name, existing_metadata["metadata"]["title"])
       end
+      File.write!(satellite_file_path, header <> with_triggers)
+      :ok
     end
   end
 
@@ -270,7 +368,9 @@ Takes a folder which contains sql migration files and adds the SQLite triggers f
 
   @doc false
   def template_all_the_things(original_sql, tables, template) do
-    patched_sql = Enum.reduce(tables, original_sql, fn {table_full_name, table}, acc -> String.replace(acc, " #{table.table_name} ", " #{table_full_name} ") end)
+    ## strip the old header
+    patched_sql = String.replace(original_sql, ~r/\A\/\*((?s).*)\*\/\n/, "")
+    ## template
     {result, _bindings} = Code.eval_quoted(template,
       is_init: true,
       original_sql: patched_sql,
