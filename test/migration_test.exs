@@ -151,8 +151,8 @@ defmodule MigrationsTest do
       --initialisation of the metadata table
       INSERT INTO _satellite_meta(key,value) VALUES ('currRowId', '-1'), ('ackRowId','-1'), ('compensations', 0);
 
-      -- These are toggles for turning the triggers on and off
 
+      -- These are toggles for turning the triggers on and off
       DROP TABLE IF EXISTS trigger_settings;
       CREATE TABLE trigger_settings(tablename STRING PRIMARY KEY, flag INTEGER);
       INSERT INTO trigger_settings(tablename,flag) VALUES ('main.cats', 1);
@@ -417,15 +417,21 @@ defmodule MigrationsTest do
       ADD COLUMN colour TEXT;
       """
 
-      sql_out =
+      sql_out1 =
+        Electric.Migrations.add_triggers_to_last_migration(
+          [sql1],
+          Electric.Migrations.get_template()
+        )
+
+      sql_out2 =
         Electric.Migrations.add_triggers_to_last_migration(
           [sql1, sql2],
           Electric.Migrations.get_template()
         )
 
       {:ok, conn} = Exqlite.Sqlite3.open(":memory:")
-      :ok = Exqlite.Sqlite3.execute(conn, sql1)
-      :ok = Exqlite.Sqlite3.execute(conn, sql_out)
+      :ok = Exqlite.Sqlite3.execute(conn, sql_out1)
+      :ok = Exqlite.Sqlite3.execute(conn, sql_out2)
 
       #        IO.puts(sql_out)
 
@@ -636,7 +642,7 @@ defmodule MigrationsFileTest do
       {:success, _msg} =
         Electric.Migrations.build_migrations(%{:bundle => true}, %{:migrations => migrations_path})
 
-      assert File.exists?(Path.join([migrations_path, "manifest.bundle.js"]))
+      assert File.exists?(Path.join([migrations_path, "index.js"]))
     end
 
     test "test build warning" do
@@ -851,7 +857,7 @@ defmodule MigrationsFileTest do
       File.copy(path, migration_file_path)
       File.copy(path_2, migration_file_path_2)
 
-      bundle_path = Path.join([migrations_folder, "manifest.bundle.js"])
+      bundle_path = Path.join([migrations_folder, "index.js"])
 
       _result =
         Electric.Migrations.build_migrations(

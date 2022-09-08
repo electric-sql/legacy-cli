@@ -8,7 +8,7 @@ defmodule Electric.Migrations do
   @satellite_file_name "satellite.sql"
   @manifest_file_name "manifest.json"
   @bundle_file_name "manifest.bundle.json"
-  @js_bundle_file_name "manifest.bundle.js"
+  @js_bundle_file_name "index.js"
   @migration_template EEx.compile_file("lib/electric/templates/migration.eex")
   @satellite_template EEx.compile_file("lib/electric/templates/triggers.eex")
   @bundle_template EEx.compile_file("lib/electric/templates/bundle_js.eex")
@@ -72,7 +72,7 @@ defmodule Electric.Migrations do
   - :migrations a folder of migrations to add too if not using one in the cwd, must be called "migrations"
   flags:
   - :manifest will also create a file called manifest.json in the migrations folder listing all migrations
-  - :bundle will also create a manifest.bundle.js file in the migrations folder which exports a js object containing all the migrations
+  - :bundle will also create a index.js file in the migrations folder which exports a js object containing all the migrations
   """
   def build_migrations(flags, options) do
     case check_migrations_folder(options) do
