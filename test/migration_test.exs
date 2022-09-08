@@ -131,7 +131,7 @@ defmodule MigrationsTest do
       ---------------------------------------------*/
 
       -- The ops log table
-      CREATE TABLE IF NOT EXISTS _oplog (
+      CREATE TABLE IF NOT EXISTS _electric_oplog (
         rowid INTEGER PRIMARY KEY AUTOINCREMENT,
         namespace String NOT NULL,
         tablename String NOT NULL,
@@ -143,13 +143,13 @@ defmodule MigrationsTest do
       );
 
       -- Somewhere to keep our metadata
-      CREATE TABLE IF NOT EXISTS _satellite_meta (
+      CREATE TABLE IF NOT EXISTS _electric_meta (
         key TEXT,
         value TEXT
       );
 
       --initialisation of the metadata table
-      INSERT INTO _satellite_meta(key,value) VALUES ('currRowId', '-1'), ('ackRowId','-1'), ('compensations', 0);
+      INSERT INTO _electric_meta(key,value) VALUES ('currRowId', '-1'), ('ackRowId','-1'), ('compensations', 0);
 
 
       -- These are toggles for turning the triggers on and off
@@ -180,7 +180,7 @@ defmodule MigrationsTest do
          AFTER INSERT ON main.cats
          WHEN 1 == (SELECT flag from trigger_settings WHERE tablename == 'main.cats')
       BEGIN
-        INSERT INTO _oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)
+        INSERT INTO _electric_oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)
         VALUES ('main', 'cats', 'INSERT', json_object('id', new.id), json_object('id', new.id, 'name', new.name, 'favourite', new.favourite), NULL, NULL);
       END;
 
@@ -189,7 +189,7 @@ defmodule MigrationsTest do
          AFTER UPDATE ON main.cats
          WHEN 1 == (SELECT flag from trigger_settings WHERE tablename == 'main.cats')
       BEGIN
-        INSERT INTO _oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)
+        INSERT INTO _electric_oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)
         VALUES ('main', 'cats', 'UPDATE', json_object('id', new.id), json_object('id', new.id, 'name', new.name, 'favourite', new.favourite), json_object('id', old.id, 'name', old.name, 'favourite', old.favourite), NULL);
       END;
 
@@ -198,7 +198,7 @@ defmodule MigrationsTest do
          AFTER DELETE ON main.cats
          WHEN 1 == (SELECT flag from trigger_settings WHERE tablename == 'main.cats')
       BEGIN
-        INSERT INTO _oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)
+        INSERT INTO _electric_oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)
         VALUES ('main', 'cats', 'DELETE', json_object('id', old.id), NULL, json_object('id', old.id, 'name', old.name, 'favourite', old.favourite), NULL);
       END;
 
@@ -208,9 +208,9 @@ defmodule MigrationsTest do
       CREATE TRIGGER compensation_insert_main_cats_favourite_into_oplog
          AFTER INSERT ON main.cats
          WHEN 1 == (SELECT flag from trigger_settings WHERE tablename == 'main.fish') AND
-              1 == (SELECT value from _satellite_meta WHERE key == 'compensations')
+              1 == (SELECT value from _electric_meta WHERE key == 'compensations')
       BEGIN
-        INSERT INTO _oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)
+        INSERT INTO _electric_oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)
         SELECT 'main', 'fish', 'UPDATE', json_object('id', id, 'colour', colour), json_object('id', id, 'colour', colour), NULL, NULL
         FROM main.fish WHERE id = new.favourite;
       END;
@@ -219,9 +219,9 @@ defmodule MigrationsTest do
       CREATE TRIGGER compensation_update_main_cats_favourite_into_oplog
          AFTER UPDATE ON main.cats
          WHEN 1 == (SELECT flag from trigger_settings WHERE tablename == 'main.fish') AND
-              1 == (SELECT value from _satellite_meta WHERE key == 'compensations')
+              1 == (SELECT value from _electric_meta WHERE key == 'compensations')
       BEGIN
-        INSERT INTO _oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)
+        INSERT INTO _electric_oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)
         SELECT 'main', 'fish', 'UPDATE', json_object('id', id, 'colour', colour), json_object('id', id, 'colour', colour), NULL, NULL
         FROM main.fish WHERE id = new.favourite;
       END;
@@ -250,7 +250,7 @@ defmodule MigrationsTest do
          AFTER INSERT ON main.fish
          WHEN 1 == (SELECT flag from trigger_settings WHERE tablename == 'main.fish')
       BEGIN
-        INSERT INTO _oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)
+        INSERT INTO _electric_oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)
         VALUES ('main', 'fish', 'INSERT', json_object('id', new.id, 'colour', new.colour), json_object('id', new.id, 'colour', new.colour), NULL, NULL);
       END;
 
@@ -259,7 +259,7 @@ defmodule MigrationsTest do
          AFTER UPDATE ON main.fish
          WHEN 1 == (SELECT flag from trigger_settings WHERE tablename == 'main.fish')
       BEGIN
-        INSERT INTO _oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)
+        INSERT INTO _electric_oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)
         VALUES ('main', 'fish', 'UPDATE', json_object('id', new.id, 'colour', new.colour), json_object('id', new.id, 'colour', new.colour), json_object('id', old.id, 'colour', old.colour), NULL);
       END;
 
@@ -268,9 +268,9 @@ defmodule MigrationsTest do
          AFTER DELETE ON main.fish
          WHEN 1 == (SELECT flag from trigger_settings WHERE tablename == 'main.fish')
       BEGIN
-        INSERT INTO _oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)
+        INSERT INTO _electric_oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)
         VALUES ('main', 'fish', 'DELETE', json_object('id', old.id, 'colour', old.colour), NULL, json_object('id', old.id, 'colour', old.colour), NULL);
-      END;\n\n\n
+      END;\n\n\n\n
       """
 
       assert templated == expected
@@ -301,8 +301,8 @@ defmodule MigrationsTest do
 
       assert MapSet.new(names) ==
                MapSet.new([
-                 "_oplog",
-                 "_satellite_meta",
+                 "_electric_oplog",
+                 "_electric_meta",
                  "fish",
                  "sqlite_sequence",
                  "trigger_settings"
@@ -346,7 +346,7 @@ defmodule MigrationsTest do
       ## adding a fish
       :ok = Exqlite.Sqlite3.execute(conn, "insert into fish (value) values ('abcdefg')")
 
-      {:ok, statement} = Exqlite.Sqlite3.prepare(conn, "SELECT * FROM _oplog;")
+      {:ok, statement} = Exqlite.Sqlite3.prepare(conn, "SELECT * FROM _electric_oplog;")
       ops = get_while_more(conn, statement, [])
 
       [_rowid, _namespace, tablename, optype, primaryKey, newRow, oldRow, _timestamp] =
@@ -383,7 +383,7 @@ defmodule MigrationsTest do
           "insert into fish (value, colour) values ('abcdefg', 'red')"
         )
 
-      {:ok, statement} = Exqlite.Sqlite3.prepare(conn, "SELECT * FROM _oplog;")
+      {:ok, statement} = Exqlite.Sqlite3.prepare(conn, "SELECT * FROM _electric_oplog;")
       ops = get_while_more(conn, statement, [])
       #        IO.puts(ops)
 
@@ -442,7 +442,7 @@ defmodule MigrationsTest do
           "insert into fish (value, colour) values ('abcdefg', 'red')"
         )
 
-      {:ok, statement} = Exqlite.Sqlite3.prepare(conn, "SELECT * FROM _oplog;")
+      {:ok, statement} = Exqlite.Sqlite3.prepare(conn, "SELECT * FROM _electric_oplog;")
       ops = get_while_more(conn, statement, [])
       #        IO.puts(ops)
 

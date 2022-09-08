@@ -382,7 +382,7 @@ defmodule Electric.Migrations do
     {:ok, statement} =
       Exqlite.Sqlite3.prepare(
         conn,
-        "SELECT name, sql FROM sqlite_master WHERE type='table' AND name!='_oplog';"
+        "SELECT name, sql FROM sqlite_master WHERE type='table' AND name!='_electric_oplog';"
       )
 
     info = get_rows_while(conn, statement, [])
