@@ -18,9 +18,9 @@ defmodule Electric.Migrations do
   optional argument:
   - :dir where to create the migration rather than the current working directory
   """
-  def init_migrations(opts \\ []) do
+  def init_migrations(options) do
     migrations_folder =
-      case root_directory = Keyword.get(opts, :dir) do
+      case root_directory = Map.get(options, :dir) do
         nil ->
           "migrations"
 
@@ -38,8 +38,14 @@ defmodule Electric.Migrations do
       File.mkdir_p!(migrations_folder)
 
       case add_migration(migrations_folder, "init") do
-        {:ok, _} -> {:ok, "Your migrations folder with an initial migration has been created"}
-        {:error, msg} -> {:error, msg}
+        {:ok, _} ->
+          {:success, "Your migrations folder with an initial migration has been created"}
+
+        {:success, _} ->
+          {:success, "Your migrations folder with an initial migration has been created"}
+
+        {:error, msg} ->
+          {:error, msg}
       end
     end
   end
@@ -49,7 +55,7 @@ defmodule Electric.Migrations do
   optional arguments:
   - :migrations a folder of migrations to add too if not using one in the cwd, must be called "migrations"
   """
-  def new_migration(migration_name, opts \\ []) do
+  def new_migration(migration_name, opts) do
     case check_migrations_folder(opts) do
       {:ok, migrations_folder} ->
         add_migration(migrations_folder, migration_name)
@@ -68,21 +74,21 @@ defmodule Electric.Migrations do
   - :manifest will also create a file called manifest.json in the migrations folder listing all migrations
   - :bundle will also create a manifest.bundle.js file in the migrations folder which exports a js object containing all the migrations
   """
-  def build_migrations(flags, opts \\ []) do
-    case check_migrations_folder(opts) do
+  def build_migrations(flags, options) do
+    case check_migrations_folder(options) do
       {:ok, migrations_folder} ->
-        template = Keyword.get(opts, :template, @satellite_template)
+        template = Map.get(options, :template, @satellite_template)
         ordered_migration_paths(migrations_folder) |> add_triggers_to_migrations(template)
 
-        if Enum.member?(flags, :manifest) do
+        if flags[:manifest] do
           write_manifest(migrations_folder)
         end
 
-        if Enum.member?(flags, :bundle) do
+        if flags[:bundle] do
           write_js_bundle(migrations_folder)
         end
 
-        {:ok, "Migrations built"}
+        {:success, "Migrations built"}
 
       {:error, msg} ->
         {:error, msg}
@@ -95,8 +101,8 @@ defmodule Electric.Migrations do
   def sync_migrations(_db, _opts \\ []) do
   end
 
-  defp check_migrations_folder(opts \\ []) do
-    migrations_folder = Keyword.get(opts, :migrations, "migrations")
+  defp check_migrations_folder(options) do
+    migrations_folder = Map.get(options, :migrations, "migrations")
 
     if !File.exists?(migrations_folder) do
       {:error, "Couldn't find the migrations folder at #{migrations_folder}"}
@@ -128,7 +134,7 @@ defmodule Electric.Migrations do
 
     migration_file_path = Path.join([migration_folder, @migration_file_name])
     File.write!(migration_file_path, body)
-    {:ok, "Migration file created at #{migration_file_path}"}
+    {:success, "Migration file created at #{migration_file_path}"}
   end
 
   def get_template() do
@@ -296,10 +302,7 @@ defmodule Electric.Migrations do
   def add_triggers_to_migration_folder(ordered_folder_paths, ordered_migrations, template) do
     migration_folder_path = List.last(ordered_folder_paths)
     migration_name = Path.basename(migration_folder_path)
-    #    migration_file_path = Path.join(migration_folder_path, @migration_file_name)
     satellite_file_path = Path.join(migration_folder_path, @satellite_file_name)
-    #    postgres_file_path = Path.join(migration_folder_path, @postgre_file_name)
-
     with_triggers = add_triggers_to_last_migration(ordered_migrations, template)
 
     migration_fingerprint =
@@ -346,7 +349,8 @@ defmodule Electric.Migrations do
     # adds triggers for all tables to the end of the last migration
     table_infos = all_tables_info(ordered_migrations)
     sql_in = List.last(ordered_migrations)
-    template_all_the_things(sql_in, table_infos, template)
+    is_init = length(ordered_migrations) == 1
+    template_all_the_things(sql_in, table_infos, template, is_init)
   end
 
   @doc false
@@ -440,13 +444,13 @@ defmodule Electric.Migrations do
   end
 
   @doc false
-  def template_all_the_things(original_sql, tables, template) do
+  def template_all_the_things(original_sql, tables, template, is_init) do
     ## strip the old header
     patched_sql = String.replace(original_sql, ~r/\A\/\*((?s).*)\*\/\n/, "")
     ## template
     {result, _bindings} =
       Code.eval_quoted(template,
-        is_init: true,
+        is_init: is_init,
         original_sql: patched_sql,
         tables: tables
       )

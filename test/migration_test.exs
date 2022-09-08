@@ -119,7 +119,8 @@ defmodule MigrationsTest do
         Electric.Migrations.template_all_the_things(
           original_sql,
           tables,
-          Electric.Migrations.get_template()
+          Electric.Migrations.get_template(),
+          true
         )
 
       expected = """
@@ -542,14 +543,14 @@ defmodule MigrationsFileTest do
     test "tests can init" do
       temp = temp_folder()
       migrations_path = Path.join([temp, "migrations"])
-      {:ok, _msg} = Electric.Migrations.init_migrations(dir: temp)
+      {:success, _msg} = Electric.Migrations.init_migrations(%{:dir => temp})
       assert File.exists?(migrations_path)
     end
 
     test "init and then modify and then build" do
       temp = temp_folder()
       migrations_path = Path.join([temp, "migrations"])
-      {:ok, _msg} = Electric.Migrations.init_migrations(dir: temp)
+      {:success, _msg} = Electric.Migrations.init_migrations(%{:dir => temp})
       assert File.exists?(migrations_path)
 
       sql_file_paths = Path.join([migrations_path, "*", "migration.sql"]) |> Path.wildcard()
@@ -563,13 +564,16 @@ defmodule MigrationsFileTest do
       """
 
       File.write!(my_new_migration, new_content, [:append])
-      {:ok, _msg} = Electric.Migrations.build_migrations([], migrations: migrations_path)
+
+      {:success, _msg} =
+        Electric.Migrations.build_migrations(%{}, %{:migrations => migrations_path})
+
       assert File.exists?(Path.join([migration_folder, "satellite.sql"]))
     end
 
     def init_and_add_migration(temp) do
       migrations_path = Path.join([temp, "migrations"])
-      {:ok, _msg} = Electric.Migrations.init_migrations(dir: temp)
+      {:success, _msg} = Electric.Migrations.init_migrations(%{:dir => temp})
 
       my_new_migration = most_recent_migration_file(migrations_path)
 
@@ -582,7 +586,8 @@ defmodule MigrationsFileTest do
       File.write!(my_new_migration, new_content, [:append])
       Process.sleep(1000)
 
-      {:ok, _msg} = Electric.Migrations.new_migration("another", migrations: migrations_path)
+      {:success, _msg} =
+        Electric.Migrations.new_migration("another", %{:migrations => migrations_path})
 
       cats_content = """
       CREATE TABLE IF NOT EXISTS cats (
@@ -603,7 +608,10 @@ defmodule MigrationsFileTest do
       migrations_path = Path.join([temp, "migrations"])
       init_and_add_migration(temp)
       second_migration_folder = Path.dirname(most_recent_migration_file(migrations_path))
-      {:ok, _msg} = Electric.Migrations.build_migrations([], migrations: migrations_path)
+
+      {:success, _msg} =
+        Electric.Migrations.build_migrations(%{}, %{:migrations => migrations_path})
+
       assert File.exists?(Path.join([second_migration_folder, "satellite.sql"]))
     end
 
@@ -611,7 +619,12 @@ defmodule MigrationsFileTest do
       temp = temp_folder()
       migrations_path = Path.join([temp, "migrations"])
       init_and_add_migration(temp)
-      {:ok, _msg} = Electric.Migrations.build_migrations([:manifest], migrations: migrations_path)
+
+      {:success, _msg} =
+        Electric.Migrations.build_migrations(%{:manifest => true}, %{
+          :migrations => migrations_path
+        })
+
       assert File.exists?(Path.join([migrations_path, "manifest.json"]))
     end
 
@@ -619,7 +632,10 @@ defmodule MigrationsFileTest do
       temp = temp_folder()
       migrations_path = Path.join([temp, "migrations"])
       init_and_add_migration(temp)
-      {:ok, _msg} = Electric.Migrations.build_migrations([:bundle], migrations: migrations_path)
+
+      {:success, _msg} =
+        Electric.Migrations.build_migrations(%{:bundle => true}, %{:migrations => migrations_path})
+
       assert File.exists?(Path.join([migrations_path, "manifest.bundle.js"]))
     end
 
@@ -627,7 +643,9 @@ defmodule MigrationsFileTest do
       temp = temp_folder()
       migrations_path = Path.join([temp, "migrations"])
       init_and_add_migration(temp)
-      {:ok, _msg} = Electric.Migrations.build_migrations([], migrations: migrations_path)
+
+      {:success, _msg} =
+        Electric.Migrations.build_migrations(%{}, %{:migrations => migrations_path})
 
       migration = most_recent_migration_file(migrations_path)
 
@@ -639,7 +657,8 @@ defmodule MigrationsFileTest do
 
       File.write!(migration, dogs_content, [:append])
 
-      {:ok, _msg} = Electric.Migrations.build_migrations([], migrations: migrations_path)
+      {:success, _msg} =
+        Electric.Migrations.build_migrations(%{}, %{:migrations => migrations_path})
     end
   end
 
@@ -696,9 +715,12 @@ defmodule MigrationsFileTest do
 
       dst_file_path = Path.join([migration_folder, "satellite.sql"])
 
-      Electric.Migrations.build_migrations([],
-        migrations: migrations_folder,
-        template: @trigger_template
+      Electric.Migrations.build_migrations(
+        %{},
+        %{
+          :migrations => migrations_folder,
+          :template => @trigger_template
+        }
       )
 
       expected = """
@@ -773,9 +795,12 @@ defmodule MigrationsFileTest do
 
       bundle_path = Path.join([migrations_folder, "manifest.bundle.json"])
 
-      Electric.Migrations.build_migrations([],
-        migrations: migrations_folder,
-        template: @trigger_template
+      Electric.Migrations.build_migrations(
+        %{},
+        %{
+          :migrations => migrations_folder,
+          :template => @trigger_template
+        }
       )
 
       Electric.Migrations.write_bundle(migrations_folder)
@@ -829,9 +854,12 @@ defmodule MigrationsFileTest do
       bundle_path = Path.join([migrations_folder, "manifest.bundle.js"])
 
       _result =
-        Electric.Migrations.build_migrations([],
-          migrations: migrations_folder,
-          template: @trigger_template
+        Electric.Migrations.build_migrations(
+          %{},
+          %{
+            :migrations => migrations_folder,
+            :template => @trigger_template
+          }
         )
 
       #      IO.puts("wtf")

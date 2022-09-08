@@ -14,7 +14,8 @@ defmodule Electric do
   @commands [
     accounts: Commands.Accounts,
     apps: Commands.Apps,
-    auth: Commands.Auth
+    auth: Commands.Auth,
+    migrations: Commands.Migrations
   ]
 
   @project Mix.Project.config()

@@ -39,8 +39,8 @@ defmodule Electric.Commands.Migrations do
     ]
   ]
 
-  @migrations_dir [
-    migrations_dir: [
+  @dir [
+    dir: [
       value_name: "MIGRATIONS_DIR",
       short: "-d",
       long: "--dir",
@@ -101,12 +101,7 @@ defmodule Electric.Commands.Migrations do
           and / or syncing to your cloud database.
           """,
           options: @dir,
-          flags:
-            Keyword.merge(
-              default_flags(),
-              @manifest,
-              @bundle
-            )
+          flags: default_flags() |> Keyword.merge(@manifest) |> Keyword.merge(@bundle)
         ],
         sync: [
           name: "sync",
@@ -145,16 +140,16 @@ defmodule Electric.Commands.Migrations do
     end
   end
 
-  def init(%{options: %{dir: dir}}) do
-    Electric.Migrations.init_migrations(dir: dir)
+  def init(%{args: _args, flags: _flags, options: options, unknown: _unknown}) do
+    Electric.Migrations.init_migrations(options)
   end
 
-  def new(%{args: %{migration_name: migration_name}, options: %{dir: dir}}) do
-    Electric.Migrations.new_migration(migration_name, dir: dir)
+  def new(%{args: args, flags: _flags, options: options, unknown: _unknown}) do
+    Electric.Migrations.new_migration(args.migration_name, options)
   end
 
-  def build(%{options: %{dir: dir}, flags: [manifest, bundle]}) do
-    Electric.Migrations.build_migrations([manifest, bundle], dir: dir)
+  def build(%{args: _args, flags: flags, options: options, unknown: _unknown}) do
+    Electric.Migrations.build_migrations(flags, options)
   end
 
   def sync(%{args: %{database_id: database_id}, options: %{dir: dir}}) do
