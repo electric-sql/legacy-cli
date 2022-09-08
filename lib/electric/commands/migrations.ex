@@ -2,24 +2,33 @@ defmodule Electric.Commands.Migrations do
   @moduledoc """
   The `Migrations` command.
 
-  # Generate an empty migration file.
-  electric migrations generate --source-path ./local/path/to/folder
 
-  # Are the migrations OK? what are the issues,
-  # e.g.: "you're using a sequential ID".
-  electric migrations validate --source-path ./local/path/to/folder
+  # Initialise a new set of migrations and the initial migration file
+  electric migrations init --migrations-dir ./local/path/to/migrations
+
+  # Generate an new empty migration file.
+  electric migrations new :migration_name --migrations-dir ./local/path/to/migrations
 
   # Read the migrations source folder. Validate.
   # Create a output folder with patched files
   # containing triggers.
-  electric migrations build --source-path ./local/path/to/folder --dist-path ./local/path/to/dist
+  electric migrations build --migrations-dir ./local/path/to/migrations --manifest --bundle
 
   # Sync the migrations with the console, so that
   # they can be applied to PG and propagated to
   # satellite clients.
-  electric migrations push :database_uuid --dist-path ./local/path/to/folder
+  electric migrations push :database_id --migrations-dir ./local/path/to/migrations
   """
   use Electric, :command
+
+  @migration_name [
+    migration_name: [
+      value_name: "MIGRATION_NAME",
+      help: "Name of a new migration",
+      required: true,
+      parser: :string
+    ]
+  ]
 
   @database_id [
     database_id: [
@@ -30,35 +39,31 @@ defmodule Electric.Commands.Migrations do
     ]
   ]
 
-  @dist_dir [
-    dist_dir: [
-      value_name: "DIST_DIR",
+  @migrations_dir [
+    migrations_dir: [
+      value_name: "MIGRATIONS_DIR",
       short: "-d",
-      long: "--dist-dir",
-      help: "Dist directory for the build migration files.",
+      long: "--dir",
+      help: "Migrations directory where the migration files live.",
       parser: :string,
-      default: "./migrations/src"
+      default: "./migrations"
     ]
   ]
 
-  @source_dir [
-    source_dir: [
-      value_name: "SOURCE_DIR",
-      short: "-s",
-      long: "--source-dir",
-      help: "Source directory where the migration files live.",
-      parser: :string,
-      default: "./migrations/dist"
+  @manifest [
+    manifest: [
+      long: "--manifest",
+      short: "-m",
+      help: "Create a json manifest when building",
+      required: false
     ]
   ]
 
-  @source_file [
-    source_file: [
-      value_name: "SOURCE_FILE",
-      short: "-f",
-      long: "--source-file",
-      help: "Path to a specific migration file.",
-      parser: :string,
+  @bundle [
+    bundle: [
+      long: "--bundle",
+      short: "-b",
+      help: "Create a js bundle of all migrations when building",
       required: false
     ]
   ]
@@ -68,38 +73,21 @@ defmodule Electric.Commands.Migrations do
       name: "migrations",
       about: "Manage database schema migrations",
       subcommands: [
-        list: [
-          name: "list",
+        init: [
+          name: "init",
           about: """
-          List the migrations for a database.
-
-          List all the migrations currently pushed to a database.
+           Initialises a new set of migrations and the initial migration file
           """,
-          args: @database_id,
+          options: @dir,
           flags: default_flags()
         ],
-        generate: [
-          name: "generate",
+        new: [
+          name: "new",
           about: """
-          Generate an empty migration file.
-
-          Ensures the migration file has the right filename prefix and metadata.
+           Creates a new migration folder and file
           """,
-          options: @source_dir,
-          flags: default_flags()
-        ],
-        validate: [
-          name: "validate",
-          about: """
-          Validate your migrations.
-
-          Either validate all migrations in a folder, or a specific migration file.
-          """,
-          options:
-            Keyword.merge(
-              @source_dir,
-              @source_file
-            ),
+          args: @migration_name,
+          options: @dir,
           flags: default_flags()
         ],
         build: [
@@ -107,30 +95,30 @@ defmodule Electric.Commands.Migrations do
           about: """
           Build migrations dist folder.
 
-          Read migrations from SOURCE_DIR. Validate and patch ready for
-          application to SQLite. Write output files to the DIST_DIR.
+          Reads the migration.sql file in each migration folder and create a new satellite.sql next to it.
 
           You must build migrations before building into your local app
-          and / or deploying to your cloud database.
+          and / or syncing to your cloud database.
           """,
-          options:
+          options: @dir,
+          flags:
             Keyword.merge(
-              @source_dir,
-              @dist_dir
-            ),
-          flags: default_flags()
+              default_flags(),
+              @manifest,
+              @bundle
+            )
         ],
-        deploy: [
-          name: "deploy",
+        sync: [
+          name: "sync",
           about: """
-          Deploy migrations to your cloud database.
+          Sync migrations to your cloud database.
 
-          Pushes your DIST_DIR of built migrations to your cloud database,
+          Pushes your built migrations to your cloud database,
           so they're applied to your cloud Postgres and propagated out to
           your live client applications.
           """,
           args: @database_id,
-          options: @dist_dir,
+          options: @dir,
           flags: default_flags()
         ]
       ]
@@ -157,32 +145,24 @@ defmodule Electric.Commands.Migrations do
     end
   end
 
-  def generate(%{options: %{source_dir: source_dir}}) do
-    # XXX
-    IO.inspect({:generate, source_dir})
+  def init(%{options: %{dir: dir}}) do
+    Electric.Migrations.init_migrations(dir: dir)
   end
 
-  def validate(%{options: %{source_file: source_file}}) when is_binary(source_file) do
-    # XXX
-    IO.inspect({:validate, :file, source_file})
+  def new(%{args: %{migration_name: migration_name}, options: %{dir: dir}}) do
+    Electric.Migrations.new_migration(migration_name, dir: dir)
   end
 
-  def validate(%{options: %{source_dir: source_dir}}) do
-    # XXX
-    IO.inspect({:validate, :dir, source_dir})
+  def build(%{options: %{dir: dir}, flags: [manifest, bundle]}) do
+    Electric.Migrations.build_migrations([manifest, bundle], dir: dir)
   end
 
-  def build(%{options: %{source_dir: source_dir, dist_dir: dist_dir}}) do
-    # XXX
-    IO.inspect({:build, source_dir, dist_dir})
-  end
-
-  def deploy(%{args: %{database_id: database_id}, options: %{dist_dir: dist_dir}}) do
+  def sync(%{args: %{database_id: database_id}, options: %{dir: dir}}) do
     path = "databases/#{database_id}/migrations"
 
     # XXX
     data = :NotImplemented
-    IO.inspect({:deploy, data, dist_dir})
+    IO.inspect({:deploy, data, dir})
 
     result =
       Progress.run("Syncing migrations", false, fn ->
