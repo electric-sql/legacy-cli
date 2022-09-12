@@ -13,7 +13,10 @@ defmodule MigrationsTest do
       );
       """
 
-      assert Electric.Migrations.validate_sql(sql) == :ok
+      migration = %Electric.Migration{name: "test1", original_body: sql}
+#      IO.inspect(migration)
+
+      assert Electric.Migration.ensure_and_validate_original_sql(migration).error == nil
     end
 
     test "tests nonsense SQL fails" do
@@ -24,7 +27,9 @@ defmodule MigrationsTest do
       SOME BOLLOCKS;
       """
 
-      assert Electric.Migrations.validate_sql(sql) == {:error, "near \"SOME\": syntax error"}
+      migration = %Electric.Migration{name: "test1", original_body: sql}
+
+      assert Electric.Migration.ensure_and_validate_original_sql(migration).error == "near \"SOME\": syntax error"
     end
   end
 
@@ -69,7 +74,7 @@ defmodule MigrationsTest do
       --ADD A TRIGGER FOR main.fish;
       """
 
-      assert Electric.Migrations.add_triggers_to_last_migration([sql], @trigger_template) ==
+      assert Electric.Migrations.add_triggers_to_last_sql([sql], @trigger_template) ==
                expected
     end
 
@@ -80,15 +85,25 @@ defmodule MigrationsTest do
       );
       """
 
+#      migration = %Electric.Migration{name: "test1", original_body: sql}
+
       sql =
-        Electric.Migrations.add_triggers_to_last_migration(
+        Electric.Migrations.add_triggers_to_last_sql(
           [sql],
           Electric.Migrations.get_template()
         )
 
-      assert Electric.Migrations.validate_sql(sql) == :ok
+      assert is_valid_sql(sql) == :ok
     end
   end
+
+
+  def is_valid_sql(sql) do
+    {:ok, conn} = Exqlite.Sqlite3.open(":memory:")
+    Exqlite.Sqlite3.execute(conn, sql)
+  end
+
+
 
   describe "Triggers works as expected" do
     test "templating" do
@@ -284,7 +299,7 @@ defmodule MigrationsTest do
       """
 
       sql =
-        Electric.Migrations.add_triggers_to_last_migration(
+        Electric.Migrations.add_triggers_to_last_sql(
           [sql],
           Electric.Migrations.get_template()
         )
@@ -335,7 +350,7 @@ defmodule MigrationsTest do
       """
 
       sql =
-        Electric.Migrations.add_triggers_to_last_migration(
+        Electric.Migrations.add_triggers_to_last_sql(
           [sql],
           Electric.Migrations.get_template()
         )
@@ -368,7 +383,7 @@ defmodule MigrationsTest do
       """
 
       sql =
-        Electric.Migrations.add_triggers_to_last_migration(
+        Electric.Migrations.add_triggers_to_last_sql(
           [sql],
           Electric.Migrations.get_template()
         )
@@ -418,13 +433,13 @@ defmodule MigrationsTest do
       """
 
       sql_out1 =
-        Electric.Migrations.add_triggers_to_last_migration(
+        Electric.Migrations.add_triggers_to_last_sql(
           [sql1],
           Electric.Migrations.get_template()
         )
 
       sql_out2 =
-        Electric.Migrations.add_triggers_to_last_migration(
+        Electric.Migrations.add_triggers_to_last_sql(
           [sql1, sql2],
           Electric.Migrations.get_template()
         )
@@ -634,7 +649,18 @@ defmodule MigrationsFileTest do
       assert File.exists?(Path.join([migrations_path, "manifest.json"]))
     end
 
-    test "test can build with bundle" do
+    test "test can build with json bundle" do
+      temp = temp_folder()
+      migrations_path = Path.join([temp, "migrations"])
+      init_and_add_migration(temp)
+
+      {:success, _msg} =
+        Electric.Migrations.build_migrations(%{:bundle => true}, %{:migrations => migrations_path})
+
+      assert File.exists?(Path.join([migrations_path, "index.js"]))
+    end
+
+    test "test can build with js bundle" do
       temp = temp_folder()
       migrations_path = Path.join([temp, "migrations"])
       init_and_add_migration(temp)
@@ -686,16 +712,17 @@ defmodule MigrationsFileTest do
 
       {:ok, migration} = File.read(migration_file_path)
 
-      Electric.Migrations.add_triggers_to_migration_folder(
-        [migration_folder],
-        [migration],
+       m = %Electric.Migration{name: migration_name, original_body: migration, src_folder: Path.join([temp, "migrations"])}
+
+      Electric.Migrations.add_triggers_to_migration(
+        [m],
         @trigger_template
       )
 
       expected = """
       /*
       ElectricDB Migration
-      {"metadata": {"name": "#{migration_name}", "sha256": "7aeaa635b94e7def04a4f9dc5ac730353d4c45cf65aa2574cee58e1154d3ed43"}}
+      {"metadata": {"name": "#{migration_name}", "sha256": "0f0eb722f4d27646a93dcd6fd645b16b158cf1e40455544e158ef71972226e00"}}
       */
       CREATE TABLE IF NOT EXISTS items (
         value TEXT PRIMARY KEY
@@ -732,7 +759,7 @@ defmodule MigrationsFileTest do
       expected = """
       /*
       ElectricDB Migration
-      {"metadata": {"name": "#{migration_name}", "sha256": "7aeaa635b94e7def04a4f9dc5ac730353d4c45cf65aa2574cee58e1154d3ed43"}}
+      {"metadata": {"name": "#{migration_name}", "sha256": "0f0eb722f4d27646a93dcd6fd645b16b158cf1e40455544e158ef71972226e00"}}
       */
       CREATE TABLE IF NOT EXISTS items (
         value TEXT PRIMARY KEY
@@ -767,11 +794,24 @@ defmodule MigrationsFileTest do
 
       manifest_path = Path.join([migrations_folder, "manifest.json"])
 
-      Electric.Migrations.write_manifest(migrations_folder)
+      Electric.Migrations.build_migrations(
+        %{},
+        %{
+          :migrations => migrations_folder
+        }
+      )
 
+      Electric.Migrations.write_manifest(migrations_folder)
       manifest = Jason.decode!(File.read!(manifest_path))
 
-      assert manifest == %{"migrations" => [migration_name, migration_name_2]}
+      expected = %{
+              "migrations" => [
+                %{"name" => migration_name, "sha256" => "0f0eb722f4d27646a93dcd6fd645b16b158cf1e40455544e158ef71972226e00"},
+                %{"name" => migration_name_2, "sha256" => "3da01b8ef4f3845fdc3cb3619c6ba75538988d6eec816f3734a7c36383874266"}
+              ]
+            }
+
+      assert manifest == expected
     end
 
     test "creates a bundle" do
@@ -818,13 +858,17 @@ defmodule MigrationsFileTest do
         "migrations" => [
           %{
             "body" =>
-              "/*\nElectricDB Migration\n{\"metadata\": {\"name\": \"#{migration_name}\", \"sha256\": \"7aeaa635b94e7def04a4f9dc5ac730353d4c45cf65aa2574cee58e1154d3ed43\"}}\n*/\nCREATE TABLE IF NOT EXISTS items (\n  value TEXT PRIMARY KEY\n);\n--ADD A TRIGGER FOR main.items;\n",
-            "name" => migration_name
+              "/*\nElectricDB Migration\n{\"metadata\": {\"name\": \"#{migration_name}\", \"sha256\": \"0f0eb722f4d27646a93dcd6fd645b16b158cf1e40455544e158ef71972226e00\"}}\n*/\nCREATE TABLE IF NOT EXISTS items (\n  value TEXT PRIMARY KEY\n);\n--ADD A TRIGGER FOR main.items;\n",
+            "name" => migration_name,
+            "encoding" => "escaped",
+            "sha256" => "0f0eb722f4d27646a93dcd6fd645b16b158cf1e40455544e158ef71972226e00"
           },
           %{
             "body" =>
-              "/*\nElectricDB Migration\n{\"metadata\": {\"name\": \"#{migration_name_2}\", \"sha256\": \"4b29f7cab89d0f0e37985280f9d311d5bf1d43132fa0183ed865a3a9b1428aa7\"}}\n*/\nCREATE TABLE IF NOT EXISTS cat (\n  value TEXT PRIMARY KEY\n);\n--ADD A TRIGGER FOR main.cat;\n\n--ADD A TRIGGER FOR main.items;\n",
-            "name" => migration_name_2
+              "/*\nElectricDB Migration\n{\"metadata\": {\"name\": \"#{migration_name_2}\", \"sha256\": \"3da01b8ef4f3845fdc3cb3619c6ba75538988d6eec816f3734a7c36383874266\"}}\n*/\nCREATE TABLE IF NOT EXISTS cat (\n  value TEXT PRIMARY KEY\n);\n--ADD A TRIGGER FOR main.cat;\n\n--ADD A TRIGGER FOR main.items;\n",
+            "name" => migration_name_2,
+            "encoding" => "escaped",
+            "sha256" => "3da01b8ef4f3845fdc3cb3619c6ba75538988d6eec816f3734a7c36383874266"
           }
         ]
       }

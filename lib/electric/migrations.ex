@@ -78,10 +78,16 @@ defmodule Electric.Migrations do
     case check_migrations_folder(options) do
       {:ok, migrations_folder} ->
         template = Map.get(options, :template, @satellite_template)
-        ordered_migration_paths(migrations_folder) |> add_triggers_to_migrations(template)
+        ordered_migrations(migrations_folder) |> add_triggers_to_migrations(template)
+
+
 
         if flags[:manifest] do
           write_manifest(migrations_folder)
+        end
+
+        if flags[:json] do
+          write_bundle(migrations_folder)
         end
 
         if flags[:bundle] do
@@ -144,13 +150,7 @@ defmodule Electric.Migrations do
   @doc false
   def write_manifest(src_folder) do
     manifest_path = Path.join(src_folder, @manifest_file_name)
-
-    migration_names =
-      for migration_folder <- ordered_migration_paths(src_folder) do
-        Path.basename(migration_folder)
-      end
-
-    manifest = Jason.encode!(%{"migrations" => migration_names}) |> Jason.Formatter.pretty_print()
+    manifest = create_bundle(src_folder, false)
 
     if File.exists?(manifest_path) do
       File.rm(manifest_path)
@@ -161,7 +161,7 @@ defmodule Electric.Migrations do
 
   @doc false
   def write_bundle(src_folder) do
-    migrations = create_bundle(src_folder)
+    migrations = create_bundle(src_folder, true)
     bundle_path = Path.join(src_folder, @bundle_file_name)
 
     if File.exists?(bundle_path) do
@@ -173,7 +173,7 @@ defmodule Electric.Migrations do
 
   @doc false
   def write_js_bundle(src_folder) do
-    migrations = create_bundle(src_folder)
+    migrations = create_bundle(src_folder, true)
     {result, _bindings} = Code.eval_quoted(@bundle_template, migrations: migrations)
     bundle_path = Path.join(src_folder, @js_bundle_file_name)
 
@@ -184,30 +184,77 @@ defmodule Electric.Migrations do
     File.write!(bundle_path, result)
   end
 
-  defp ordered_migration_paths(src_folder) do
+  defp ordered_migrations(src_folder) do
     sql_file_paths = Path.join([src_folder, "*", @migration_file_name]) |> Path.wildcard()
 
-    migration_names =
-      for file_path <- sql_file_paths do
+    migration_names = for file_path <- sql_file_paths do
         Path.dirname(file_path) |> Path.basename()
       end
 
     for migration_name <- Enum.sort(migration_names) do
-      Path.join(src_folder, migration_name)
+      %Electric.Migration{name: migration_name, src_folder: src_folder}
     end
   end
 
-  defp create_bundle(src_folder) do
-    migrations =
-      for migration_folder <- ordered_migration_paths(src_folder) do
-        satellite_sql_path = Path.join(migration_folder, @satellite_file_name)
-        migration_text = File.read!(satellite_sql_path)
-        migration_name = Path.basename(migration_folder)
-        %{"name" => migration_name, "body" => migration_text}
-      end
-
+  defp create_bundle(src_folder, with_body) do
+    migrations = all_migrations_as_maps(src_folder, with_body)
     Jason.encode!(%{"migrations" => migrations}) |> Jason.Formatter.pretty_print()
   end
+
+  defp all_migrations_as_maps(src_folder, with_body) do
+    for migration <- ordered_migrations(src_folder) do
+      Electric.Migration.as_json_map(migration, with_body)
+    end
+  end
+
+
+#  defp diff_migrations(server_migrations, src_folder) do
+#
+#    missing_locally = for server_migration_info <- server_migrations if !File.exists?(Path.join([src_folder, server_migration_info["name"]])) do
+#      server_migration_info["name"]
+#    end
+#
+#    if length(missing_locally) != 0 do
+#      {:missing_error, conflicted_migrations}
+#    else
+#      local_migrations = all_migrations_as_maps(src_folder, true)
+#      server_migrations_lookup = Enum.into(server_migrations, %{}, fn info -> {info["name"], info} end)
+#
+#      migration_statuses = for local_migration <- local_migrations do
+#        migration_name = local_migration["name"]
+#        if Map.has_key?(server_migrations_lookup, migration_name) do
+#          server_migration_info = server_migrations_lookup[migration_name]
+#          if server_migration_info["sha256"] != local_migration_info["sha256"] do
+#            if server_migration_info["applied"] == true do
+#              {:conflicted, local_migration}
+#            else
+#              {:modified, local_migration}
+#            end
+#          else
+#            [:matches, local_migration]
+#          end
+#        else
+#          {:new, local_migration}
+#        end
+#      end
+#
+#      conflicted_migrations = for {status, local_migration} <- local_migrations if status == :conflicted  do
+#        local_migration
+#      end
+#
+#      if length(conflicted_migrations) != 0 do
+#      {:conflict_error, conflicted_migrations}
+#      else
+#         new_migrations = for {status, local_migration} <- local_migrations if status != :conflicted  do
+#           if status == :modified do
+#             IO.puts("The migration #{local_migration["name"]} will be changed on the server.")
+#           end
+#           local_migration
+#        end
+#         {:ok, new_migrations}
+#      end
+#    end
+#  end
 
   defp calc_hash(with_triggers) do
     sha = :crypto.hash(:sha256, with_triggers)
@@ -215,126 +262,75 @@ defmodule Electric.Migrations do
     String.downcase(base16)
   end
 
-  defp get_metadata(file_path) do
-    case File.read(file_path) do
-      {:ok, body} ->
-        get_body_metadata(body)
+  
+  defp add_triggers_to_migrations(ordered_migrations, template) do
 
-      {:error, reason} ->
-        {:error, reason}
+    validated_migrations = for migration <- ordered_migrations do
+      Electric.Migration.ensure_and_validate_original_sql(migration)
     end
-  end
 
-  defp get_body_metadata(body) do
-    regex = ~r/ElectricDB Migration[\s]*(.*?)[\s]*\*/
-    matches = Regex.run(regex, body)
+    failed_validation = Enum.filter(validated_migrations, fn migration -> migration.error != nil end)
 
-    if matches == nil do
-      {:error, "no header"}
+    if length(failed_validation) > 0 do
+      {:error, failed_validation}
     else
-      case Jason.decode(List.last(matches)) do
-        {:ok, metadata} -> metadata["metadata"]
+      try do
+        for {_migration, i} <- Enum.with_index(validated_migrations) do
+          subset_of_migrations = Enum.take(validated_migrations, i + 1)
+          # this is using a migration file path and all the migrations up to, an including this migration
+          case add_triggers_to_migration(
+                 subset_of_migrations,
+                 template
+               ) do
+            :ok -> :ok
+            {:error, reason} -> throw({:error, reason})
+          end
+        end
+      catch
         {:error, reason} -> {:error, reason}
       end
     end
   end
 
-  defp file_header(hash, name, title) do
-    case title do
-      nil ->
-        """
-        /*
-        ElectricDB Migration
-        {"metadata": {"name": "#{name}", "sha256": "#{hash}"}}
-        */
-        """
-
-      _ ->
-        """
-        /*
-        ElectricDB Migration
-        {"metadata": {"title": "#{title}", "name": "#{name}", "sha256": "#{hash}"}}
-        */
-        """
-    end
-  end
-
-  defp add_triggers_to_migrations(ordered_migration_paths, template) do
-    ## throwing tuples funky!
-    try do
-      ordered_migrations =
-        for migration_folder_path <- ordered_migration_paths do
-          migration_file_path = Path.join([migration_folder_path, @migration_file_name])
-
-          case File.read(migration_file_path) do
-            {:ok, sql} ->
-              case validate_sql(sql) do
-                :ok -> sql
-                {:error, reason} -> throw({:error, reason})
-              end
-
-            {:error, reason} ->
-              throw({:error, reason})
-          end
-        end
-
-      # needs to fail early so has to start at the first migration and go through
-      for {_migration_folder_path, i} <- Enum.with_index(ordered_migration_paths) do
-        subset_of_migrations = Enum.take(ordered_migrations, i + 1)
-        subset_of_migration_folders = Enum.take(ordered_migration_paths, i + 1)
-
-        # this is using a migration file path and all the migrations up to, an including this migration
-        case add_triggers_to_migration_folder(
-               subset_of_migration_folders,
-               subset_of_migrations,
-               template
-             ) do
-          :ok -> :ok
-          {:error, reason} -> throw({:error, reason})
-        end
-      end
-    catch
-      {:error, reason} -> {:error, reason}
-    end
-  end
 
   @doc false
-  def add_triggers_to_migration_folder(ordered_folder_paths, ordered_migrations, template) do
-    migration_folder_path = List.last(ordered_folder_paths)
-    migration_name = Path.basename(migration_folder_path)
-    satellite_file_path = Path.join(migration_folder_path, @satellite_file_name)
-    with_triggers = add_triggers_to_last_migration(ordered_migrations, template)
+  def add_triggers_to_migration(ordered_migrations, template) do
+
+    migration = List.last(ordered_migrations)
+
+    ordered_sql = for migration <- ordered_migrations do
+      migration.original_body
+    end
+
+    with_triggers = add_triggers_to_last_sql(ordered_sql, template)
 
     migration_fingerprint =
       if length(ordered_migrations) > 1 do
-        previous_satellite_migration_file_path =
-          Path.join(Enum.at(ordered_folder_paths, -2), @satellite_file_name)
-
-        previous_metadata = get_metadata(previous_satellite_migration_file_path)
-        "#{with_triggers}#{previous_metadata["sha256"]}"
+        previous_migration = Enum.at(ordered_migrations, -2)
+        previous_metadata = Electric.Migration.get_satellite_metadata(previous_migration)
+        "#{migration.original_body}#{previous_metadata["sha256"]}"
       else
-        with_triggers
+        migration.original_body
       end
 
     hash = calc_hash(migration_fingerprint)
+    satellite_file_path = Electric.Migration.satellite_file_path(migration)
 
     if File.exists?(satellite_file_path) do
-      metadata = get_metadata(satellite_file_path)
-
+      metadata = Electric.Migration.get_satellite_metadata(migration)
       if metadata["sha256"] != hash do
-        IO.puts("Warning: The migration #{migration_name} has been modified.")
+        IO.puts("Warning: The migration #{migration.name} has been modified.")
         File.rm(satellite_file_path)
       end
     end
 
     if !File.exists?(satellite_file_path) do
       header =
-        case get_body_metadata(List.last(ordered_migrations)) do
+        case Electric.Migration.get_original_metadata(migration) do
           {:error, _reason} ->
-            file_header(hash, migration_name, nil)
-
+            Electric.Migration.file_header(migration, hash, nil)
           existing_metadata ->
-            file_header(hash, migration_name, existing_metadata["title"])
+            Electric.Migration.file_header(migration, hash, existing_metadata["title"])
         end
 
       File.write!(satellite_file_path, header <> with_triggers)
@@ -343,24 +339,16 @@ defmodule Electric.Migrations do
       :ok
     end
   end
+  
 
   @doc false
-  def add_triggers_to_last_migration(ordered_migrations, template) do
+  def add_triggers_to_last_sql(ordered_sql, template) do
+    
     # adds triggers for all tables to the end of the last migration
-    table_infos = all_tables_info(ordered_migrations)
-    sql_in = List.last(ordered_migrations)
-    is_init = length(ordered_migrations) == 1
+    table_infos = all_tables_info(ordered_sql)
+    sql_in = List.last(ordered_sql)
+    is_init = length(ordered_sql) == 1
     template_all_the_things(sql_in, table_infos, template, is_init)
-  end
-
-  @doc false
-  def validate_sql(sql_in) do
-    {:ok, conn} = Exqlite.Sqlite3.open(":memory:")
-
-    case Exqlite.Sqlite3.execute(conn, sql_in) do
-      :ok -> :ok
-      {:error, reason} -> {:error, reason}
-    end
   end
 
   @doc false
@@ -371,6 +359,7 @@ defmodule Electric.Migrations do
 
   @doc false
   def all_tables_info(all_migrations) do
+
     namespace = "main"
     # get all the table names
     {:ok, conn} = Exqlite.Sqlite3.open(":memory:")
