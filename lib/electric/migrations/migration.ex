@@ -39,18 +39,18 @@ defmodule Electric.Migration do
     end
   end
 
-#  def ensure_and_validate_original_sql(migration) do
-#    with_body = ensure_original_body(migration)
-#    {:ok, conn} = Exqlite.Sqlite3.open(":memory:")
-#
-#    case Exqlite.Sqlite3.execute(conn, with_body.original_body) do
-#      :ok ->
-#        with_body
-#
-#      {:error, reason} ->
-#        %{with_body | error: reason}
-#    end
-#  end
+  #  def ensure_and_validate_original_sql(migration) do
+  #    with_body = ensure_original_body(migration)
+  #    {:ok, conn} = Exqlite.Sqlite3.open(":memory:")
+  #
+  #    case Exqlite.Sqlite3.execute(conn, with_body.original_body) do
+  #      :ok ->
+  #        with_body
+  #
+  #      {:error, reason} ->
+  #        %{with_body | error: reason}
+  #    end
+  #  end
 
   def as_json_map(migration, with_body) do
     with_satellite_body = ensure_satellite_body(migration)

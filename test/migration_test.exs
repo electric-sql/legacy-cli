@@ -17,8 +17,6 @@ defmodule MigrationsTest do
 
       assert Electric.Migration.ensure_original_body(migration).error == nil
     end
-
-
   end
 
   describe "adds_triggers to sql" do
@@ -36,7 +34,10 @@ defmodule MigrationsTest do
       --ADD A TRIGGER FOR main.fish;
       """
 
-      assert Electric.Migrations.Triggers.add_triggers_to_last_migration([%Electric.Migration{name: "test1", original_body: sql}], @trigger_template) ==
+      assert Electric.Migrations.Triggers.add_triggers_to_last_migration(
+               [%Electric.Migration{name: "test1", original_body: sql}],
+               @trigger_template
+             ) ==
                expected
     end
 
@@ -50,7 +51,8 @@ defmodule MigrationsTest do
       #      migration = %Electric.Migration{name: "test1", original_body: sql}
 
       sql =
-        Electric.Migrations.Triggers.add_triggers_to_last_migration([%Electric.Migration{name: "test1", original_body: sql}],
+        Electric.Migrations.Triggers.add_triggers_to_last_migration(
+          [%Electric.Migration{name: "test1", original_body: sql}],
           Electric.Migrations.get_template()
         )
 
@@ -257,7 +259,8 @@ defmodule MigrationsTest do
       """
 
       sql =
-        Electric.Migrations.Triggers.add_triggers_to_last_migration([%Electric.Migration{name: "test1", original_body: sql}],
+        Electric.Migrations.Triggers.add_triggers_to_last_migration(
+          [%Electric.Migration{name: "test1", original_body: sql}],
           Electric.Migrations.get_template()
         )
 
@@ -307,7 +310,8 @@ defmodule MigrationsTest do
       """
 
       sql =
-        Electric.Migrations.Triggers.add_triggers_to_last_migration([%Electric.Migration{name: "test1", original_body: sql}],
+        Electric.Migrations.Triggers.add_triggers_to_last_migration(
+          [%Electric.Migration{name: "test1", original_body: sql}],
           Electric.Migrations.get_template()
         )
 
@@ -339,7 +343,8 @@ defmodule MigrationsTest do
       """
 
       sql =
-        Electric.Migrations.Triggers.add_triggers_to_last_migration([%Electric.Migration{name: "test1", original_body: sql}],
+        Electric.Migrations.Triggers.add_triggers_to_last_migration(
+          [%Electric.Migration{name: "test1", original_body: sql}],
           Electric.Migrations.get_template()
         )
 
@@ -388,10 +393,10 @@ defmodule MigrationsTest do
       """
 
       sql_out1 =
-        Electric.Migrations.Triggers.add_triggers_to_last_migration([%Electric.Migration{name: "test1", original_body: sql1}],
+        Electric.Migrations.Triggers.add_triggers_to_last_migration(
+          [%Electric.Migration{name: "test1", original_body: sql1}],
           Electric.Migrations.get_template()
         )
-
 
       migration_1 = %Electric.Migration{name: "test1", original_body: sql1}
       migration_2 = %Electric.Migration{name: "test2", original_body: sql2}
@@ -428,11 +433,7 @@ defmodule MigrationsTest do
       assert newRow == "{\"value\":\"abcdefg\",\"colour\":\"red\"}"
       assert oldRow == nil
     end
-
   end
-
-
-
 
   def get_while(conn, statement, names) do
     case Exqlite.Sqlite3.step(conn, statement) do

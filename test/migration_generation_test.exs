@@ -3,7 +3,6 @@ defmodule MigrationsPostgresTest do
 
   describe "Generate PostgresSQL SQL text" do
     test "Test create a new table" do
-
       sql = """
       CREATE TABLE IF NOT EXISTS fish (
       value TEXT PRIMARY KEY
@@ -11,7 +10,9 @@ defmodule MigrationsPostgresTest do
       """
 
       migration = %Electric.Migration{name: "test1", original_body: sql}
-      postgres_version = Electric.Migrations.Generation.postgres_for_ordered_migrations([migration])
+
+      postgres_version =
+        Electric.Migrations.Generation.postgres_for_ordered_migrations([migration])
 
       expected = "\nCREATE TABLE main.fish (\n  value text PRIMARY KEY);\n"
 
@@ -19,7 +20,6 @@ defmodule MigrationsPostgresTest do
     end
 
     test "Test two migrations and remove not null" do
-
       sql1 = """
       CREATE TABLE IF NOT EXISTS fish (
       value TEXT PRIMARY KEY
@@ -34,7 +34,9 @@ defmodule MigrationsPostgresTest do
 
       migration_1 = %Electric.Migration{name: "test_1", original_body: sql1}
       migration_2 = %Electric.Migration{name: "test_2", original_body: sql2}
-      postgres_version = Electric.Migrations.Generation.postgres_for_ordered_migrations([migration_1, migration_2])
+
+      postgres_version =
+        Electric.Migrations.Generation.postgres_for_ordered_migrations([migration_1, migration_2])
 
       expected = "\nCREATE TABLE main.goat (\n  name text PRIMARY KEY);\n"
 
@@ -57,7 +59,10 @@ defmodule MigrationsPostgresTest do
 
       migration_1 = %Electric.Migration{name: "test_1", original_body: sql1}
       migration_2 = %Electric.Migration{name: "test_2", original_body: sql2}
-      postgres_version = Electric.Migrations.Generation.postgres_for_ordered_migrations([migration_1, migration_2])
+
+      postgres_version =
+        Electric.Migrations.Generation.postgres_for_ordered_migrations([migration_1, migration_2])
+
       expected = """
       ALTER TABLE main.fish ADD COLUMN eyes integer DEFAULT 2;
 
@@ -69,7 +74,6 @@ defmodule MigrationsPostgresTest do
     end
 
     test "foreign keys" do
-
       sql_in = """
       CREATE TABLE IF NOT EXISTS parent (
         id INTEGER PRIMARY KEY,
@@ -84,7 +88,9 @@ defmodule MigrationsPostgresTest do
       """
 
       migration = %Electric.Migration{name: "test1", original_body: sql_in}
-      postgres_version = Electric.Migrations.Generation.postgres_for_ordered_migrations([migration])
+
+      postgres_version =
+        Electric.Migrations.Generation.postgres_for_ordered_migrations([migration])
 
       expected = """
 
@@ -102,7 +108,6 @@ defmodule MigrationsPostgresTest do
     end
 
     test "unique keys" do
-
       sql_in = """
       CREATE TABLE IF NOT EXISTS parent (
         id INTEGER PRIMARY KEY,
@@ -112,7 +117,9 @@ defmodule MigrationsPostgresTest do
       """
 
       migration = %Electric.Migration{name: "test1", original_body: sql_in}
-      postgres_version = Electric.Migrations.Generation.postgres_for_ordered_migrations([migration])
+
+      postgres_version =
+        Electric.Migrations.Generation.postgres_for_ordered_migrations([migration])
 
       expected = """
 
@@ -124,9 +131,7 @@ defmodule MigrationsPostgresTest do
       assert expected == postgres_version
     end
 
-
     test "desc primary keys" do
-
       sql_in = """
       CREATE TABLE IF NOT EXISTS parent (
         id INTEGER PRIMARY KEY DESC,
@@ -136,7 +141,9 @@ defmodule MigrationsPostgresTest do
       """
 
       migration = %Electric.Migration{name: "test1", original_body: sql_in}
-      postgres_version = Electric.Migrations.Generation.postgres_for_ordered_migrations([migration])
+
+      postgres_version =
+        Electric.Migrations.Generation.postgres_for_ordered_migrations([migration])
 
       expected = """
 
@@ -147,8 +154,5 @@ defmodule MigrationsPostgresTest do
 
       assert expected == postgres_version
     end
-
-
-
   end
 end

@@ -23,6 +23,7 @@ defmodule Electric.Migrations do
       case root_directory = Map.get(options, :dir) do
         nil ->
           "migrations"
+
         _ ->
           if Path.basename(root_directory) == "migrations" do
             root_directory
@@ -79,7 +80,6 @@ defmodule Electric.Migrations do
         template = Map.get(options, :template, @satellite_template)
         migration_set = ordered_migrations(migrations_folder)
         add_triggers_to_migrations(migration_set, template)
-
 
         if flags[:manifest] do
           write_manifest(migrations_folder)
@@ -218,6 +218,7 @@ defmodule Electric.Migrations do
       for migration <- ordered_migrations do
         Electric.Migration.ensure_original_body(migration)
       end
+
     failed_validation =
       Enum.filter(validated_migrations, fn migration -> migration.error != nil end)
 
@@ -243,58 +244,59 @@ defmodule Electric.Migrations do
     end
   end
 
-
   @doc false
   def add_triggers_to_migration(migration_set, template) do
     migration = List.last(migration_set)
 
     case Electric.Migrations.Triggers.add_triggers_to_last_migration(migration_set, template) do
-    {:error, reasons} ->
-      {:error, reasons}
-    with_triggers ->
-      migration_fingerprint =
-        if length(migration_set) > 1 do
-          previous_migration = Enum.at(migration_set, -2)
-          previous_metadata = Electric.Migration.get_satellite_metadata(previous_migration)
-          "#{migration.original_body}#{previous_metadata["sha256"]}"
-        else
-          migration.original_body
-        end
+      {:error, reasons} ->
+        {:error, reasons}
 
-      postgres_version = Electric.Migrations.Generation.postgres_for_ordered_migrations(migration_set)
-
-      hash = calc_hash(migration_fingerprint)
-      satellite_file_path = Electric.Migration.satellite_file_path(migration)
-      postgres_file_path = Electric.Migration.postgres_file_path(migration)
-
-      if File.exists?(satellite_file_path) do
-        metadata = Electric.Migration.get_satellite_metadata(migration)
-
-        if metadata["sha256"] != hash do
-          IO.puts("Warning: The migration #{migration.name} has been modified.")
-          File.rm(satellite_file_path)
-          File.rm(postgres_file_path)
-        end
-      end
-
-
-
-      if !File.exists?(satellite_file_path) do
-        header =
-          case Electric.Migration.get_original_metadata(migration) do
-            {:error, _reason} ->
-              Electric.Migration.file_header(migration, hash, nil)
-
-            existing_metadata ->
-              Electric.Migration.file_header(migration, hash, existing_metadata["title"])
+      with_triggers ->
+        migration_fingerprint =
+          if length(migration_set) > 1 do
+            previous_migration = Enum.at(migration_set, -2)
+            previous_metadata = Electric.Migration.get_satellite_metadata(previous_migration)
+            "#{migration.original_body}#{previous_metadata["sha256"]}"
+          else
+            migration.original_body
           end
 
-        File.write!(satellite_file_path, header <> with_triggers)
-        File.write!(postgres_file_path, header <> postgres_version)
-        :ok
-      else
-        :ok
-      end
+        postgres_version =
+          Electric.Migrations.Generation.postgres_for_ordered_migrations(migration_set)
+
+        hash = calc_hash(migration_fingerprint)
+        satellite_file_path = Electric.Migration.satellite_file_path(migration)
+        postgres_file_path = Electric.Migration.postgres_file_path(migration)
+
+        if File.exists?(satellite_file_path) do
+          metadata = Electric.Migration.get_satellite_metadata(migration)
+
+          if metadata["sha256"] != hash do
+            IO.puts("Warning: The migration #{migration.name} has been modified.")
+            File.rm(satellite_file_path)
+            File.rm(postgres_file_path)
+          end
+        end
+
+        if !File.exists?(satellite_file_path) do
+          header =
+            case Electric.Migration.get_original_metadata(migration) do
+              {:error, _reason} ->
+                Electric.Migration.file_header(migration, hash, nil)
+
+              existing_metadata ->
+                Electric.Migration.file_header(migration, hash, existing_metadata["title"])
+            end
+
+          File.write!(satellite_file_path, header <> with_triggers)
+          File.write!(postgres_file_path, header <> postgres_version)
+          :ok
+        else
+          :ok
+        end
     end
-  end #function
+  end
+
+  # function
 end

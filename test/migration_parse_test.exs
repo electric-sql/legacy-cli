@@ -1,9 +1,7 @@
 defmodule MigrationsParseTest do
   use ExUnit.Case
-  
-  
-  describe "Parse sql" do
 
+  describe "Parse sql" do
     test "tests can get column names" do
       sql_in = """
       CREATE TABLE IF NOT EXISTS fish (
@@ -27,15 +25,15 @@ defmodule MigrationsParseTest do
       SOME BOLLOCKS;
       """
 
-      {:error, [reason]} = Electric.Migrations.Parse.sql_ast_from_migration_set([%Electric.Migration{name: "test1", original_body: sql_in}])
+      {:error, [reason]} =
+        Electric.Migrations.Parse.sql_ast_from_migration_set([
+          %Electric.Migration{name: "test1", original_body: sql_in}
+        ])
 
       assert reason == "In migration test1 SQL error: near \"SOME\": syntax error"
-
     end
 
-
     test "tests can check for strictness and rowid" do
-
       sql_in = """
       CREATE TABLE IF NOT EXISTS fish (
       value TEXT PRIMARY KEY,
@@ -43,13 +41,17 @@ defmodule MigrationsParseTest do
       );
       """
 
-      {:error, [reason1, reason2]} = Electric.Migrations.Parse.sql_ast_from_migration_set([%Electric.Migration{name: "test1", original_body: sql_in}])
+      {:error, [reason1, reason2]} =
+        Electric.Migrations.Parse.sql_ast_from_migration_set([
+          %Electric.Migration{name: "test1", original_body: sql_in}
+        ])
 
-      assert reason1 == "The table fish is not WITHOUT ROWID. Add the WITHOUT ROWID option at the end of the create table statement and make sure you also specify a primary key"
-      assert reason2 == "The table fish is not STRICT. Add the STRICT option at the end of the create table statement"
+      assert reason1 ==
+               "The table fish is not WITHOUT ROWID. Add the WITHOUT ROWID option at the end of the create table statement and make sure you also specify a primary key"
 
+      assert reason2 ==
+               "The table fish is not STRICT. Add the STRICT option at the end of the create table statement"
     end
-
 
     test "tests getting SQL structure for templating" do
       sql_in = """
@@ -65,7 +67,10 @@ defmodule MigrationsParseTest do
       ) STRICT, WITHOUT ROWID;
       """
 
-      info = Electric.Migrations.Parse.sql_ast_from_migration_set([%Electric.Migration{name: "test1", original_body: sql_in}])
+      info =
+        Electric.Migrations.Parse.sql_ast_from_migration_set([
+          %Electric.Migration{name: "test1", original_body: sql_in}
+        ])
 
       expected_info = %{
         "main.parent" => %{
@@ -101,7 +106,8 @@ defmodule MigrationsParseTest do
           table_info: %{
             name: "parent",
             rootpage: 2,
-            sql: "CREATE TABLE parent (\n  id INTEGER PRIMARY KEY,\n  value TEXT\n) STRICT, WITHOUT ROWID",
+            sql:
+              "CREATE TABLE parent (\n  id INTEGER PRIMARY KEY,\n  value TEXT\n) STRICT, WITHOUT ROWID",
             tbl_name: "parent",
             type: "table"
           }
@@ -152,7 +158,8 @@ defmodule MigrationsParseTest do
           table_info: %{
             name: "child",
             rootpage: 3,
-            sql: "CREATE TABLE child (\n  id INTEGER PRIMARY KEY,\n  daddy INTEGER NOT NULL,\n  FOREIGN KEY(daddy) REFERENCES parent(id)\n) STRICT, WITHOUT ROWID",
+            sql:
+              "CREATE TABLE child (\n  id INTEGER PRIMARY KEY,\n  daddy INTEGER NOT NULL,\n  FOREIGN KEY(daddy) REFERENCES parent(id)\n) STRICT, WITHOUT ROWID",
             tbl_name: "child",
             type: "table"
           }
@@ -161,7 +168,6 @@ defmodule MigrationsParseTest do
 
       assert info == expected_info
     end
-
 
     test "tests getting uniques" do
       sql_in = """
@@ -178,7 +184,10 @@ defmodule MigrationsParseTest do
       ) STRICT, WITHOUT ROWID;
       """
 
-      info = Electric.Migrations.Parse.sql_ast_from_migration_set([%Electric.Migration{name: "test1", original_body: sql_in}])
+      info =
+        Electric.Migrations.Parse.sql_ast_from_migration_set([
+          %Electric.Migration{name: "test1", original_body: sql_in}
+        ])
 
       expected_info = %{
         "main.child" => %{
@@ -224,7 +233,8 @@ defmodule MigrationsParseTest do
           table_info: %{
             name: "child",
             rootpage: 4,
-            sql: "CREATE TABLE child (\n  id INTEGER PRIMARY KEY,\n  daddy INTEGER NOT NULL,\n  FOREIGN KEY(daddy) REFERENCES parent(id)\n) STRICT, WITHOUT ROWID",
+            sql:
+              "CREATE TABLE child (\n  id INTEGER PRIMARY KEY,\n  daddy INTEGER NOT NULL,\n  FOREIGN KEY(daddy) REFERENCES parent(id)\n) STRICT, WITHOUT ROWID",
             tbl_name: "child",
             type: "table"
           },
@@ -272,7 +282,8 @@ defmodule MigrationsParseTest do
           table_info: %{
             name: "parent",
             rootpage: 2,
-            sql: "CREATE TABLE parent (\n  id INTEGER PRIMARY KEY DESC,\n  value TEXT,\n  email TEXT UNIQUE\n) STRICT, WITHOUT ROWID",
+            sql:
+              "CREATE TABLE parent (\n  id INTEGER PRIMARY KEY DESC,\n  value TEXT,\n  email TEXT UNIQUE\n) STRICT, WITHOUT ROWID",
             tbl_name: "parent",
             type: "table"
           },
@@ -284,7 +295,6 @@ defmodule MigrationsParseTest do
     end
 
     test "tests getting SQL index structure" do
-
       sql_in = """
       CREATE TABLE IF NOT EXISTS parent (
         id INTEGER PRIMARY KEY,
@@ -299,42 +309,45 @@ defmodule MigrationsParseTest do
       ) STRICT, WITHOUT ROWID;
       """
 
-      table_info = Electric.Migrations.Parse.sql_ast_from_migration_set([%Electric.Migration{name: "test1", original_body: sql_in}])
-      ##IO.inspect(table_info)
+      table_info =
+        Electric.Migrations.Parse.sql_ast_from_migration_set([
+          %Electric.Migration{name: "test1", original_body: sql_in}
+        ])
+
+      ## IO.inspect(table_info)
 
       index_info = Electric.Migrations.Parse.all_index_info([sql_in])
 
       assert index_info == %{
-              "main.parent" => %{
-                0 => %{
-                  columns: [
-                    %{cid: 0, coll: "BINARY", desc: 0, key: 1, name: "id", seqno: 0},
-                    %{cid: 1, coll: "BINARY", desc: 0, key: 0, name: "value", seqno: 1},
-                    %{cid: 2, coll: "BINARY", desc: 0, key: 0, name: "email", seqno: 2}
-                  ],
-                  name: "sqlite_autoindex_parent_2",
-                  origin: "pk",
-                  partial: 0,
-                  seq: 0,
-                  unique: 1
-                },
-                1 => %{
-                  columns: [
-                    %{cid: 2, coll: "BINARY", desc: 0, key: 1, name: "email", seqno: 0},
-                    %{cid: 0, coll: "BINARY", desc: 0, key: 0, name: "id", seqno: 1}
-                  ],
-                  name: "sqlite_autoindex_parent_1",
-                  origin: "u",
-                  partial: 0,
-                  seq: 1,
-                  unique: 1
-                }
-              }
-            }
+               "main.parent" => %{
+                 0 => %{
+                   columns: [
+                     %{cid: 0, coll: "BINARY", desc: 0, key: 1, name: "id", seqno: 0},
+                     %{cid: 1, coll: "BINARY", desc: 0, key: 0, name: "value", seqno: 1},
+                     %{cid: 2, coll: "BINARY", desc: 0, key: 0, name: "email", seqno: 2}
+                   ],
+                   name: "sqlite_autoindex_parent_2",
+                   origin: "pk",
+                   partial: 0,
+                   seq: 0,
+                   unique: 1
+                 },
+                 1 => %{
+                   columns: [
+                     %{cid: 2, coll: "BINARY", desc: 0, key: 1, name: "email", seqno: 0},
+                     %{cid: 0, coll: "BINARY", desc: 0, key: 0, name: "id", seqno: 1}
+                   ],
+                   name: "sqlite_autoindex_parent_1",
+                   origin: "u",
+                   partial: 0,
+                   seq: 1,
+                   unique: 1
+                 }
+               }
+             }
     end
 
     test "tests getting SQL conflict" do
-
       sql_in = """
       CREATE TABLE IF NOT EXISTS parent (
         id INTEGER PRIMARY KEY,
@@ -349,8 +362,12 @@ defmodule MigrationsParseTest do
       );
       """
 
-      table_info = Electric.Migrations.Parse.sql_ast_from_migration_set([%Electric.Migration{name: "test1", original_body: sql_in}])
-      ##IO.inspect(table_info)
+      table_info =
+        Electric.Migrations.Parse.sql_ast_from_migration_set([
+          %Electric.Migration{name: "test1", original_body: sql_in}
+        ])
+
+      ## IO.inspect(table_info)
 
       index_info = Electric.Migrations.Parse.all_index_info([sql_in])
 
@@ -370,15 +387,5 @@ defmodule MigrationsParseTest do
                }
              }
     end
-
   end
-  
-  
-  
-  
-  
-  
-  
-  
-  
 end
