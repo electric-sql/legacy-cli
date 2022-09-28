@@ -1,15 +1,18 @@
 defmodule Electric.Migrations.Parse do
   @moduledoc """
-  hello
+  Creates an AST from SQL migrations
   """
 
-  @doc false
+  @doc """
+  Given a set of Electric.Migration and returns an ugly map of maps containing info about the DB structure.
+  Also validates the SQL and returns error messages if validation fails
+  """
   def sql_ast_from_migration_set(migrations) do
     case ast_from_ordered_migrations(migrations) do
       {ast, []} ->
         ast
 
-      {ast, errors} ->
+      {_ast, errors} ->
         {:error, errors}
     end
   end
@@ -84,7 +87,7 @@ defmodule Electric.Migrations.Parse do
           foreign_keys_rows = get_rows_while(conn, foreign_statement, [])
 
           foreign_keys =
-            for [id, seq, table, from, to, on_update, on_delete, match] <- foreign_keys_rows do
+            for [_id, _seq, table, from, to, _on_update, _on_delete, _match] <- foreign_keys_rows do
               %{
                 :child_key => from,
                 :parent_key => to,
@@ -136,7 +139,7 @@ defmodule Electric.Migrations.Parse do
     end
   end
 
-  def check_sql(table_name, sql) do
+  defp check_sql(table_name, sql) do
     validation_fails = []
     lower = String.downcase(sql)
 
@@ -150,20 +153,17 @@ defmodule Electric.Migrations.Parse do
         validation_fails
       end
 
-    validation_fails =
-      if !String.contains?(lower, "without rowid") do
-        [
-          "The table #{table_name} is not WITHOUT ROWID. Add the WITHOUT ROWID option at the end of the create table statement and make sure you also specify a primary key"
-          | validation_fails
-        ]
-      else
-        validation_fails
-      end
+    if !String.contains?(lower, "without rowid") do
+      [
+        "The table #{table_name} is not WITHOUT ROWID. Add the WITHOUT ROWID option at the end of the create table statement and make sure you also specify a primary key"
+        | validation_fails
+      ]
+    else
+      validation_fails
+    end
   end
 
   def all_index_info(all_migrations) do
-    namespace = "main"
-    # get all the table names
     {:ok, conn} = Exqlite.Sqlite3.open(":memory:")
 
     for migration <- all_migrations do
@@ -186,44 +186,43 @@ defmodule Electric.Migrations.Parse do
     :ok = Exqlite.Sqlite3.release(conn, statement)
 
     # for each table
-    infos =
-      for [type, name, tbl_name, rootpage, sql] <- info, into: %{} do
-        # column names
-        {:ok, info_statement} = Exqlite.Sqlite3.prepare(conn, "PRAGMA index_list(#{tbl_name});")
-        indexes = Enum.reverse(get_rows_while(conn, info_statement, []))
+    for [_type, _name, tbl_name, _rootpage, _sql] <- info, into: %{} do
+      # column names
+      {:ok, info_statement} = Exqlite.Sqlite3.prepare(conn, "PRAGMA index_list(#{tbl_name});")
+      indexes = Enum.reverse(get_rows_while(conn, info_statement, []))
 
-        index_infos =
-          for [seq, name, unique, origin, partial] <- indexes, into: %{} do
-            {:ok, col_info_statement} =
-              Exqlite.Sqlite3.prepare(conn, "PRAGMA index_xinfo(#{name});")
+      index_infos =
+        for [seq, name, unique, origin, partial] <- indexes, into: %{} do
+          {:ok, col_info_statement} =
+            Exqlite.Sqlite3.prepare(conn, "PRAGMA index_xinfo(#{name});")
 
-            index_columns = Enum.reverse(get_rows_while(conn, col_info_statement, []))
+          index_columns = Enum.reverse(get_rows_while(conn, col_info_statement, []))
 
-            index_column_infos =
-              for [seqno, cid, name, desc, coll, key] <- index_columns do
-                %{
-                  :seqno => seqno,
-                  :cid => cid,
-                  :name => name,
-                  :desc => desc,
-                  :coll => coll,
-                  :key => key
-                }
-              end
+          index_column_infos =
+            for [seqno, cid, name, desc, coll, key] <- index_columns do
+              %{
+                :seqno => seqno,
+                :cid => cid,
+                :name => name,
+                :desc => desc,
+                :coll => coll,
+                :key => key
+              }
+            end
 
-            {seq,
-             %{
-               :seq => seq,
-               :name => name,
-               :unique => unique,
-               :origin => origin,
-               :partial => partial,
-               :columns => index_column_infos
-             }}
-          end
+          {seq,
+           %{
+             :seq => seq,
+             :name => name,
+             :unique => unique,
+             :origin => origin,
+             :partial => partial,
+             :columns => index_column_infos
+           }}
+        end
 
-        {"main.#{tbl_name}", index_infos}
-      end
+      {"#{namespace}.#{tbl_name}", index_infos}
+    end
   end
 
   defp get_rows_while(conn, statement, rows) do
@@ -243,7 +242,7 @@ defmodule Electric.Migrations.Parse do
 
       _ ->
         matching_unique_indexes =
-          for {seq, info} <- indexes do
+          for {_seq, info} <- indexes do
             case info.origin do
               "u" ->
                 cols =
@@ -269,7 +268,7 @@ defmodule Electric.Migrations.Parse do
 
       _ ->
         matching_desc_indexes =
-          for {seq, info} <- indexes do
+          for {_seq, info} <- indexes do
             case info.origin do
               "pk" ->
                 cols =

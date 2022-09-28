@@ -1,8 +1,12 @@
 defmodule Electric.Migrations.Triggers do
   @moduledoc """
-
+  Adds triggers to the Satellite SQLite files with templates to allow integration with electric
   """
 
+  @doc """
+  Given an ordered set of Electric.Migration returns a templated version of the final migration
+  SQL with all the triggers needed by Satellite added.
+  """
   def add_triggers_to_last_migration(migration_set, template) do
     case Electric.Migrations.Parse.sql_ast_from_migration_set(migration_set) do
       {:error, reasons} ->

@@ -1,8 +1,11 @@
 defmodule Electric.Migrations.Generation do
   @moduledoc """
-
+  Generates PostgreSQL text from SQLite text
   """
 
+  @doc """
+  Given an ordered list of Electric.Migration objects creates a PostgreSQL file for the last migration in the list
+  """
   def postgres_for_ordered_migrations(ordered_migrations) do
     {before_ast, after_ast} = before_and_after_ast(ordered_migrations)
     get_postgres_for_infos(before_ast, after_ast)
@@ -32,7 +35,7 @@ defmodule Electric.Migrations.Generation do
             ## %{cid: 0, dflt_value: nil, name: "id", notnull: 0, pk: 1, type: "INTEGER"}
 
             column_definitions =
-              for {column_id, column_info} <- table_after.column_infos do
+              for {_column_id, column_info} <- table_after.column_infos do
                 "\n  " <> column_def_sql_from_info(column_info, flavour)
               end
 

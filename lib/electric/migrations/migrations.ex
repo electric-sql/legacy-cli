@@ -5,13 +5,12 @@ defmodule Electric.Migrations do
   """
 
   @migration_file_name "migration.sql"
-  @satellite_file_name "satellite.sql"
   @manifest_file_name "manifest.json"
   @bundle_file_name "manifest.bundle.json"
   @js_bundle_file_name "index.js"
-  @migration_template EEx.compile_file("lib/electric/templates/migration.eex")
-  @satellite_template EEx.compile_file("lib/electric/templates/triggers.eex")
-  @bundle_template EEx.compile_file("lib/electric/templates/bundle_js.eex")
+  @migration_template EEx.compile_file("lib/electric/migrations/templates/migration.eex")
+  @satellite_template EEx.compile_file("lib/electric/migrations/templates/triggers.eex")
+  @bundle_template EEx.compile_file("lib/electric/migrations/templates/bundle_js.eex")
 
   @doc """
   Creates the migrations folder and adds in initial migration to it.
@@ -297,6 +296,4 @@ defmodule Electric.Migrations do
         end
     end
   end
-
-  # function
 end

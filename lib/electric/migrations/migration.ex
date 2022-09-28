@@ -1,6 +1,6 @@
 defmodule Electric.Migration do
   @moduledoc """
-
+  A struct to hold information about a single migration
   """
 
   @migration_file_name "migration.sql"
@@ -9,18 +9,30 @@ defmodule Electric.Migration do
   @enforce_keys [:name]
   defstruct name: "noname", src_folder: nil, original_body: nil, satellite_body: nil, error: nil
 
+  @doc """
+  The file path for this migration's original source within the migrations folder
+  """
   def original_file_path(migration) do
     Path.join([migration.src_folder, migration.name, @migration_file_name])
   end
 
+  @doc """
+  The file path for this migration's satellite SQL file within the migrations folder
+  """
   def satellite_file_path(migration) do
     Path.join([migration.src_folder, migration.name, @satellite_file_name])
   end
 
+  @doc """
+  The file path for this migration's PostgreSQL file within the migrations folder
+  """
   def postgres_file_path(migration) do
     Path.join([migration.src_folder, migration.name, @postgres_file_name])
   end
 
+  @doc """
+  reads the original source from file
+  """
   def ensure_original_body(migration) do
     if migration.original_body == nil do
       sql = File.read!(original_file_path(migration))
@@ -30,6 +42,9 @@ defmodule Electric.Migration do
     end
   end
 
+  @doc """
+  reads the satellite source from file
+  """
   def ensure_satellite_body(migration) do
     if migration.satellite_body == nil do
       sql = File.read!(satellite_file_path(migration))
@@ -39,19 +54,10 @@ defmodule Electric.Migration do
     end
   end
 
-  #  def ensure_and_validate_original_sql(migration) do
-  #    with_body = ensure_original_body(migration)
-  #    {:ok, conn} = Exqlite.Sqlite3.open(":memory:")
-  #
-  #    case Exqlite.Sqlite3.execute(conn, with_body.original_body) do
-  #      :ok ->
-  #        with_body
-  #
-  #      {:error, reason} ->
-  #        %{with_body | error: reason}
-  #    end
-  #  end
-
+  @doc """
+  reads the satellite metadata from the file header and returns the metadata as a json serialisable map
+  with_body: is a bool to ask for the satellite migration body itself to be included
+  """
   def as_json_map(migration, with_body) do
     with_satellite_body = ensure_satellite_body(migration)
     metadata = get_satellite_metadata(with_satellite_body)
@@ -65,11 +71,17 @@ defmodule Electric.Migration do
     end
   end
 
+  @doc """
+  reads the satellite metadata from the file header
+  """
   def get_satellite_metadata(migration) do
     with_satellite = ensure_satellite_body(migration)
     get_body_metadata(with_satellite.satellite_body)
   end
 
+  @doc """
+  reads the original metadata from the file header
+  """
   def get_original_metadata(migration) do
     with_original = ensure_original_body(migration)
     get_body_metadata(with_original.original_body)

@@ -309,13 +309,6 @@ defmodule MigrationsParseTest do
       ) STRICT, WITHOUT ROWID;
       """
 
-      table_info =
-        Electric.Migrations.Parse.sql_ast_from_migration_set([
-          %Electric.Migration{name: "test1", original_body: sql_in}
-        ])
-
-      ## IO.inspect(table_info)
-
       index_info = Electric.Migrations.Parse.all_index_info([sql_in])
 
       assert index_info == %{
@@ -361,13 +354,6 @@ defmodule MigrationsParseTest do
         FOREIGN KEY(daddy) REFERENCES parent(id)
       );
       """
-
-      table_info =
-        Electric.Migrations.Parse.sql_ast_from_migration_set([
-          %Electric.Migration{name: "test1", original_body: sql_in}
-        ])
-
-      ## IO.inspect(table_info)
 
       index_info = Electric.Migrations.Parse.all_index_info([sql_in])
 
