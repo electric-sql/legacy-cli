@@ -23,7 +23,6 @@ defmodule Electric.Migrations do
       case root_directory = Map.get(options, :dir) do
         nil ->
           "migrations"
-
         _ ->
           if Path.basename(root_directory) == "migrations" do
             root_directory
@@ -78,8 +77,8 @@ defmodule Electric.Migrations do
     case check_migrations_folder(options) do
       {:ok, migrations_folder} ->
         template = Map.get(options, :template, @satellite_template)
-        ordered_migrations(migrations_folder) |> add_triggers_to_migrations(template)
-
+        migration_set = ordered_migrations(migrations_folder)
+        add_triggers_to_migrations(migration_set, template)
 
 
         if flags[:manifest] do
@@ -187,7 +186,8 @@ defmodule Electric.Migrations do
   defp ordered_migrations(src_folder) do
     sql_file_paths = Path.join([src_folder, "*", @migration_file_name]) |> Path.wildcard()
 
-    migration_names = for file_path <- sql_file_paths do
+    migration_names =
+      for file_path <- sql_file_paths do
         Path.dirname(file_path) |> Path.basename()
       end
 
@@ -207,69 +207,19 @@ defmodule Electric.Migrations do
     end
   end
 
-
-#  defp diff_migrations(server_migrations, src_folder) do
-#
-#    missing_locally = for server_migration_info <- server_migrations if !File.exists?(Path.join([src_folder, server_migration_info["name"]])) do
-#      server_migration_info["name"]
-#    end
-#
-#    if length(missing_locally) != 0 do
-#      {:missing_error, conflicted_migrations}
-#    else
-#      local_migrations = all_migrations_as_maps(src_folder, true)
-#      server_migrations_lookup = Enum.into(server_migrations, %{}, fn info -> {info["name"], info} end)
-#
-#      migration_statuses = for local_migration <- local_migrations do
-#        migration_name = local_migration["name"]
-#        if Map.has_key?(server_migrations_lookup, migration_name) do
-#          server_migration_info = server_migrations_lookup[migration_name]
-#          if server_migration_info["sha256"] != local_migration_info["sha256"] do
-#            if server_migration_info["applied"] == true do
-#              {:conflicted, local_migration}
-#            else
-#              {:modified, local_migration}
-#            end
-#          else
-#            [:matches, local_migration]
-#          end
-#        else
-#          {:new, local_migration}
-#        end
-#      end
-#
-#      conflicted_migrations = for {status, local_migration} <- local_migrations if status == :conflicted  do
-#        local_migration
-#      end
-#
-#      if length(conflicted_migrations) != 0 do
-#      {:conflict_error, conflicted_migrations}
-#      else
-#         new_migrations = for {status, local_migration} <- local_migrations if status != :conflicted  do
-#           if status == :modified do
-#             IO.puts("The migration #{local_migration["name"]} will be changed on the server.")
-#           end
-#           local_migration
-#        end
-#         {:ok, new_migrations}
-#      end
-#    end
-#  end
-
   defp calc_hash(with_triggers) do
     sha = :crypto.hash(:sha256, with_triggers)
     base16 = Base.encode16(sha)
     String.downcase(base16)
   end
 
-  
   defp add_triggers_to_migrations(ordered_migrations, template) do
-
-    validated_migrations = for migration <- ordered_migrations do
-      Electric.Migration.ensure_and_validate_original_sql(migration)
-    end
-
-    failed_validation = Enum.filter(validated_migrations, fn migration -> migration.error != nil end)
+    validated_migrations =
+      for migration <- ordered_migrations do
+        Electric.Migration.ensure_original_body(migration)
+      end
+    failed_validation =
+      Enum.filter(validated_migrations, fn migration -> migration.error != nil end)
 
     if length(failed_validation) > 0 do
       {:error, failed_validation}
@@ -277,6 +227,7 @@ defmodule Electric.Migrations do
       try do
         for {_migration, i} <- Enum.with_index(validated_migrations) do
           subset_of_migrations = Enum.take(validated_migrations, i + 1)
+
           # this is using a migration file path and all the migrations up to, an including this migration
           case add_triggers_to_migration(
                  subset_of_migrations,
@@ -294,156 +245,56 @@ defmodule Electric.Migrations do
 
 
   @doc false
-  def add_triggers_to_migration(ordered_migrations, template) do
+  def add_triggers_to_migration(migration_set, template) do
+    migration = List.last(migration_set)
 
-    migration = List.last(ordered_migrations)
-
-    ordered_sql = for migration <- ordered_migrations do
-      migration.original_body
-    end
-
-    with_triggers = add_triggers_to_last_sql(ordered_sql, template)
-
-    migration_fingerprint =
-      if length(ordered_migrations) > 1 do
-        previous_migration = Enum.at(ordered_migrations, -2)
-        previous_metadata = Electric.Migration.get_satellite_metadata(previous_migration)
-        "#{migration.original_body}#{previous_metadata["sha256"]}"
-      else
-        migration.original_body
-      end
-
-    hash = calc_hash(migration_fingerprint)
-    satellite_file_path = Electric.Migration.satellite_file_path(migration)
-
-    if File.exists?(satellite_file_path) do
-      metadata = Electric.Migration.get_satellite_metadata(migration)
-      if metadata["sha256"] != hash do
-        IO.puts("Warning: The migration #{migration.name} has been modified.")
-        File.rm(satellite_file_path)
-      end
-    end
-
-    if !File.exists?(satellite_file_path) do
-      header =
-        case Electric.Migration.get_original_metadata(migration) do
-          {:error, _reason} ->
-            Electric.Migration.file_header(migration, hash, nil)
-          existing_metadata ->
-            Electric.Migration.file_header(migration, hash, existing_metadata["title"])
+    case Electric.Migrations.Triggers.add_triggers_to_last_migration(migration_set, template) do
+    {:error, reasons} ->
+      {:error, reasons}
+    with_triggers ->
+      migration_fingerprint =
+        if length(migration_set) > 1 do
+          previous_migration = Enum.at(migration_set, -2)
+          previous_metadata = Electric.Migration.get_satellite_metadata(previous_migration)
+          "#{migration.original_body}#{previous_metadata["sha256"]}"
+        else
+          migration.original_body
         end
 
-      File.write!(satellite_file_path, header <> with_triggers)
-      :ok
-    else
-      :ok
-    end
-  end
-  
+      postgres_version = Electric.Migrations.Generation.postgres_for_ordered_migrations(migration_set)
 
-  @doc false
-  def add_triggers_to_last_sql(ordered_sql, template) do
-    
-    # adds triggers for all tables to the end of the last migration
-    table_infos = all_tables_info(ordered_sql)
-    sql_in = List.last(ordered_sql)
-    is_init = length(ordered_sql) == 1
-    template_all_the_things(sql_in, table_infos, template, is_init)
-  end
+      hash = calc_hash(migration_fingerprint)
+      satellite_file_path = Electric.Migration.satellite_file_path(migration)
+      postgres_file_path = Electric.Migration.postgres_file_path(migration)
 
-  @doc false
-  def created_table_names(sql_in) do
-    info = all_tables_info(sql_in)
-    Map.keys(info)
-  end
+      if File.exists?(satellite_file_path) do
+        metadata = Electric.Migration.get_satellite_metadata(migration)
 
-  @doc false
-  def all_tables_info(all_migrations) do
-
-    namespace = "main"
-    # get all the table names
-    {:ok, conn} = Exqlite.Sqlite3.open(":memory:")
-
-    for migration <- all_migrations do
-      :ok = Exqlite.Sqlite3.execute(conn, migration)
-    end
-
-    {:ok, statement} =
-      Exqlite.Sqlite3.prepare(
-        conn,
-        "SELECT name, sql FROM sqlite_master WHERE type='table' AND name!='_electric_oplog';"
-      )
-
-    info = get_rows_while(conn, statement, [])
-    :ok = Exqlite.Sqlite3.release(conn, statement)
-
-    # for each table
-    infos =
-      for [table_name, _sql] <- info do
-        # column names
-        {:ok, info_statement} = Exqlite.Sqlite3.prepare(conn, "PRAGMA table_info(#{table_name});")
-        columns = Enum.reverse(get_rows_while(conn, info_statement, []))
-
-        column_names =
-          for [_cid, name, _type, _notnull, _dflt_value, _pk] <- columns do
-            name
-          end
-
-        # private keys columns
-        private_key_column_names =
-          for [_cid, name, _type, _notnull, _dflt_value, pk] when pk == 1 <- columns do
-            name
-          end
-
-        # foreign keys
-        {:ok, foreign_statement} =
-          Exqlite.Sqlite3.prepare(conn, "PRAGMA foreign_key_list(#{table_name});")
-
-        foreign_keys = get_rows_while(conn, foreign_statement, [])
-
-        foreign_keys =
-          for [_a, _b, parent_table, child_key, parent_key, _c, _d, _e] <- foreign_keys do
-            %{
-              :child_key => child_key,
-              :parent_key => parent_key,
-              :table => "#{namespace}.#{parent_table}"
-            }
-          end
-
-        %{
-          :table_name => table_name,
-          :columns => column_names,
-          :namespace => namespace,
-          :primary => private_key_column_names,
-          :foreign_keys => foreign_keys
-        }
+        if metadata["sha256"] != hash do
+          IO.puts("Warning: The migration #{migration.name} has been modified.")
+          File.rm(satellite_file_path)
+          File.rm(postgres_file_path)
+        end
       end
 
-    Enum.into(infos, %{}, fn info -> {"#{namespace}.#{info.table_name}", info} end)
-  end
 
-  defp get_rows_while(conn, statement, rows) do
-    case Exqlite.Sqlite3.step(conn, statement) do
-      {:row, row} ->
-        get_rows_while(conn, statement, [row | rows])
 
-      :done ->
-        rows
+      if !File.exists?(satellite_file_path) do
+        header =
+          case Electric.Migration.get_original_metadata(migration) do
+            {:error, _reason} ->
+              Electric.Migration.file_header(migration, hash, nil)
+
+            existing_metadata ->
+              Electric.Migration.file_header(migration, hash, existing_metadata["title"])
+          end
+
+        File.write!(satellite_file_path, header <> with_triggers)
+        File.write!(postgres_file_path, header <> postgres_version)
+        :ok
+      else
+        :ok
+      end
     end
-  end
-
-  @doc false
-  def template_all_the_things(original_sql, tables, template, is_init) do
-    ## strip the old header
-    patched_sql = String.replace(original_sql, ~r/\A\/\*((?s).*)\*\/\n/, "")
-    ## template
-    {result, _bindings} =
-      Code.eval_quoted(template,
-        is_init: is_init,
-        original_sql: patched_sql,
-        tables: tables
-      )
-
-    result
-  end
+  end #function
 end

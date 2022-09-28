@@ -3,12 +3,11 @@ defmodule Electric.Migration do
 
   """
 
-
   @migration_file_name "migration.sql"
   @satellite_file_name "satellite.sql"
+  @postgres_file_name "postgres.sql"
   @enforce_keys [:name]
   defstruct name: "noname", src_folder: nil, original_body: nil, satellite_body: nil, error: nil
-
 
   def original_file_path(migration) do
     Path.join([migration.src_folder, migration.name, @migration_file_name])
@@ -16,6 +15,10 @@ defmodule Electric.Migration do
 
   def satellite_file_path(migration) do
     Path.join([migration.src_folder, migration.name, @satellite_file_name])
+  end
+
+  def postgres_file_path(migration) do
+    Path.join([migration.src_folder, migration.name, @postgres_file_name])
   end
 
   def ensure_original_body(migration) do
@@ -36,20 +39,23 @@ defmodule Electric.Migration do
     end
   end
 
-
-  def ensure_and_validate_original_sql(migration) do
-    with_body = ensure_original_body(migration)
-    {:ok, conn} = Exqlite.Sqlite3.open(":memory:")
-    case Exqlite.Sqlite3.execute(conn, with_body.original_body) do
-      :ok -> with_body
-      {:error, reason} ->
-        %{with_body | error: reason}
-    end
-  end
+#  def ensure_and_validate_original_sql(migration) do
+#    with_body = ensure_original_body(migration)
+#    {:ok, conn} = Exqlite.Sqlite3.open(":memory:")
+#
+#    case Exqlite.Sqlite3.execute(conn, with_body.original_body) do
+#      :ok ->
+#        with_body
+#
+#      {:error, reason} ->
+#        %{with_body | error: reason}
+#    end
+#  end
 
   def as_json_map(migration, with_body) do
     with_satellite_body = ensure_satellite_body(migration)
     metadata = get_satellite_metadata(with_satellite_body)
+
     if with_body do
       # At the moment just using elixir jason's default escaping of the SQL text - maybe switch to base64 if causes issues
       # see here for json escaping https://www.ietf.org/rfc/rfc4627.txt
@@ -102,6 +108,4 @@ defmodule Electric.Migration do
         """
     end
   end
-
-
 end

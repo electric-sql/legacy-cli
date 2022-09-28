@@ -10,53 +10,15 @@ defmodule MigrationsTest do
       sql = """
       CREATE TABLE IF NOT EXISTS fish (
       value TEXT PRIMARY KEY
-      );
-      """
-
-      migration = %Electric.Migration{name: "test1", original_body: sql}
-#      IO.inspect(migration)
-
-      assert Electric.Migration.ensure_and_validate_original_sql(migration).error == nil
-    end
-
-    test "tests nonsense SQL fails" do
-      sql = """
-      CREATE TABLE IF NOT EXISTS fish (
-      value TEXT PRIMARY KEY
-      );
-      SOME BOLLOCKS;
+      ) STRICT, WITHOUT ROWID;
       """
 
       migration = %Electric.Migration{name: "test1", original_body: sql}
 
-      assert Electric.Migration.ensure_and_validate_original_sql(migration).error == "near \"SOME\": syntax error"
-    end
-  end
-
-  describe "Finds create table instructions in sql" do
-    test "find single create" do
-      sql = """
-      CREATE TABLE IF NOT EXISTS fish (
-      value TEXT PRIMARY KEY
-      );
-      """
-
-      assert Electric.Migrations.created_table_names([sql]) == ["main.fish"]
+      assert Electric.Migration.ensure_original_body(migration).error == nil
     end
 
-    test "find multiple creates" do
-      sql = """
-      CREATE TABLE IF NOT EXISTS fish (
-      value TEXT PRIMARY KEY
-      );
-      CREATE TABLE IF NOT EXISTS dogs (
-      value TEXT PRIMARY KEY
-      );
-      """
 
-      assert MapSet.new(Electric.Migrations.created_table_names([sql])) ==
-               MapSet.new(["main.fish", "main.dogs"])
-    end
   end
 
   describe "adds_triggers to sql" do
@@ -64,17 +26,17 @@ defmodule MigrationsTest do
       sql = """
       CREATE TABLE IF NOT EXISTS fish (
       value TEXT PRIMARY KEY
-      );
+      ) STRICT, WITHOUT ROWID;
       """
 
       expected = """
       CREATE TABLE IF NOT EXISTS fish (
       value TEXT PRIMARY KEY
-      );
+      ) STRICT, WITHOUT ROWID;
       --ADD A TRIGGER FOR main.fish;
       """
 
-      assert Electric.Migrations.add_triggers_to_last_sql([sql], @trigger_template) ==
+      assert Electric.Migrations.Triggers.add_triggers_to_last_migration([%Electric.Migration{name: "test1", original_body: sql}], @trigger_template) ==
                expected
     end
 
@@ -82,14 +44,13 @@ defmodule MigrationsTest do
       sql = """
       CREATE TABLE IF NOT EXISTS fish (
       value TEXT PRIMARY KEY
-      );
+      ) STRICT, WITHOUT ROWID;
       """
 
-#      migration = %Electric.Migration{name: "test1", original_body: sql}
+      #      migration = %Electric.Migration{name: "test1", original_body: sql}
 
       sql =
-        Electric.Migrations.add_triggers_to_last_sql(
-          [sql],
+        Electric.Migrations.Triggers.add_triggers_to_last_migration([%Electric.Migration{name: "test1", original_body: sql}],
           Electric.Migrations.get_template()
         )
 
@@ -97,13 +58,10 @@ defmodule MigrationsTest do
     end
   end
 
-
   def is_valid_sql(sql) do
     {:ok, conn} = Exqlite.Sqlite3.open(":memory:")
     Exqlite.Sqlite3.execute(conn, sql)
   end
-
-
 
   describe "Triggers works as expected" do
     test "templating" do
@@ -131,7 +89,7 @@ defmodule MigrationsTest do
       }
 
       templated =
-        Electric.Migrations.template_all_the_things(
+        Electric.Migrations.Triggers.template_all_the_things(
           original_sql,
           tables,
           Electric.Migrations.get_template(),
@@ -295,12 +253,11 @@ defmodule MigrationsTest do
       sql = """
       CREATE TABLE IF NOT EXISTS fish (
       value TEXT PRIMARY KEY
-      );
+      ) STRICT, WITHOUT ROWID;
       """
 
       sql =
-        Electric.Migrations.add_triggers_to_last_sql(
-          [sql],
+        Electric.Migrations.Triggers.add_triggers_to_last_migration([%Electric.Migration{name: "test1", original_body: sql}],
           Electric.Migrations.get_template()
         )
 
@@ -328,7 +285,7 @@ defmodule MigrationsTest do
       sql = """
       CREATE TABLE IF NOT EXISTS main.fish (
       value TEXT PRIMARY KEY
-      );
+      ) STRICT, WITHOUT ROWID;
       """
 
       {:ok, conn} = Exqlite.Sqlite3.open(":memory:")
@@ -346,12 +303,11 @@ defmodule MigrationsTest do
       sql = """
       CREATE TABLE IF NOT EXISTS fish (
       value TEXT PRIMARY KEY
-      );
+      ) STRICT, WITHOUT ROWID;
       """
 
       sql =
-        Electric.Migrations.add_triggers_to_last_sql(
-          [sql],
+        Electric.Migrations.Triggers.add_triggers_to_last_migration([%Electric.Migration{name: "test1", original_body: sql}],
           Electric.Migrations.get_template()
         )
 
@@ -379,12 +335,11 @@ defmodule MigrationsTest do
       CREATE TABLE IF NOT EXISTS fish (
       value TEXT PRIMARY KEY,
       colour TEXT
-      );
+      ) STRICT, WITHOUT ROWID;
       """
 
       sql =
-        Electric.Migrations.add_triggers_to_last_sql(
-          [sql],
+        Electric.Migrations.Triggers.add_triggers_to_last_migration([%Electric.Migration{name: "test1", original_body: sql}],
           Electric.Migrations.get_template()
         )
 
@@ -424,7 +379,7 @@ defmodule MigrationsTest do
       sql1 = """
       CREATE TABLE IF NOT EXISTS fish (
       value TEXT PRIMARY KEY
-      );
+      ) STRICT, WITHOUT ROWID;
       """
 
       sql2 = """
@@ -433,14 +388,17 @@ defmodule MigrationsTest do
       """
 
       sql_out1 =
-        Electric.Migrations.add_triggers_to_last_sql(
-          [sql1],
+        Electric.Migrations.Triggers.add_triggers_to_last_migration([%Electric.Migration{name: "test1", original_body: sql1}],
           Electric.Migrations.get_template()
         )
 
+
+      migration_1 = %Electric.Migration{name: "test1", original_body: sql1}
+      migration_2 = %Electric.Migration{name: "test2", original_body: sql2}
+
       sql_out2 =
-        Electric.Migrations.add_triggers_to_last_sql(
-          [sql1, sql2],
+        Electric.Migrations.Triggers.add_triggers_to_last_migration(
+          [migration_1, migration_2],
           Electric.Migrations.get_template()
         )
 
@@ -471,58 +429,10 @@ defmodule MigrationsTest do
       assert oldRow == nil
     end
 
-    test "tests can get column names" do
-      sql_in = """
-      CREATE TABLE IF NOT EXISTS fish (
-      value TEXT PRIMARY KEY,
-      colour TEXT
-      );
-      """
-
-      info = Electric.Migrations.all_tables_info([sql_in])
-
-      column_names = info["main.fish"][:columns]
-      assert column_names == ["value", "colour"]
-    end
-
-    test "tests getting SQL structure for templating" do
-      sql_in = """
-      CREATE TABLE IF NOT EXISTS parent (
-        id INTEGER PRIMARY KEY,
-        value TEXT
-      );
-
-      CREATE TABLE IF NOT EXISTS child (
-        id INTEGER PRIMARY KEY,
-        daddy INTEGER NOT NULL,
-        FOREIGN KEY(daddy) REFERENCES parent(id)
-      );
-      """
-
-      info = Electric.Migrations.all_tables_info([sql_in])
-
-      expected_info = %{
-        "main.parent" => %{
-          :namespace => "main",
-          :table_name => "parent",
-          :primary => ["id"],
-          :foreign_keys => [],
-          :columns => ["id", "value"]
-        },
-        "main.child" => %{
-          :namespace => "main",
-          :table_name => "child",
-          :primary => ["id"],
-          :foreign_keys => [
-            %{:child_key => "daddy", :parent_key => "id", :table => "main.parent"}
-          ],
-          :columns => ["id", "daddy"]
-        }
-      }
-
-      assert info == expected_info
-    end
   end
+
+
+
 
   def get_while(conn, statement, names) do
     case Exqlite.Sqlite3.step(conn, statement) do
@@ -581,7 +491,7 @@ defmodule MigrationsFileTest do
       new_content = """
       CREATE TABLE IF NOT EXISTS items (
         value TEXT PRIMARY KEY
-      );
+      ) STRICT, WITHOUT ROWID;
       """
 
       File.write!(my_new_migration, new_content, [:append])
@@ -601,7 +511,7 @@ defmodule MigrationsFileTest do
       new_content = """
       CREATE TABLE IF NOT EXISTS items (
         value TEXT PRIMARY KEY
-      );
+      ) STRICT, WITHOUT ROWID;
       """
 
       File.write!(my_new_migration, new_content, [:append])
@@ -613,7 +523,7 @@ defmodule MigrationsFileTest do
       cats_content = """
       CREATE TABLE IF NOT EXISTS cats (
         value TEXT PRIMARY KEY
-      );
+      ) STRICT, WITHOUT ROWID;
       """
 
       second_migration = most_recent_migration_file(migrations_path)
@@ -684,7 +594,7 @@ defmodule MigrationsFileTest do
       dogs_content = """
       CREATE TABLE IF NOT EXISTS dogs (
         value TEXT PRIMARY KEY
-      );
+      ) STRICT, WITHOUT ROWID;
       """
 
       File.write!(migration, dogs_content, [:append])
@@ -712,7 +622,11 @@ defmodule MigrationsFileTest do
 
       {:ok, migration} = File.read(migration_file_path)
 
-       m = %Electric.Migration{name: migration_name, original_body: migration, src_folder: Path.join([temp, "migrations"])}
+      m = %Electric.Migration{
+        name: migration_name,
+        original_body: migration,
+        src_folder: Path.join([temp, "migrations"])
+      }
 
       Electric.Migrations.add_triggers_to_migration(
         [m],
@@ -722,11 +636,11 @@ defmodule MigrationsFileTest do
       expected = """
       /*
       ElectricDB Migration
-      {"metadata": {"name": "#{migration_name}", "sha256": "0f0eb722f4d27646a93dcd6fd645b16b158cf1e40455544e158ef71972226e00"}}
+      {"metadata": {"name": "#{migration_name}", "sha256": "211b1e2b203d1fcac6ccb526d2775ec1f5575d4018ab1a33272948ce0ae76775"}}
       */
       CREATE TABLE IF NOT EXISTS items (
         value TEXT PRIMARY KEY
-      );
+      ) STRICT, WITHOUT ROWID;
       --ADD A TRIGGER FOR main.items;
       """
 
@@ -759,11 +673,11 @@ defmodule MigrationsFileTest do
       expected = """
       /*
       ElectricDB Migration
-      {"metadata": {"name": "#{migration_name}", "sha256": "0f0eb722f4d27646a93dcd6fd645b16b158cf1e40455544e158ef71972226e00"}}
+      {"metadata": {"name": "#{migration_name}", "sha256": "211b1e2b203d1fcac6ccb526d2775ec1f5575d4018ab1a33272948ce0ae76775"}}
       */
       CREATE TABLE IF NOT EXISTS items (
         value TEXT PRIMARY KEY
-      );
+      ) STRICT, WITHOUT ROWID;
       --ADD A TRIGGER FOR main.items;
       """
 
@@ -805,11 +719,17 @@ defmodule MigrationsFileTest do
       manifest = Jason.decode!(File.read!(manifest_path))
 
       expected = %{
-              "migrations" => [
-                %{"name" => migration_name, "sha256" => "0f0eb722f4d27646a93dcd6fd645b16b158cf1e40455544e158ef71972226e00"},
-                %{"name" => migration_name_2, "sha256" => "3da01b8ef4f3845fdc3cb3619c6ba75538988d6eec816f3734a7c36383874266"}
-              ]
-            }
+        "migrations" => [
+          %{
+            "name" => migration_name,
+            "sha256" => "211b1e2b203d1fcac6ccb526d2775ec1f5575d4018ab1a33272948ce0ae76775"
+          },
+          %{
+            "name" => migration_name_2,
+            "sha256" => "946f0f3a0d0338fa486d3d7da35c3b6032f837336fb9a08f933d44675bb264d3"
+          }
+        ]
+      }
 
       assert manifest == expected
     end
@@ -858,17 +778,17 @@ defmodule MigrationsFileTest do
         "migrations" => [
           %{
             "body" =>
-              "/*\nElectricDB Migration\n{\"metadata\": {\"name\": \"#{migration_name}\", \"sha256\": \"0f0eb722f4d27646a93dcd6fd645b16b158cf1e40455544e158ef71972226e00\"}}\n*/\nCREATE TABLE IF NOT EXISTS items (\n  value TEXT PRIMARY KEY\n);\n--ADD A TRIGGER FOR main.items;\n",
+              "/*\nElectricDB Migration\n{\"metadata\": {\"name\": \"#{migration_name}\", \"sha256\": \"211b1e2b203d1fcac6ccb526d2775ec1f5575d4018ab1a33272948ce0ae76775\"}}\n*/\nCREATE TABLE IF NOT EXISTS items (\n  value TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;\n--ADD A TRIGGER FOR main.items;\n",
             "name" => migration_name,
             "encoding" => "escaped",
-            "sha256" => "0f0eb722f4d27646a93dcd6fd645b16b158cf1e40455544e158ef71972226e00"
+            "sha256" => "211b1e2b203d1fcac6ccb526d2775ec1f5575d4018ab1a33272948ce0ae76775"
           },
           %{
             "body" =>
-              "/*\nElectricDB Migration\n{\"metadata\": {\"name\": \"#{migration_name_2}\", \"sha256\": \"3da01b8ef4f3845fdc3cb3619c6ba75538988d6eec816f3734a7c36383874266\"}}\n*/\nCREATE TABLE IF NOT EXISTS cat (\n  value TEXT PRIMARY KEY\n);\n--ADD A TRIGGER FOR main.cat;\n\n--ADD A TRIGGER FOR main.items;\n",
+              "/*\nElectricDB Migration\n{\"metadata\": {\"name\": \"#{migration_name_2}\", \"sha256\": \"946f0f3a0d0338fa486d3d7da35c3b6032f837336fb9a08f933d44675bb264d3\"}}\n*/\nCREATE TABLE IF NOT EXISTS cat (\n  value TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;\n--ADD A TRIGGER FOR main.cat;\n\n--ADD A TRIGGER FOR main.items;\n",
             "name" => migration_name_2,
             "encoding" => "escaped",
-            "sha256" => "3da01b8ef4f3845fdc3cb3619c6ba75538988d6eec816f3734a7c36383874266"
+            "sha256" => "946f0f3a0d0338fa486d3d7da35c3b6032f837336fb9a08f933d44675bb264d3"
           }
         ]
       }

@@ -57,3 +57,8 @@ And run it:
 
 This creates a binary at `./dist/electric` and needs to be run on the OS you are targetting.
 See also https://github.com/bake-bake-bake/bakeware#static-compiling-openssl-into-erlang-distribution
+
+
+## Migration commands
+
+
