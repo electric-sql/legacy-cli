@@ -106,7 +106,7 @@ defmodule Electric.Migrations do
   end
 
   defp check_migrations_folder(options) do
-    migrations_folder = Map.get(options, :migrations, "migrations")
+    migrations_folder = Map.get(options, :dir, "migrations")
 
     if !File.exists?(migrations_folder) do
       {:error, "Couldn't find the migrations folder at #{migrations_folder}"}
