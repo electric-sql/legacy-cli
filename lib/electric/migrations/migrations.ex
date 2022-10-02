@@ -88,11 +88,11 @@ defmodule Electric.Migrations do
     end
   end
 
-  defp optionally_write(func, folder, flag) when flag !== true do
+  defp optionally_write(_func, _folder, flag) when flag !== true do
     :ok
   end
 
-  defp optionally_write(func, folder, flag) do
+  defp optionally_write(func, folder, _flag) do
     func.(folder)
   end
 
