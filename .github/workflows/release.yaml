@@ -1,0 +1,30 @@
+name: Release
+on: 
+  push:
+    tags:
+      - "v*.*.*"
+    branches:
+      - "ilia/ci-*"
+
+jobs:
+  build_binary:
+    name: Build binary on linux
+    strategy:
+      matrix:
+        os: [ubuntu-20.04, macos-12]
+    runs-on: ${{ matrix.os }}
+    env:
+      MIX_ENV: prod
+    steps:
+      - uses: actions/checkout@v2
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: 25.0
+          elixir-version: 1.14
+      - run: mix deps.get
+      - run: mix release
+      - uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.os }}-binary
+          path: _build/prod/rel/bakeware/electric
+  
