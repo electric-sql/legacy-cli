@@ -11,7 +11,7 @@ jobs:
     name: Build the cli binary
     strategy:
       matrix:
-        os: [ubuntu-20.04, ubuntu-18.04, macos-12]
+        os: [windows-latest, ubuntu-20.04, ubuntu-18.04, macos-12]
     runs-on: ${{ matrix.os }}
     env:
       MIX_ENV: prod
