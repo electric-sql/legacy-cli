@@ -34,9 +34,9 @@ INSERT INTO _electric_meta (key, value) VALUES ('compensations', 0), ('lastAckdR
 <% end %>
 
 -- These are toggles for turning the triggers on and off
-DROP TABLE IF EXISTS trigger_settings;
-CREATE TABLE trigger_settings(tablename STRING PRIMARY KEY, flag INTEGER);
-<%= for {table_full_name, _table} <- tables do %>INSERT INTO trigger_settings(tablename,flag) VALUES ('<%= table_full_name %>', 1);
+DROP TABLE IF EXISTS _electric_trigger_settings;
+CREATE TABLE _electric_trigger_settings(tablename STRING PRIMARY KEY, flag INTEGER);
+<%= for {table_full_name, _table} <- tables do %>INSERT INTO _electric_trigger_settings(tablename,flag) VALUES ('<%= table_full_name %>', 1);
 <% end %>
 <%= for {table_full_name, table} <- tables do %>
 /* Triggers for table <%= table.table_name %> */
@@ -58,7 +58,7 @@ END;
 DROP TRIGGER IF EXISTS insert_<%= table.namespace %>_<%= table.table_name %>_into_oplog;
 CREATE TRIGGER insert_<%= table.namespace %>_<%= table.table_name %>_into_oplog
    AFTER INSERT ON <%= table_full_name %>
-   WHEN 1 == (SELECT flag from trigger_settings WHERE tablename == '<%= table_full_name %>')
+   WHEN 1 == (SELECT flag from _electric_trigger_settings WHERE tablename == '<%= table_full_name %>')
 BEGIN
   INSERT INTO _electric_oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)
   VALUES ('<%= table.namespace %>', '<%= table.table_name %>', 'INSERT', json_object(<%= Enum.join(for col <- table.primary do "'#{col}', new.#{col}" end, ", ") %>), json_object(<%= Enum.join(for col <- table[:columns] do "'#{col}', new.#{col}" end, ", ") %>), NULL, NULL);
@@ -67,7 +67,7 @@ END;
 DROP TRIGGER IF EXISTS update_<%= table.namespace %>_<%= table.table_name %>_into_oplog;
 CREATE TRIGGER update_<%= table.namespace %>_<%= table.table_name %>_into_oplog
    AFTER UPDATE ON <%= table_full_name %>
-   WHEN 1 == (SELECT flag from trigger_settings WHERE tablename == '<%= table_full_name %>')
+   WHEN 1 == (SELECT flag from _electric_trigger_settings WHERE tablename == '<%= table_full_name %>')
 BEGIN
   INSERT INTO _electric_oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)
   VALUES ('<%= table.namespace %>', '<%= table.table_name %>', 'UPDATE', json_object(<%= Enum.join(for col <- table.primary do "'#{col}', new.#{col}" end, ", ") %>), json_object(<%= Enum.join(for col <- table.columns do "'#{col}', new.#{col}" end, ", ") %>), json_object(<%= Enum.join(for col <- table.columns do "'#{col}', old.#{col}" end, ", ") %>), NULL);
@@ -76,7 +76,7 @@ END;
 DROP TRIGGER IF EXISTS delete_<%= table.namespace %>_<%= table.table_name %>_into_oplog;
 CREATE TRIGGER delete_<%= table.namespace %>_<%= table.table_name %>_into_oplog
    AFTER DELETE ON <%= table_full_name %>
-   WHEN 1 == (SELECT flag from trigger_settings WHERE tablename == '<%= table_full_name %>')
+   WHEN 1 == (SELECT flag from _electric_trigger_settings WHERE tablename == '<%= table_full_name %>')
 BEGIN
   INSERT INTO _electric_oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)
   VALUES ('<%= table.namespace %>', '<%= table.table_name %>', 'DELETE', json_object(<%= Enum.join(for col <- table.primary do "'#{col}', old.#{col}" end, ", ") %>), NULL, json_object(<%= Enum.join(for col <- table.columns do "'#{col}', old.#{col}" end, ", ") %>), NULL);
@@ -87,7 +87,7 @@ END;
 DROP TRIGGER IF EXISTS compensation_insert_<%= table.namespace %>_<%= table.table_name %>_<%= foreign_key.child_key %>_into_oplog;
 CREATE TRIGGER compensation_insert_<%= table.namespace %>_<%= table.table_name %>_<%= foreign_key.child_key %>_into_oplog
    AFTER INSERT ON <%= table_full_name %>
-   WHEN 1 == (SELECT flag from trigger_settings WHERE tablename == '<%= tables[foreign_key.table].namespace %>.<%= tables[foreign_key.table].table_name %>') AND
+   WHEN 1 == (SELECT flag from _electric_trigger_settings WHERE tablename == '<%= tables[foreign_key.table].namespace %>.<%= tables[foreign_key.table].table_name %>') AND
         1 == (SELECT value from _electric_meta WHERE key == 'compensations')
 BEGIN
   INSERT INTO _electric_oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)
@@ -98,7 +98,7 @@ END;
 DROP TRIGGER IF EXISTS compensation_update_<%= table.namespace %>_<%= table.table_name %>_<%= foreign_key.child_key %>_into_oplog;
 CREATE TRIGGER compensation_update_<%= table.namespace %>_<%= table.table_name %>_<%= foreign_key.child_key %>_into_oplog
    AFTER UPDATE ON <%= table.namespace %>.<%= table.table_name %>
-   WHEN 1 == (SELECT flag from trigger_settings WHERE tablename == '<%= tables[foreign_key.table].namespace %>.<%= tables[foreign_key.table].table_name %>') AND
+   WHEN 1 == (SELECT flag from _electric_trigger_settings WHERE tablename == '<%= tables[foreign_key.table].namespace %>.<%= tables[foreign_key.table].table_name %>') AND
         1 == (SELECT value from _electric_meta WHERE key == 'compensations')
 BEGIN
   INSERT INTO _electric_oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)
