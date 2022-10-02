@@ -1,5 +1,5 @@
 name: Release
-on: 
+on:
   push:
     tags:
       - "v*.*.*"
@@ -8,7 +8,7 @@ on:
 
 jobs:
   build_binary:
-    name: Build binary on linux
+    name: Build the cli binary
     strategy:
       matrix:
         os: [ubuntu-20.04, macos-12]
@@ -18,13 +18,29 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: erlef/setup-beam@v1
+        if: ${{ !startsWith(matrix.os, 'macos')}}
         with:
           otp-version: 25.0
           elixir-version: 1.14
+      - name: Setup elixir on mac
+        if: ${{ startsWith(matrix.os, 'macos')}}
+        run: |
+          brew update --preinstall
+          brew install erlang@25
+          brew install elixir
+      - name: Setup dependency caching
+        if: ${{ startsWith(matrix.os, 'macos')}}
+        uses: actions/cache@v3
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-mix-${{ hashfiles('**/mix.lock')}}
+          restore-keys: |
+            ${{ runner.os }}-mix-
       - run: mix deps.get
       - run: mix release
       - uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.os }}-binary
           path: _build/prod/rel/bakeware/electric
-  
