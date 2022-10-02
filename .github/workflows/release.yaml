@@ -28,6 +28,8 @@ jobs:
           brew update --preinstall
           brew install erlang@25
           brew install elixir
+          mix local.hex --force
+          mix local.rebar --force
       - name: Setup dependency caching
         if: ${{ startsWith(matrix.os, 'macos')}}
         uses: actions/cache@v3
