@@ -123,7 +123,15 @@ defmodule MigrationsTest do
         value TEXT
       );
 
-      --initialisation of the metadata table
+      -- Somewhere to track migrations
+      CREATE TABLE IF NOT EXISTS _electric_migrations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT UNIQUE,
+        sha256 TEXT
+        applied_at TEXT
+      );
+
+      -- Initialisation of the metadata table
       INSERT INTO _electric_meta(key,value) VALUES ('currRowId', '-1'), ('ackRowId','-1'), ('compensations', 0);
 
 
@@ -278,6 +286,7 @@ defmodule MigrationsTest do
                MapSet.new([
                  "_electric_oplog",
                  "_electric_meta",
+                 "_electric_migrations",
                  "fish",
                  "sqlite_sequence",
                  "trigger_settings"
