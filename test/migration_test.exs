@@ -770,7 +770,7 @@ defmodule MigrationsFileTest do
         }
       )
 
-      Electric.Migrations.write_bundle(migrations_folder)
+      Electric.Migrations.write_json_bundle(migrations_folder)
 
       bundle = Jason.decode!(File.read!(bundle_path))
       #      IO.inspect(bundle)
