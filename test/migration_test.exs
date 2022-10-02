@@ -126,9 +126,9 @@ defmodule MigrationsTest do
       -- Somewhere to track migrations
       CREATE TABLE IF NOT EXISTS _electric_migrations (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT UNIQUE,
-        sha256 TEXT
-        applied_at TEXT
+        name TEXT NOT NULL UNIQUE,
+        sha256 TEXT NOT NULL,
+        applied_at TEXT NOT NULL
       );
 
       -- Initialisation of the metadata table
