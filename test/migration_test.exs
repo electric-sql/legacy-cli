@@ -484,14 +484,14 @@ defmodule MigrationsFileTest do
     test "tests can init" do
       temp = temp_folder()
       migrations_path = Path.join([temp, "migrations"])
-      {:success, _msg} = Electric.Migrations.init_migrations(%{:dir => temp})
+      {:ok, _msg} = Electric.Migrations.init_migrations(%{:dir => temp})
       assert File.exists?(migrations_path)
     end
 
     test "init and then modify and then build" do
       temp = temp_folder()
       migrations_path = Path.join([temp, "migrations"])
-      {:success, _msg} = Electric.Migrations.init_migrations(%{:dir => temp})
+      {:ok, _msg} = Electric.Migrations.init_migrations(%{:dir => temp})
       assert File.exists?(migrations_path)
 
       sql_file_paths = Path.join([migrations_path, "*", "migration.sql"]) |> Path.wildcard()
@@ -506,14 +506,14 @@ defmodule MigrationsFileTest do
 
       File.write!(my_new_migration, new_content, [:append])
 
-      {:success, _msg} = Electric.Migrations.build_migrations(%{}, %{:dir => migrations_path})
+      {:ok, _msg} = Electric.Migrations.build_migrations(%{}, %{:dir => migrations_path})
 
       assert File.exists?(Path.join([migration_folder, "satellite.sql"]))
     end
 
     def init_and_add_migration(temp) do
       migrations_path = Path.join([temp, "migrations"])
-      {:success, _msg} = Electric.Migrations.init_migrations(%{:dir => temp})
+      {:ok, _msg} = Electric.Migrations.init_migrations(%{:dir => temp})
 
       my_new_migration = most_recent_migration_file(migrations_path)
 
@@ -526,7 +526,7 @@ defmodule MigrationsFileTest do
       File.write!(my_new_migration, new_content, [:append])
       Process.sleep(1000)
 
-      {:success, _msg} = Electric.Migrations.new_migration("another", %{:dir => migrations_path})
+      {:ok, _msg} = Electric.Migrations.new_migration("another", %{:dir => migrations_path})
 
       cats_content = """
       CREATE TABLE IF NOT EXISTS cats (
@@ -548,7 +548,7 @@ defmodule MigrationsFileTest do
       init_and_add_migration(temp)
       second_migration_folder = Path.dirname(most_recent_migration_file(migrations_path))
 
-      {:success, _msg} = Electric.Migrations.build_migrations(%{}, %{:dir => migrations_path})
+      {:ok, _msg} = Electric.Migrations.build_migrations(%{}, %{:dir => migrations_path})
 
       assert File.exists?(Path.join([second_migration_folder, "satellite.sql"]))
     end
@@ -558,7 +558,7 @@ defmodule MigrationsFileTest do
       migrations_path = Path.join([temp, "migrations"])
       init_and_add_migration(temp)
 
-      {:success, _msg} =
+      {:ok, _msg} =
         Electric.Migrations.build_migrations(%{:manifest => true}, %{
           :dir => migrations_path
         })
@@ -571,7 +571,7 @@ defmodule MigrationsFileTest do
       migrations_path = Path.join([temp, "migrations"])
       init_and_add_migration(temp)
 
-      {:success, _msg} =
+      {:ok, _msg} =
         Electric.Migrations.build_migrations(%{:bundle => true}, %{:dir => migrations_path})
 
       assert File.exists?(Path.join([migrations_path, "index.js"]))
@@ -582,7 +582,7 @@ defmodule MigrationsFileTest do
       migrations_path = Path.join([temp, "migrations"])
       init_and_add_migration(temp)
 
-      {:success, _msg} =
+      {:ok, _msg} =
         Electric.Migrations.build_migrations(%{:bundle => true}, %{:dir => migrations_path})
 
       assert File.exists?(Path.join([migrations_path, "index.js"]))
@@ -593,7 +593,7 @@ defmodule MigrationsFileTest do
       migrations_path = Path.join([temp, "migrations"])
       init_and_add_migration(temp)
 
-      {:success, _msg} = Electric.Migrations.build_migrations(%{}, %{:dir => migrations_path})
+      {:ok, _msg} = Electric.Migrations.build_migrations(%{}, %{:dir => migrations_path})
 
       migration = most_recent_migration_file(migrations_path)
 
@@ -605,7 +605,7 @@ defmodule MigrationsFileTest do
 
       File.write!(migration, dogs_content, [:append])
 
-      {:success, _msg} = Electric.Migrations.build_migrations(%{}, %{:dir => migrations_path})
+      {:ok, _msg} = Electric.Migrations.build_migrations(%{}, %{:dir => migrations_path})
     end
   end
 

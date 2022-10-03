@@ -141,15 +141,24 @@ defmodule Electric.Commands.Migrations do
   end
 
   def init(%{args: _args, flags: _flags, options: options, unknown: _unknown}) do
-    Electric.Migrations.init_migrations(options)
+    case Electric.Migrations.init_migrations(options) do
+      {:ok, message} -> {:success, message}
+      {:error, message} -> {:error, message}
+    end
   end
 
   def new(%{args: args, flags: _flags, options: options, unknown: _unknown}) do
-    Electric.Migrations.new_migration(args.migration_name, options)
+    case Electric.Migrations.new_migration(args.migration_name, options) do
+      {:ok, message} -> {:success, message}
+      {:error, message} -> {:error, message}
+    end
   end
 
   def build(%{args: _args, flags: flags, options: options, unknown: _unknown}) do
-    Electric.Migrations.build_migrations(flags, options)
+    case Electric.Migrations.build_migrations(flags, options) do
+      {:ok, message} -> {:success, message}
+      {:error, message} -> {:error, message}
+    end
   end
 
   def sync(%{args: %{database_id: database_id}, options: %{dir: dir}}) do

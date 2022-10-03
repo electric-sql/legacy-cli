@@ -13,7 +13,7 @@ defmodule Electric.Migrations.Parse do
         {:ok, ast}
 
       {_ast, errors} ->
-        {:error, errors}
+        {:error, Enum.join(errors, "\n")}
     end
   end
 

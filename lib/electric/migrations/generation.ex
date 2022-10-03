@@ -66,6 +66,7 @@ defmodule Electric.Migrations.Generation do
 
     foreign_key_clauses =
       Enum.map(table_info.foreign_keys_info, &foreign_key_sql_from_info(&1, flavour))
+
     columns_and_keys = "\n  " <> Enum.join(column_definitions ++ foreign_key_clauses, ",\n  ")
 
     case flavour do

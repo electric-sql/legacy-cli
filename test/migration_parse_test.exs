@@ -25,7 +25,7 @@ defmodule MigrationsParseTest do
       SOME BOLLOCKS;
       """
 
-      {:error, [reason]} =
+      {:error, reason} =
         Electric.Migrations.Parse.sql_ast_from_migration_set([
           %Electric.Migration{name: "test1", original_body: sql_in}
         ])
@@ -41,16 +41,15 @@ defmodule MigrationsParseTest do
       );
       """
 
-      {:error, [reason1, reason2]} =
+      {:error, message} =
         Electric.Migrations.Parse.sql_ast_from_migration_set([
           %Electric.Migration{name: "test1", original_body: sql_in}
         ])
 
-      assert reason1 ==
-               "The table fish is not WITHOUT ROWID. Add the WITHOUT ROWID option at the end of the create table statement and make sure you also specify a primary key"
+      expected =
+        "The table fish is not WITHOUT ROWID. Add the WITHOUT ROWID option at the end of the create table statement and make sure you also specify a primary key\nThe table fish is not STRICT. Add the STRICT option at the end of the create table statement"
 
-      assert reason2 ==
-               "The table fish is not STRICT. Add the STRICT option at the end of the create table statement"
+      assert message == expected
     end
 
     test "tests getting SQL structure for templating" do

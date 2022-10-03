@@ -35,17 +35,7 @@ defmodule Electric.Migrations do
       {:error, "Migrations folder at #{migrations_folder} already exists."}
     else
       File.mkdir_p!(migrations_folder)
-
-      case add_migration(migrations_folder, "init") do
-        {:ok, _} ->
-          {:success, "Your migrations folder with an initial migration has been created"}
-
-        {:success, _} ->
-          {:success, "Your migrations folder with an initial migration has been created"}
-
-        {:error, msg} ->
-          {:error, msg}
-      end
+      add_migration(migrations_folder, "init")
     end
   end
 
@@ -81,7 +71,7 @@ defmodule Electric.Migrations do
          :ok <- optionally_write(&write_js_bundle/1, folder, flags[:bundle]),
          :ok <- optionally_write(&write_json_bundle/1, folder, flags[:json]),
          :ok <- optionally_write(&write_manifest/1, folder, flags[:manifest]) do
-      {:success, "Migrations built"}
+      {:ok, "Migrations built"}
     else
       {:error, msg} ->
         {:error, msg}
@@ -135,7 +125,7 @@ defmodule Electric.Migrations do
 
     migration_file_path = Path.join([migration_folder, @migration_file_name])
     File.write!(migration_file_path, body)
-    {:success, "Migration file created at #{migration_file_path}"}
+    {:ok, "Migration file created at #{migration_file_path}"}
   end
 
   def get_template() do
