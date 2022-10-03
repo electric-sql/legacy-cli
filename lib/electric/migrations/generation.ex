@@ -60,16 +60,13 @@ defmodule Electric.Migrations.Generation do
     ## %{cid: 0, dflt_value: nil, name: "id", notnull: 0, pk: 1, type: "INTEGER"}
 
     column_definitions =
-      Enum.map(table_info.column_infos, fn {_, info} ->
-        "\n  " <> column_def_sql_from_info(info, flavour)
-      end)
+      table_info.column_infos
+      |> Enum.map(fn {_, info} -> info end)
+      |> Enum.map(&column_def_sql_from_info(&1, flavour))
 
     foreign_key_clauses =
-      for foreign_key_info <- table_info.foreign_keys_info do
-        "\n  " <> foreign_key_sql_from_info(foreign_key_info, flavour)
-      end
-
-    columns_and_keys = Enum.join(column_definitions ++ foreign_key_clauses, ",")
+      Enum.map(table_info.foreign_keys_info, &foreign_key_sql_from_info(&1, flavour))
+    columns_and_keys = "\n  " <> Enum.join(column_definitions ++ foreign_key_clauses, ",\n  ")
 
     case flavour do
       :postgresql ->
