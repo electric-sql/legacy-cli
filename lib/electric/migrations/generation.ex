@@ -21,20 +21,10 @@ defmodule Electric.Migrations.Generation do
   end
 
   defp before_and_after_ast(migration_set) do
-    case Parse.sql_ast_from_migration_set(migration_set) do
-      {:ok, after_ast} ->
-        all_but_last_migration_set = Enum.drop(migration_set, -1)
-
-        case Parse.sql_ast_from_migration_set(all_but_last_migration_set) do
-          {:ok, before_ast} ->
-            {:ok, before_ast, after_ast}
-
-          {:error, reasons} ->
-            {:error, reasons}
-        end
-
-      {:error, reasons} ->
-        {:error, reasons}
+    with {:ok, after_ast} <- Parse.sql_ast_from_migration_set(migration_set),
+         all_but_last_migration_set = Enum.drop(migration_set, -1),
+         {:ok, before_ast} <- Parse.sql_ast_from_migration_set(all_but_last_migration_set) do
+      {:ok, before_ast, after_ast}
     end
   end
 
