@@ -123,15 +123,23 @@ defmodule MigrationsTest do
         value TEXT
       );
 
-      --initialisation of the metadata table
-      INSERT INTO _electric_meta(key,value) VALUES ('currRowId', '-1'), ('ackRowId','-1'), ('compensations', 0);
+      -- Somewhere to track migrations
+      CREATE TABLE IF NOT EXISTS _electric_migrations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL UNIQUE,
+        sha256 TEXT NOT NULL,
+        applied_at TEXT NOT NULL
+      );
+
+      -- Initialisation of the metadata table
+      INSERT INTO _electric_meta (key, value) VALUES ('compensations', 0), ('lastAckdRowId','0'), ('lastSentRowId', '0'), ('lsn', '0');
 
 
       -- These are toggles for turning the triggers on and off
-      DROP TABLE IF EXISTS trigger_settings;
-      CREATE TABLE trigger_settings(tablename STRING PRIMARY KEY, flag INTEGER);
-      INSERT INTO trigger_settings(tablename,flag) VALUES ('main.cats', 1);
-      INSERT INTO trigger_settings(tablename,flag) VALUES ('main.fish', 1);
+      DROP TABLE IF EXISTS _electric_trigger_settings;
+      CREATE TABLE _electric_trigger_settings(tablename STRING PRIMARY KEY, flag INTEGER);
+      INSERT INTO _electric_trigger_settings(tablename,flag) VALUES ('main.cats', 1);
+      INSERT INTO _electric_trigger_settings(tablename,flag) VALUES ('main.fish', 1);
 
 
       /* Triggers for table cats */
@@ -153,7 +161,7 @@ defmodule MigrationsTest do
       DROP TRIGGER IF EXISTS insert_main_cats_into_oplog;
       CREATE TRIGGER insert_main_cats_into_oplog
          AFTER INSERT ON main.cats
-         WHEN 1 == (SELECT flag from trigger_settings WHERE tablename == 'main.cats')
+         WHEN 1 == (SELECT flag from _electric_trigger_settings WHERE tablename == 'main.cats')
       BEGIN
         INSERT INTO _electric_oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)
         VALUES ('main', 'cats', 'INSERT', json_object('id', new.id), json_object('id', new.id, 'name', new.name, 'favourite', new.favourite), NULL, NULL);
@@ -162,7 +170,7 @@ defmodule MigrationsTest do
       DROP TRIGGER IF EXISTS update_main_cats_into_oplog;
       CREATE TRIGGER update_main_cats_into_oplog
          AFTER UPDATE ON main.cats
-         WHEN 1 == (SELECT flag from trigger_settings WHERE tablename == 'main.cats')
+         WHEN 1 == (SELECT flag from _electric_trigger_settings WHERE tablename == 'main.cats')
       BEGIN
         INSERT INTO _electric_oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)
         VALUES ('main', 'cats', 'UPDATE', json_object('id', new.id), json_object('id', new.id, 'name', new.name, 'favourite', new.favourite), json_object('id', old.id, 'name', old.name, 'favourite', old.favourite), NULL);
@@ -171,7 +179,7 @@ defmodule MigrationsTest do
       DROP TRIGGER IF EXISTS delete_main_cats_into_oplog;
       CREATE TRIGGER delete_main_cats_into_oplog
          AFTER DELETE ON main.cats
-         WHEN 1 == (SELECT flag from trigger_settings WHERE tablename == 'main.cats')
+         WHEN 1 == (SELECT flag from _electric_trigger_settings WHERE tablename == 'main.cats')
       BEGIN
         INSERT INTO _electric_oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)
         VALUES ('main', 'cats', 'DELETE', json_object('id', old.id), NULL, json_object('id', old.id, 'name', old.name, 'favourite', old.favourite), NULL);
@@ -182,7 +190,7 @@ defmodule MigrationsTest do
       DROP TRIGGER IF EXISTS compensation_insert_main_cats_favourite_into_oplog;
       CREATE TRIGGER compensation_insert_main_cats_favourite_into_oplog
          AFTER INSERT ON main.cats
-         WHEN 1 == (SELECT flag from trigger_settings WHERE tablename == 'main.fish') AND
+         WHEN 1 == (SELECT flag from _electric_trigger_settings WHERE tablename == 'main.fish') AND
               1 == (SELECT value from _electric_meta WHERE key == 'compensations')
       BEGIN
         INSERT INTO _electric_oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)
@@ -193,7 +201,7 @@ defmodule MigrationsTest do
       DROP TRIGGER IF EXISTS compensation_update_main_cats_favourite_into_oplog;
       CREATE TRIGGER compensation_update_main_cats_favourite_into_oplog
          AFTER UPDATE ON main.cats
-         WHEN 1 == (SELECT flag from trigger_settings WHERE tablename == 'main.fish') AND
+         WHEN 1 == (SELECT flag from _electric_trigger_settings WHERE tablename == 'main.fish') AND
               1 == (SELECT value from _electric_meta WHERE key == 'compensations')
       BEGIN
         INSERT INTO _electric_oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)
@@ -223,7 +231,7 @@ defmodule MigrationsTest do
       DROP TRIGGER IF EXISTS insert_main_fish_into_oplog;
       CREATE TRIGGER insert_main_fish_into_oplog
          AFTER INSERT ON main.fish
-         WHEN 1 == (SELECT flag from trigger_settings WHERE tablename == 'main.fish')
+         WHEN 1 == (SELECT flag from _electric_trigger_settings WHERE tablename == 'main.fish')
       BEGIN
         INSERT INTO _electric_oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)
         VALUES ('main', 'fish', 'INSERT', json_object('id', new.id, 'colour', new.colour), json_object('id', new.id, 'colour', new.colour), NULL, NULL);
@@ -232,7 +240,7 @@ defmodule MigrationsTest do
       DROP TRIGGER IF EXISTS update_main_fish_into_oplog;
       CREATE TRIGGER update_main_fish_into_oplog
          AFTER UPDATE ON main.fish
-         WHEN 1 == (SELECT flag from trigger_settings WHERE tablename == 'main.fish')
+         WHEN 1 == (SELECT flag from _electric_trigger_settings WHERE tablename == 'main.fish')
       BEGIN
         INSERT INTO _electric_oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)
         VALUES ('main', 'fish', 'UPDATE', json_object('id', new.id, 'colour', new.colour), json_object('id', new.id, 'colour', new.colour), json_object('id', old.id, 'colour', old.colour), NULL);
@@ -241,7 +249,7 @@ defmodule MigrationsTest do
       DROP TRIGGER IF EXISTS delete_main_fish_into_oplog;
       CREATE TRIGGER delete_main_fish_into_oplog
          AFTER DELETE ON main.fish
-         WHEN 1 == (SELECT flag from trigger_settings WHERE tablename == 'main.fish')
+         WHEN 1 == (SELECT flag from _electric_trigger_settings WHERE tablename == 'main.fish')
       BEGIN
         INSERT INTO _electric_oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)
         VALUES ('main', 'fish', 'DELETE', json_object('id', old.id, 'colour', old.colour), NULL, json_object('id', old.id, 'colour', old.colour), NULL);
@@ -278,9 +286,10 @@ defmodule MigrationsTest do
                MapSet.new([
                  "_electric_oplog",
                  "_electric_meta",
+                 "_electric_migrations",
+                 "_electric_trigger_settings",
                  "fish",
-                 "sqlite_sequence",
-                 "trigger_settings"
+                 "sqlite_sequence"
                ])
     end
 
@@ -497,8 +506,7 @@ defmodule MigrationsFileTest do
 
       File.write!(my_new_migration, new_content, [:append])
 
-      {:success, _msg} =
-        Electric.Migrations.build_migrations(%{}, %{:migrations => migrations_path})
+      {:success, _msg} = Electric.Migrations.build_migrations(%{}, %{:dir => migrations_path})
 
       assert File.exists?(Path.join([migration_folder, "satellite.sql"]))
     end
@@ -518,8 +526,7 @@ defmodule MigrationsFileTest do
       File.write!(my_new_migration, new_content, [:append])
       Process.sleep(1000)
 
-      {:success, _msg} =
-        Electric.Migrations.new_migration("another", %{:migrations => migrations_path})
+      {:success, _msg} = Electric.Migrations.new_migration("another", %{:dir => migrations_path})
 
       cats_content = """
       CREATE TABLE IF NOT EXISTS cats (
@@ -541,8 +548,7 @@ defmodule MigrationsFileTest do
       init_and_add_migration(temp)
       second_migration_folder = Path.dirname(most_recent_migration_file(migrations_path))
 
-      {:success, _msg} =
-        Electric.Migrations.build_migrations(%{}, %{:migrations => migrations_path})
+      {:success, _msg} = Electric.Migrations.build_migrations(%{}, %{:dir => migrations_path})
 
       assert File.exists?(Path.join([second_migration_folder, "satellite.sql"]))
     end
@@ -554,7 +560,7 @@ defmodule MigrationsFileTest do
 
       {:success, _msg} =
         Electric.Migrations.build_migrations(%{:manifest => true}, %{
-          :migrations => migrations_path
+          :dir => migrations_path
         })
 
       assert File.exists?(Path.join([migrations_path, "manifest.json"]))
@@ -566,7 +572,7 @@ defmodule MigrationsFileTest do
       init_and_add_migration(temp)
 
       {:success, _msg} =
-        Electric.Migrations.build_migrations(%{:bundle => true}, %{:migrations => migrations_path})
+        Electric.Migrations.build_migrations(%{:bundle => true}, %{:dir => migrations_path})
 
       assert File.exists?(Path.join([migrations_path, "index.js"]))
     end
@@ -577,7 +583,7 @@ defmodule MigrationsFileTest do
       init_and_add_migration(temp)
 
       {:success, _msg} =
-        Electric.Migrations.build_migrations(%{:bundle => true}, %{:migrations => migrations_path})
+        Electric.Migrations.build_migrations(%{:bundle => true}, %{:dir => migrations_path})
 
       assert File.exists?(Path.join([migrations_path, "index.js"]))
     end
@@ -587,8 +593,7 @@ defmodule MigrationsFileTest do
       migrations_path = Path.join([temp, "migrations"])
       init_and_add_migration(temp)
 
-      {:success, _msg} =
-        Electric.Migrations.build_migrations(%{}, %{:migrations => migrations_path})
+      {:success, _msg} = Electric.Migrations.build_migrations(%{}, %{:dir => migrations_path})
 
       migration = most_recent_migration_file(migrations_path)
 
@@ -600,8 +605,7 @@ defmodule MigrationsFileTest do
 
       File.write!(migration, dogs_content, [:append])
 
-      {:success, _msg} =
-        Electric.Migrations.build_migrations(%{}, %{:migrations => migrations_path})
+      {:success, _msg} = Electric.Migrations.build_migrations(%{}, %{:dir => migrations_path})
     end
   end
 
@@ -666,7 +670,7 @@ defmodule MigrationsFileTest do
       Electric.Migrations.build_migrations(
         %{},
         %{
-          :migrations => migrations_folder,
+          :dir => migrations_folder,
           :template => @trigger_template
         }
       )
@@ -712,7 +716,7 @@ defmodule MigrationsFileTest do
       Electric.Migrations.build_migrations(
         %{},
         %{
-          :migrations => migrations_folder
+          :dir => migrations_folder
         }
       )
 
@@ -765,12 +769,12 @@ defmodule MigrationsFileTest do
       Electric.Migrations.build_migrations(
         %{},
         %{
-          :migrations => migrations_folder,
+          :dir => migrations_folder,
           :template => @trigger_template
         }
       )
 
-      Electric.Migrations.write_bundle(migrations_folder)
+      Electric.Migrations.write_json_bundle(migrations_folder)
 
       bundle = Jason.decode!(File.read!(bundle_path))
       #      IO.inspect(bundle)
@@ -828,7 +832,7 @@ defmodule MigrationsFileTest do
         Electric.Migrations.build_migrations(
           %{},
           %{
-            :migrations => migrations_folder,
+            :dir => migrations_folder,
             :template => @trigger_template
           }
         )

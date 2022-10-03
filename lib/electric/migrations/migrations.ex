@@ -74,29 +74,26 @@ defmodule Electric.Migrations do
   - :bundle will also create a index.js file in the migrations folder which exports a js object containing all the migrations
   """
   def build_migrations(flags, options) do
-    case check_migrations_folder(options) do
-      {:ok, migrations_folder} ->
-        template = Map.get(options, :template, @satellite_template)
-        migration_set = ordered_migrations(migrations_folder)
-        add_triggers_to_migrations(migration_set, template)
+    template = Map.get(options, :template, @satellite_template)
 
-        if flags[:manifest] do
-          write_manifest(migrations_folder)
-        end
-
-        if flags[:json] do
-          write_bundle(migrations_folder)
-        end
-
-        if flags[:bundle] do
-          write_js_bundle(migrations_folder)
-        end
-
-        {:success, "Migrations built"}
-
+    with {:ok, folder} <- check_migrations_folder(options),
+         :ok <- folder |> ordered_migrations() |> add_triggers_to_migrations(template),
+         :ok <- optionally_write(&write_js_bundle/1, folder, flags[:bundle]),
+         :ok <- optionally_write(&write_json_bundle/1, folder, flags[:json]),
+         :ok <- optionally_write(&write_manifest/1, folder, flags[:manifest]) do
+      {:success, "Migrations built"}
+    else
       {:error, msg} ->
         {:error, msg}
     end
+  end
+
+  defp optionally_write(_func, _folder, flag) when flag !== true do
+    :ok
+  end
+
+  defp optionally_write(func, folder, _flag) do
+    func.(folder)
   end
 
   @doc """
@@ -158,7 +155,7 @@ defmodule Electric.Migrations do
   end
 
   @doc false
-  def write_bundle(src_folder) do
+  def write_json_bundle(src_folder) do
     migrations = create_bundle(src_folder, true)
     bundle_path = Path.join(src_folder, @bundle_file_name)
 
@@ -224,22 +221,19 @@ defmodule Electric.Migrations do
     if length(failed_validation) > 0 do
       {:error, failed_validation}
     else
-      try do
-        for {_migration, i} <- Enum.with_index(validated_migrations) do
-          subset_of_migrations = Enum.take(validated_migrations, i + 1)
+      validated_migrations
+      |> Enum.with_index()
+      |> Enum.reduce(nil, fn {_migration, i}, acc ->
+        case acc do
+          alt when alt in [nil, :ok] ->
+            validated_migrations
+            |> Enum.take(i + 1)
+            |> add_triggers_to_migration(template)
 
-          # this is using a migration file path and all the migrations up to, an including this migration
-          case add_triggers_to_migration(
-                 subset_of_migrations,
-                 template
-               ) do
-            :ok -> :ok
-            {:error, reason} -> throw({:error, reason})
-          end
+          {:error, reason} ->
+            {:error, reason}
         end
-      catch
-        {:error, reason} -> {:error, reason}
-      end
+      end)
     end
   end
 
