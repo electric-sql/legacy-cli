@@ -10,25 +10,31 @@ defmodule Electric.Migrations.Generation do
   Given an ordered list of Electric.Migration objects creates a PostgreSQL file for the last migration in the list
   """
   def postgres_for_ordered_migrations(ordered_migrations) do
-    with {:ok, before_ast, after_ast} = before_and_after_ast(ordered_migrations) do
-      postgres_string = get_postgres_for_ast_changes(before_ast, after_ast)
-      {:ok, postgres_string}
-    else
-      {:error, reasons} -> {:error, reasons}
+    case before_and_after_ast(ordered_migrations) do
+      {:ok, before_ast, after_ast} ->
+        postgres_string = get_postgres_for_ast_changes(before_ast, after_ast)
+        {:ok, postgres_string}
+
+      {:error, reasons} ->
+        {:error, reasons}
     end
   end
 
   defp before_and_after_ast(migration_set) do
-    with {:ok, after_ast} = Parse.sql_ast_from_migration_set(migration_set) do
-      all_but_last_migration_set = Enum.drop(migration_set, -1)
+    case Parse.sql_ast_from_migration_set(migration_set) do
+      {:ok, after_ast} ->
+        all_but_last_migration_set = Enum.drop(migration_set, -1)
 
-      with {:ok, before_ast} = Parse.sql_ast_from_migration_set(all_but_last_migration_set) do
-        {:ok, before_ast, after_ast}
-      else
-        {:error, reasons} -> {:error, reasons}
-      end
-    else
-      {:error, reasons} -> {:error, reasons}
+        case Parse.sql_ast_from_migration_set(all_but_last_migration_set) do
+          {:ok, before_ast} ->
+            {:ok, before_ast, after_ast}
+
+          {:error, reasons} ->
+            {:error, reasons}
+        end
+
+      {:error, reasons} ->
+        {:error, reasons}
     end
   end
 
@@ -36,9 +42,9 @@ defmodule Electric.Migrations.Generation do
     get_sql_for_ast_changes(before_ast, after_ast, :postgresql)
   end
 
-  defp get_sqlite_for_ast_changes(before_ast, after_ast) do
-    get_sql_for_ast_changes(before_ast, after_ast, :sqlite)
-  end
+  #  defp _get_sqlite_for_ast_changes(before_ast, after_ast) do
+  #    get_sql_for_ast_changes(before_ast, after_ast, :sqlite)
+  #  end
 
   defp get_sql_for_ast_changes(before_ast, after_ast, flavour) do
     for change <- table_changes(before_ast, after_ast), into: "" do
@@ -116,7 +122,7 @@ defmodule Electric.Migrations.Generation do
   end
 
   defp table_changes(nil, after_ast) do
-    for {table_name, table_info} <- after_ast do
+    for {_, table_info} <- after_ast do
       {nil, table_info}
     end
   end
