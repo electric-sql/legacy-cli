@@ -8,14 +8,12 @@ defmodule Electric.Migrations.Triggers do
   SQL with all the triggers needed by Satellite added.
   """
   def add_triggers_to_last_migration(migration_set, template) do
-    case Electric.Migrations.Parse.sql_ast_from_migration_set(migration_set) do
-      {:error, reasons} ->
-        {:error, reasons}
-
-      ast ->
-        sql_in = List.last(migration_set).original_body
-        is_init = length(migration_set) == 1
-        template_all_the_things(sql_in, ast, template, is_init)
+    with {:ok, ast} = Electric.Migrations.Parse.sql_ast_from_migration_set(migration_set) do
+      sql_in = List.last(migration_set).original_body
+      is_init = length(migration_set) == 1
+      template_all_the_things(sql_in, ast, template, is_init)
+    else
+      {:error, reasons} -> {:error, reasons}
     end
   end
 

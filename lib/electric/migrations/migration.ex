@@ -33,25 +33,25 @@ defmodule Electric.Migration do
   @doc """
   reads the original source from file
   """
-  def ensure_original_body(migration) do
-    if migration.original_body == nil do
-      sql = File.read!(original_file_path(migration))
-      %{migration | original_body: sql}
-    else
-      migration
-    end
+  def ensure_original_body(migration) when migration.original_body == nil do
+    sql = File.read!(original_file_path(migration))
+    %{migration | original_body: sql}
+  end
+
+  def ensure_original_body(migration) when migration.original_body != nil do
+    migration
   end
 
   @doc """
   reads the satellite source from file
   """
-  def ensure_satellite_body(migration) do
-    if migration.satellite_body == nil do
-      sql = File.read!(satellite_file_path(migration))
-      %{migration | satellite_body: sql}
-    else
-      migration
-    end
+  def ensure_satellite_body(migration) when migration.satellite_body == nil do
+    sql = File.read!(satellite_file_path(migration))
+    %{migration | satellite_body: sql}
+  end
+
+  def ensure_satellite_body(migration) when migration.satellite_body != nil do
+    migration
   end
 
   @doc """

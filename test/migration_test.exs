@@ -120,7 +120,7 @@ defmodule MigrationsTest do
       -- Somewhere to keep our metadata
       CREATE TABLE IF NOT EXISTS _electric_meta (
         key TEXT,
-        value TEXT
+        value BLOB
       );
 
       -- Somewhere to track migrations

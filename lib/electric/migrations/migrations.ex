@@ -8,9 +8,9 @@ defmodule Electric.Migrations do
   @manifest_file_name "manifest.json"
   @bundle_file_name "manifest.bundle.json"
   @js_bundle_file_name "index.js"
-  @migration_template EEx.compile_file("lib/electric/migrations/templates/migration.eex")
-  @satellite_template EEx.compile_file("lib/electric/migrations/templates/triggers.eex")
-  @bundle_template EEx.compile_file("lib/electric/migrations/templates/bundle_js.eex")
+  @migration_template EEx.compile_file("lib/electric/migrations/templates/migration.sql.eex")
+  @satellite_template EEx.compile_file("lib/electric/migrations/templates/satellite.sql.eex")
+  @bundle_template EEx.compile_file("lib/electric/migrations/templates/index.js.eex")
 
   @doc """
   Creates the migrations folder and adds in initial migration to it.
@@ -105,7 +105,7 @@ defmodule Electric.Migrations do
   defp check_migrations_folder(options) do
     migrations_folder = Map.get(options, :dir, "migrations")
 
-    if !File.exists?(migrations_folder) do
+    if not File.exists?(migrations_folder) do
       {:error, "Couldn't find the migrations folder at #{migrations_folder}"}
     else
       if Path.basename(migrations_folder) == "migrations" do
@@ -210,31 +210,19 @@ defmodule Electric.Migrations do
   end
 
   defp add_triggers_to_migrations(ordered_migrations, template) do
-    validated_migrations =
+    read_migrations =
       for migration <- ordered_migrations do
         Electric.Migration.ensure_original_body(migration)
       end
 
-    failed_validation =
-      Enum.filter(validated_migrations, fn migration -> migration.error != nil end)
-
-    if length(failed_validation) > 0 do
-      {:error, failed_validation}
-    else
-      validated_migrations
-      |> Enum.with_index()
-      |> Enum.reduce(nil, fn {_migration, i}, acc ->
-        case acc do
-          alt when alt in [nil, :ok] ->
-            validated_migrations
-            |> Enum.take(i + 1)
-            |> add_triggers_to_migration(template)
-
-          {:error, reason} ->
-            {:error, reason}
-        end
-      end)
-    end
+    1..length(read_migrations)
+    |> Enum.map(&Enum.take(read_migrations, &1))
+    |> Enum.reduce_while(:ok, fn subset, _ ->
+      case add_triggers_to_migration(subset, template) do
+        :ok -> {:cont, :ok}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
   end
 
   @doc false
@@ -255,7 +243,7 @@ defmodule Electric.Migrations do
             migration.original_body
           end
 
-        postgres_version =
+        {:ok, postgres_version} =
           Electric.Migrations.Generation.postgres_for_ordered_migrations(migration_set)
 
         hash = calc_hash(migration_fingerprint)
@@ -272,7 +260,7 @@ defmodule Electric.Migrations do
           end
         end
 
-        if !File.exists?(satellite_file_path) do
+        if not File.exists?(satellite_file_path) do
           header =
             case Electric.Migration.get_original_metadata(migration) do
               {:error, _reason} ->

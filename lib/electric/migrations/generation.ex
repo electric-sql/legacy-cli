@@ -3,141 +3,151 @@ defmodule Electric.Migrations.Generation do
   Generates PostgreSQL text from SQLite text
   """
 
+  @type flavour() :: :postgresql | :sqlite
+  alias Electric.Migrations.Parse, as: Parse
+
   @doc """
   Given an ordered list of Electric.Migration objects creates a PostgreSQL file for the last migration in the list
   """
   def postgres_for_ordered_migrations(ordered_migrations) do
-    {before_ast, after_ast} = before_and_after_ast(ordered_migrations)
-    get_postgres_for_infos(before_ast, after_ast)
-  end
-
-  defp before_and_after_ast(migration_set) do
-    after_ast = Electric.Migrations.Parse.sql_ast_from_migration_set(migration_set)
-    all_but_last_migration_set = Enum.take(migration_set, Enum.count(migration_set) - 1)
-    before_ast = Electric.Migrations.Parse.sql_ast_from_migration_set(all_but_last_migration_set)
-    {before_ast, after_ast}
-  end
-
-  defp get_postgres_for_infos(before_ast, after_ast) do
-    get_sql_for_infos(before_ast, after_ast, "postgres")
-  end
-
-  defp get_sqlite_for_infos(before_ast, after_ast) do
-    get_sql_for_infos(before_ast, after_ast, "sqlite")
-  end
-
-  defp get_sql_for_infos(before_ast, after_ast, flavour) do
-    statements =
-      for change <- table_changes(before_ast, after_ast) do
-        case change do
-          {nil, table_after} ->
-            ## https://www.sqlite.org/syntax/column-constraint.html
-            ## %{cid: 0, dflt_value: nil, name: "id", notnull: 0, pk: 1, type: "INTEGER"}
-
-            column_definitions =
-              for {_column_id, column_info} <- table_after.column_infos do
-                "\n  " <> column_def_sql_from_info(column_info, flavour)
-              end
-
-            foreign_key_clauses =
-              for foreign_key_info <- table_after.foreign_keys_info do
-                "\n  " <> foreign_key_sql_from_info(foreign_key_info, flavour)
-              end
-
-            columns_and_keys = column_definitions ++ foreign_key_clauses
-
-            case flavour do
-              "postgres" ->
-                "\nCREATE TABLE #{table_after.namespace}.#{table_after.table_name} (#{Enum.join(columns_and_keys, ",")});\n"
-
-              "sqlite" ->
-                "\nCREATE TABLE #{table_after.namespace}.#{table_after.table_name} (#{Enum.join(columns_and_keys, ",")})STRICT;\n"
-            end
-
-          {table_before, nil} ->
-            "DROP TABLE #{table_before.namespace}.#{table_before.table_name};\n"
-
-          {table_before, table_after} ->
-            ## add columns
-            added_colums_lines =
-              for {column_id, column_info} <- table_after.column_infos,
-                  !Map.has_key?(table_before.column_infos, column_id) do
-                "ALTER TABLE #{table_after.namespace}.#{table_after.table_name} ADD COLUMN #{column_def_sql_from_info(column_info, flavour)};\n"
-              end
-
-            ## delete columns
-            dropped_colums_lines =
-              for {column_id, column_info} <- table_before.column_infos,
-                  !Map.has_key?(table_after.column_infos, column_id) do
-                "ALTER TABLE #{table_before.namespace}.#{table_before.table_name} DROP COLUMN #{column_info.name};\n"
-              end
-
-            ## rename columns
-            rename_colums_lines =
-              for {column_id, column_info} <- table_after.column_infos,
-                  Map.has_key?(table_before.column_infos, column_id) &&
-                    column_info.name != table_before.column_infos[column_id].name do
-                "ALTER TABLE #{table_after.namespace}.#{table_after.table_name} RENAME COLUMN #{table_before.column_infos[column_id].name} TO #{column_info.name};\n"
-              end
-
-            all_change_lines = added_colums_lines ++ dropped_colums_lines ++ rename_colums_lines
-            Enum.join(all_change_lines, " ")
-        end
-      end
-
-    Enum.join(statements, "")
-  end
-
-  defp table_changes(before_ast, after_ast) do
-    if before_ast == nil do
-      for {table_name, table_info} <- after_ast do
-        {nil, table_info}
-      end
+    with {:ok, before_ast, after_ast} = before_and_after_ast(ordered_migrations) do
+      postgres_string = get_postgres_for_ast_changes(before_ast, after_ast)
+      {:ok, postgres_string}
     else
-      new_and_changed =
-        for {table_name, table_info} <- after_ast, table_info != before_ast[table_name] do
-          {before_ast[table_name], table_info}
-        end
-
-      dropped =
-        for {table_name, table_info} <- before_ast, !Map.has_key?(after_ast, table_name) do
-          {table_info, nil}
-        end
-
-      new_and_changed ++ dropped
+      {:error, reasons} -> {:error, reasons}
     end
   end
 
+  defp before_and_after_ast(migration_set) do
+    with {:ok, after_ast} = Parse.sql_ast_from_migration_set(migration_set) do
+      all_but_last_migration_set = Enum.drop(migration_set, -1)
+
+      with {:ok, before_ast} = Parse.sql_ast_from_migration_set(all_but_last_migration_set) do
+        {:ok, before_ast, after_ast}
+      else
+        {:error, reasons} -> {:error, reasons}
+      end
+    else
+      {:error, reasons} -> {:error, reasons}
+    end
+  end
+
+  defp get_postgres_for_ast_changes(before_ast, after_ast) do
+    get_sql_for_ast_changes(before_ast, after_ast, :postgresql)
+  end
+
+  defp get_sqlite_for_ast_changes(before_ast, after_ast) do
+    get_sql_for_ast_changes(before_ast, after_ast, :sqlite)
+  end
+
+  defp get_sql_for_ast_changes(before_ast, after_ast, flavour) do
+    for change <- table_changes(before_ast, after_ast), into: "" do
+      case change do
+        {nil, table_after} ->
+          build_sql_create_table(table_after, flavour)
+
+        {table_before, nil} ->
+          build_sql_drop_table(table_before)
+
+        {table_before, table_after} ->
+          build_sql_alter_table(table_before, table_after, flavour)
+      end
+    end
+  end
+
+  defp table_full_name(table_info) do
+    "#{table_info.namespace}.#{table_info.table_name}"
+  end
+
+  defp build_sql_create_table(table_info, flavour) do
+    ## https://www.sqlite.org/syntax/column-constraint.html
+    ## %{cid: 0, dflt_value: nil, name: "id", notnull: 0, pk: 1, type: "INTEGER"}
+
+    column_definitions =
+      Enum.map(table_info.column_infos, fn {_, info} ->
+        "\n  " <> column_def_sql_from_info(info, flavour)
+      end)
+
+    foreign_key_clauses =
+      for foreign_key_info <- table_info.foreign_keys_info do
+        "\n  " <> foreign_key_sql_from_info(foreign_key_info, flavour)
+      end
+
+    columns_and_keys = Enum.join(column_definitions ++ foreign_key_clauses, ",")
+
+    case flavour do
+      :postgresql ->
+        "\nCREATE TABLE #{table_full_name(table_info)} (#{columns_and_keys});\n"
+
+      :sqlite ->
+        "\nCREATE TABLE #{table_full_name(table_info)} (#{columns_and_keys})STRICT;\n"
+    end
+  end
+
+  defp build_sql_drop_table(table_info) do
+    "DROP TABLE #{table_full_name(table_info)};\n"
+  end
+
+  defp build_sql_alter_table(table_before, table_after, flavour) do
+    ## add columns
+    added_colums_lines =
+      for {column_id, column_info} <- table_after.column_infos,
+          not Map.has_key?(table_before.column_infos, column_id) do
+        "ALTER TABLE #{table_full_name(table_after)} ADD COLUMN #{column_def_sql_from_info(column_info, flavour)};\n"
+      end
+
+    ## delete columns
+    dropped_colums_lines =
+      for {column_id, column_info} <- table_before.column_infos,
+          not Map.has_key?(table_after.column_infos, column_id) do
+        "ALTER TABLE #{table_full_name(table_after)} DROP COLUMN #{column_info.name};\n"
+      end
+
+    ## rename columns
+    rename_colums_lines =
+      for {column_id, column_info} <- table_after.column_infos,
+          Map.has_key?(table_before.column_infos, column_id) &&
+            column_info.name != table_before.column_infos[column_id].name do
+        "ALTER TABLE #{table_full_name(table_after)} RENAME COLUMN #{table_before.column_infos[column_id].name} TO #{column_info.name};\n"
+      end
+
+    all_change_lines = added_colums_lines ++ dropped_colums_lines ++ rename_colums_lines
+    Enum.join(all_change_lines, " ")
+  end
+
+  defp table_changes(nil, after_ast) do
+    for {table_name, table_info} <- after_ast do
+      {nil, table_info}
+    end
+  end
+
+  defp table_changes(before_ast, after_ast) do
+    new_and_changed =
+      for {table_name, table_info} <- after_ast, table_info != before_ast[table_name] do
+        {before_ast[table_name], table_info}
+      end
+
+    dropped =
+      for {table_name, table_info} <- before_ast, not Map.has_key?(after_ast, table_name) do
+        {table_info, nil}
+      end
+
+    new_and_changed ++ dropped
+  end
+
+  defp prepend_if(list, true, item) when is_list(list), do: [item | list]
+  defp prepend_if(list, false, _) when is_list(list), do: list
+
   defp foreign_key_sql_from_info(key_info, flavour) do
-    # DEFERRABLE
-
-    # %{from: "daddy", id: 0, match: "NONE", on_delete: "NO ACTION", on_update: "NO ACTION", seq: 0, table: "parent", to: "id"}
-
-    elements = []
-
-    # force postgres to MATCH SIMPLE as sqlite always does this
-    elements =
-      case flavour do
-        "postgres" ->
-          ["MATCH SIMPLE" | elements]
-
-        _ ->
-          elements
-      end
+    # TODO DEFERRABLE
+    # key_info looks like this %{from: "daddy", id: 0, match: "NONE", on_delete: "NO ACTION", on_update: "NO ACTION", seq: 0, table: "parent", to: "id"}
 
     elements =
-      if key_info.on_delete != "NO ACTION" do
-        ["ON DELETE #{key_info.on_delete}" | elements]
-      else
-        elements
-      end
-
-    elements =
-      if key_info.on_update != "NO ACTION" do
-        ["ON UPDATE #{key_info.on_update}" | elements]
-      else
-        elements
-      end
+      []
+      # force postgres to MATCH SIMPLE as sqlite always does this
+      |> prepend_if(flavour == :postgresql, "MATCH SIMPLE")
+      |> prepend_if(key_info.on_delete != "NO ACTION", "ON DELETE #{key_info.on_delete}")
+      |> prepend_if(key_info.on_update != "NO ACTION", "ON UPDATE #{key_info.on_update}")
 
     elements = [
       "FOREIGN KEY(#{key_info.from}) REFERENCES #{key_info.table}(#{key_info.to})" | elements
@@ -171,7 +181,7 @@ defmodule Electric.Migrations.Generation do
 
     type_lookup =
       case flavour do
-        "postgres" ->
+        :postgresql ->
           %{
             "TEXT" => "text",
             "NUMERIC" => "numeric",
@@ -190,39 +200,14 @@ defmodule Electric.Migrations.Generation do
           }
       end
 
-    elements = []
+    sorting = if column_info.pk_desc, do: " DESC", else: ""
 
     elements =
-      if column_info.dflt_value != nil do
-        ["DEFAULT #{column_info.dflt_value}" | elements]
-      else
-        elements
-      end
-
-    elements =
-      if column_info.unique do
-        ["UNIQUE" | elements]
-      else
-        elements
-      end
-
-    elements =
-      if column_info.notnull != 0 && column_info.pk == 0 do
-        ["NOT NULL" | elements]
-      else
-        elements
-      end
-
-    elements =
-      if column_info.pk != 0 do
-        ["PRIMARY KEY#{if column_info.pk_desc do
-          " DESC"
-        else
-          ""
-        end}" | elements]
-      else
-        elements
-      end
+      []
+      |> prepend_if(column_info.dflt_value != nil, "DEFAULT #{column_info.dflt_value}")
+      |> prepend_if(column_info.unique, "UNIQUE")
+      |> prepend_if(column_info.notnull != 0 && column_info.pk == 0, "NOT NULL")
+      |> prepend_if(column_info.pk != 0, "PRIMARY KEY#{sorting}")
 
     elements = [type_lookup[column_info.type] | elements]
     elements = [column_info.name | elements]

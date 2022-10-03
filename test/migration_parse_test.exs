@@ -11,7 +11,7 @@ defmodule MigrationsParseTest do
       """
 
       migration = %Electric.Migration{name: "test1", original_body: sql_in}
-      info = Electric.Migrations.Parse.sql_ast_from_migration_set([migration])
+      {:ok, info} = Electric.Migrations.Parse.sql_ast_from_migration_set([migration])
 
       column_names = info["main.fish"][:columns]
       assert column_names == ["value", "colour"]
@@ -67,7 +67,7 @@ defmodule MigrationsParseTest do
       ) STRICT, WITHOUT ROWID;
       """
 
-      info =
+      {:ok, info} =
         Electric.Migrations.Parse.sql_ast_from_migration_set([
           %Electric.Migration{name: "test1", original_body: sql_in}
         ])
@@ -184,7 +184,7 @@ defmodule MigrationsParseTest do
       ) STRICT, WITHOUT ROWID;
       """
 
-      info =
+      {:ok, info} =
         Electric.Migrations.Parse.sql_ast_from_migration_set([
           %Electric.Migration{name: "test1", original_body: sql_in}
         ])
