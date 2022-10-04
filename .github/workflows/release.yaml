@@ -11,7 +11,8 @@ jobs:
     name: Build the cli binary
     strategy:
       matrix:
-        os: [windows-latest, ubuntu-20.04, ubuntu-18.04, macos-12, macos-12-m1]
+        # os: [windows-latest, ubuntu-20.04, ubuntu-18.04, macos-12, macos-12-m1]
+        os: [windows-latest]
     runs-on: ${{ matrix.os }}
     env:
       MIX_ENV: prod
@@ -20,11 +21,13 @@ jobs:
       - uses: erlef/setup-beam@v1
         if: ${{ !startsWith(matrix.os, 'macos')}}
         with:
-          otp-version: 25.0
+          otp-version: 24.3
           elixir-version: 1.14
       - name: Install build tools on windows
         if: ${{ startsWith(matrix.os, 'windows')}}
-        run: choco install -y zstandard make
+        run: |
+          choco install -y zstandard make
+          Add-Content -Path $env:GITHUB_ENV -Value "CC=gcc"
       - name: Setup elixir on mac
         if: ${{ startsWith(matrix.os, 'macos')}}
         run: |
@@ -44,7 +47,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-mix-
       - run: mix deps.get
-      - run: mix release
+      - run: "dir env: ; mix release"
       - uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.os }}-binary
