@@ -11,6 +11,8 @@ defmodule Electric.Migrations do
   @migration_template EEx.compile_file("lib/electric/migrations/templates/migration.sql.eex")
   @satellite_template EEx.compile_file("lib/electric/migrations/templates/satellite.sql.eex")
   @bundle_template EEx.compile_file("lib/electric/migrations/templates/index.js.eex")
+  
+  @type body_style() :: :none | :text | :list
 
   @doc """
   Creates the migrations folder and adds in initial migration to it.
@@ -135,7 +137,7 @@ defmodule Electric.Migrations do
   @doc false
   def write_manifest(src_folder) do
     manifest_path = Path.join(src_folder, @manifest_file_name)
-    manifest = create_bundle(src_folder, false)
+    manifest = create_bundle(src_folder, :none)
 
     if File.exists?(manifest_path) do
       File.rm(manifest_path)
@@ -146,7 +148,7 @@ defmodule Electric.Migrations do
 
   @doc false
   def write_json_bundle(src_folder) do
-    migrations = create_bundle(src_folder, true)
+    migrations = create_bundle(src_folder, :text)
     bundle_path = Path.join(src_folder, @bundle_file_name)
 
     if File.exists?(bundle_path) do
@@ -158,7 +160,7 @@ defmodule Electric.Migrations do
 
   @doc false
   def write_js_bundle(src_folder) do
-    migrations = create_bundle(src_folder, true)
+    migrations = create_bundle(src_folder, :list)
     {result, _bindings} = Code.eval_quoted(@bundle_template, migrations: migrations)
     bundle_path = Path.join(src_folder, @js_bundle_file_name)
 
@@ -182,14 +184,14 @@ defmodule Electric.Migrations do
     end
   end
 
-  defp create_bundle(src_folder, with_body) do
-    migrations = all_migrations_as_maps(src_folder, with_body)
+  defp create_bundle(src_folder, body_style) do
+    migrations = all_migrations_as_maps(src_folder, body_style)
     Jason.encode!(%{"migrations" => migrations}) |> Jason.Formatter.pretty_print()
   end
 
-  defp all_migrations_as_maps(src_folder, with_body) do
+  defp all_migrations_as_maps(src_folder, body_style) do
     for migration <- ordered_migrations(src_folder) do
-      Electric.Migration.as_json_map(migration, with_body)
+      Electric.Migration.as_json_map(migration, body_style)
     end
   end
 
@@ -205,22 +207,22 @@ defmodule Electric.Migrations do
         Electric.Migration.ensure_original_body(migration)
       end
 
-    {status, message} = 1..length(read_migrations)
-    |> Enum.map(&Enum.take(read_migrations, &1))
-    |> Enum.reduce_while({:ok, ""}, fn subset, {status, messages} ->
-      case add_triggers_to_migration(subset, template) do
-        {:ok, warning_message} -> {:cont, {:ok, "#{messages}#{warning_message}"}}
-        {:ok, nil} -> {:cont, {:ok, messages}}
-        {:error, reason} -> {:halt, {:error, reason}}
-      end
-    end)
+    {status, message} =
+      1..length(read_migrations)
+      |> Enum.map(&Enum.take(read_migrations, &1))
+      |> Enum.reduce_while({:ok, ""}, fn subset, {status, messages} ->
+        case add_triggers_to_migration(subset, template) do
+          {:ok, warning_message} -> {:cont, {:ok, "#{messages}#{warning_message}"}}
+          {:ok, nil} -> {:cont, {:ok, messages}}
+          {:error, reason} -> {:halt, {:error, reason}}
+        end
+      end)
 
     if message == "" do
       {status, "Migrations built"}
     else
       {status, message}
     end
-
   end
 
   @doc false

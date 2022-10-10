@@ -11,8 +11,10 @@ defmodule Electric.Migrations.Parse do
     case ast_from_ordered_migrations(migrations) do
       {ast, [], []} ->
         {:ok, ast, nil}
+
       {ast, [], warnings} ->
         {:ok, ast, Enum.join(warnings, "\n")}
+
       {_ast, errors, warnings} ->
         {:error, Enum.join(errors, "\n")}
     end
@@ -152,7 +154,7 @@ defmodule Electric.Migrations.Parse do
       column_infos: column_infos,
       foreign_keys_info: foreign_keys_info,
       validation_fails: validation_fails,
-      warning_messages: warning_messages,
+      warning_messages: warning_messages
     }
   end
 

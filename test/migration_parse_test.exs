@@ -31,24 +31,24 @@ defmodule MigrationsParseTest do
       assert reason == "In migration test1 SQL error: near \"SOME\": syntax error"
     end
 
-#    test "tests can check for strictness and rowid" do
-#      sql_in = """
-#      CREATE TABLE IF NOT EXISTS fish (
-#      value TEXT PRIMARY KEY,
-#      colour TEXT
-#      );
-#      """
-#
-#      {:error, message} =
-#        Electric.Migrations.Parse.sql_ast_from_migration_set([
-#          %Electric.Migration{name: "test1", original_body: sql_in}
-#        ])
-#
-#      expected =
-#        "The table fish is not WITHOUT ROWID. Add the WITHOUT ROWID option at the end of the create table statement and make sure you also specify a primary key\nThe table fish is not STRICT. Add the STRICT option at the end of the create table statement"
-#
-#      assert message == expected
-#    end
+    #    test "tests can check for strictness and rowid" do
+    #      sql_in = """
+    #      CREATE TABLE IF NOT EXISTS fish (
+    #      value TEXT PRIMARY KEY,
+    #      colour TEXT
+    #      );
+    #      """
+    #
+    #      {:error, message} =
+    #        Electric.Migrations.Parse.sql_ast_from_migration_set([
+    #          %Electric.Migration{name: "test1", original_body: sql_in}
+    #        ])
+    #
+    #      expected =
+    #        "The table fish is not WITHOUT ROWID. Add the WITHOUT ROWID option at the end of the create table statement and make sure you also specify a primary key\nThe table fish is not STRICT. Add the STRICT option at the end of the create table statement"
+    #
+    #      assert message == expected
+    #    end
 
     test "tests getting SQL structure for templating" do
       sql_in = """

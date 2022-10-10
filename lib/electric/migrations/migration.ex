@@ -58,18 +58,30 @@ defmodule Electric.Migration do
   reads the satellite metadata from the file header and returns the metadata as a json serialisable map
   with_body: is a bool to ask for the satellite migration body itself to be included
   """
-  def as_json_map(migration, with_body) do
+  def as_json_map(migration, body_style) do
     with_satellite_body = ensure_satellite_body(migration)
     metadata = get_satellite_metadata(with_satellite_body)
-
-    if with_body do
-      # At the moment just using elixir jason's default escaping of the SQL text - maybe switch to base64 if causes issues
-      # see here for json escaping https://www.ietf.org/rfc/rfc4627.txt
-      Map.merge(metadata, %{"body" => with_satellite_body.satellite_body, "encoding" => "escaped"})
-    else
-      metadata
+    case body_style do
+      :none ->
+        metadata
+      :text ->
+        Map.merge(metadata, %{"body" => with_satellite_body.satellite_body, "encoding" => "escaped"})
+      :list ->
+        body = with_satellite_body.satellite_body
+        Map.merge(metadata, %{"body" => split_body_into_commands(body), "encoding" => "escaped"})
     end
   end
+
+
+  defp split_body_into_commands(body) do
+    regex = ~r/(?:--[^\n]*\n)|(?:\/\*[\s\S]*?\*\/)|([^\s][^;]+;)/
+    matches = Regex.scan(regex, body)
+    for match <- matches, length(match) > 1 do
+      List.last(match)
+    end
+  end
+
+
 
   @doc """
   reads the satellite metadata from the file header

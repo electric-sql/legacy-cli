@@ -14,6 +14,7 @@ defmodule Electric.Migrations.Generation do
       {:ok, before_ast, after_ast, warning_message} ->
         postgres_string = get_postgres_for_ast_changes(before_ast, after_ast)
         {:ok, postgres_string, warning_message}
+
       {:error, reasons} ->
         {:error, reasons}
     end
@@ -22,7 +23,8 @@ defmodule Electric.Migrations.Generation do
   defp before_and_after_ast(migration_set) do
     with {:ok, after_ast, after_warnings} <- Parse.sql_ast_from_migration_set(migration_set),
          all_but_last_migration_set = Enum.drop(migration_set, -1),
-         {:ok, before_ast, _warnings} <- Parse.sql_ast_from_migration_set(all_but_last_migration_set) do
+         {:ok, before_ast, _warnings} <-
+           Parse.sql_ast_from_migration_set(all_but_last_migration_set) do
       {:ok, before_ast, after_ast, after_warnings}
     end
   end

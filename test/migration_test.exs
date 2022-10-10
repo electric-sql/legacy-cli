@@ -27,12 +27,13 @@ defmodule MigrationsTest do
       ) STRICT, WITHOUT ROWID;
       """
 
-      expected = {"""
-      CREATE TABLE IF NOT EXISTS fish (
-      value TEXT PRIMARY KEY
-      ) STRICT, WITHOUT ROWID;
-      --ADD A TRIGGER FOR main.fish;
-      """, nil}
+      expected =
+        {"""
+         CREATE TABLE IF NOT EXISTS fish (
+         value TEXT PRIMARY KEY
+         ) STRICT, WITHOUT ROWID;
+         --ADD A TRIGGER FOR main.fish;
+         """, nil}
 
       assert Electric.Migrations.Triggers.add_triggers_to_last_migration(
                [%Electric.Migration{name: "test1", original_body: sql}],
@@ -266,7 +267,7 @@ defmodule MigrationsTest do
       ) STRICT, WITHOUT ROWID;
       """
 
-    {sql, warning} =
+      {sql, warning} =
         Electric.Migrations.Triggers.add_triggers_to_last_migration(
           [%Electric.Migration{name: "test1", original_body: sql}],
           Electric.Migrations.get_template()
@@ -401,7 +402,7 @@ defmodule MigrationsTest do
       ADD COLUMN colour TEXT;
       """
 
-    {sql_out1, warning} =
+      {sql_out1, warning} =
         Electric.Migrations.Triggers.add_triggers_to_last_migration(
           [%Electric.Migration{name: "test1", original_body: sql1}],
           Electric.Migrations.get_template()
@@ -607,7 +608,6 @@ defmodule MigrationsFileTest do
 
       {:ok, msg} = Electric.Migrations.build_migrations(%{}, %{:dir => migrations_path})
       assert msg == "The table dogs is not WITHOUT ROWID.\nThe table dogs is not STRICT."
-
     end
   end
 
@@ -784,15 +784,13 @@ defmodule MigrationsFileTest do
       expected = %{
         "migrations" => [
           %{
-            "body" =>
-              "/*\nElectricDB Migration\n{\"metadata\": {\"name\": \"#{migration_name}\", \"sha256\": \"211b1e2b203d1fcac6ccb526d2775ec1f5575d4018ab1a33272948ce0ae76775\"}}\n*/\nCREATE TABLE IF NOT EXISTS items (\n  value TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;\n--ADD A TRIGGER FOR main.items;\n",
+            "body" => "/*\nElectricDB Migration\n{\"metadata\": {\"name\": \"#{migration_name}\", \"sha256\": \"211b1e2b203d1fcac6ccb526d2775ec1f5575d4018ab1a33272948ce0ae76775\"}}\n*/\nCREATE TABLE IF NOT EXISTS items (\n  value TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;\n--ADD A TRIGGER FOR main.items;\n",
             "name" => migration_name,
             "encoding" => "escaped",
             "sha256" => "211b1e2b203d1fcac6ccb526d2775ec1f5575d4018ab1a33272948ce0ae76775"
           },
           %{
-            "body" =>
-              "/*\nElectricDB Migration\n{\"metadata\": {\"name\": \"#{migration_name_2}\", \"sha256\": \"946f0f3a0d0338fa486d3d7da35c3b6032f837336fb9a08f933d44675bb264d3\"}}\n*/\nCREATE TABLE IF NOT EXISTS cat (\n  value TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;\n--ADD A TRIGGER FOR main.cat;\n\n--ADD A TRIGGER FOR main.items;\n",
+            "body" => "/*\nElectricDB Migration\n{\"metadata\": {\"name\": \"#{migration_name_2}\", \"sha256\": \"946f0f3a0d0338fa486d3d7da35c3b6032f837336fb9a08f933d44675bb264d3\"}}\n*/\nCREATE TABLE IF NOT EXISTS cat (\n  value TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;\n--ADD A TRIGGER FOR main.cat;\n\n--ADD A TRIGGER FOR main.items;\n",
             "name" => migration_name_2,
             "encoding" => "escaped",
             "sha256" => "946f0f3a0d0338fa486d3d7da35c3b6032f837336fb9a08f933d44675bb264d3"
