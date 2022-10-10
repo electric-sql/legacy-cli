@@ -11,7 +11,7 @@ defmodule Electric.Migrations do
   @migration_template EEx.compile_file("lib/electric/migrations/templates/migration.sql.eex")
   @satellite_template EEx.compile_file("lib/electric/migrations/templates/satellite.sql.eex")
   @bundle_template EEx.compile_file("lib/electric/migrations/templates/index.js.eex")
-  
+
   @type body_style() :: :none | :text | :list
 
   @doc """
@@ -210,7 +210,7 @@ defmodule Electric.Migrations do
     {status, message} =
       1..length(read_migrations)
       |> Enum.map(&Enum.take(read_migrations, &1))
-      |> Enum.reduce_while({:ok, ""}, fn subset, {status, messages} ->
+      |> Enum.reduce_while({:ok, ""}, fn subset, {_status, messages} ->
         case add_triggers_to_migration(subset, template) do
           {:ok, warning_message} -> {:cont, {:ok, "#{messages}#{warning_message}"}}
           {:ok, nil} -> {:cont, {:ok, messages}}

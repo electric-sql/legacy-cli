@@ -267,7 +267,7 @@ defmodule MigrationsTest do
       ) STRICT, WITHOUT ROWID;
       """
 
-      {sql, warning} =
+      {sql, _warning} =
         Electric.Migrations.Triggers.add_triggers_to_last_migration(
           [%Electric.Migration{name: "test1", original_body: sql}],
           Electric.Migrations.get_template()
@@ -402,7 +402,7 @@ defmodule MigrationsTest do
       ADD COLUMN colour TEXT;
       """
 
-      {sql_out1, warning} =
+      {sql_out1, _warning} =
         Electric.Migrations.Triggers.add_triggers_to_last_migration(
           [%Electric.Migration{name: "test1", original_body: sql1}],
           Electric.Migrations.get_template()
@@ -411,7 +411,7 @@ defmodule MigrationsTest do
       migration_1 = %Electric.Migration{name: "test1", original_body: sql1}
       migration_2 = %Electric.Migration{name: "test2", original_body: sql2}
 
-      {sql_out2, warning} =
+      {sql_out2, _warning} =
         Electric.Migrations.Triggers.add_triggers_to_last_migration(
           [migration_1, migration_2],
           Electric.Migrations.get_template()
@@ -784,13 +784,15 @@ defmodule MigrationsFileTest do
       expected = %{
         "migrations" => [
           %{
-            "body" => "/*\nElectricDB Migration\n{\"metadata\": {\"name\": \"#{migration_name}\", \"sha256\": \"211b1e2b203d1fcac6ccb526d2775ec1f5575d4018ab1a33272948ce0ae76775\"}}\n*/\nCREATE TABLE IF NOT EXISTS items (\n  value TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;\n--ADD A TRIGGER FOR main.items;\n",
+            "body" =>
+              "/*\nElectricDB Migration\n{\"metadata\": {\"name\": \"#{migration_name}\", \"sha256\": \"211b1e2b203d1fcac6ccb526d2775ec1f5575d4018ab1a33272948ce0ae76775\"}}\n*/\nCREATE TABLE IF NOT EXISTS items (\n  value TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;\n--ADD A TRIGGER FOR main.items;\n",
             "name" => migration_name,
             "encoding" => "escaped",
             "sha256" => "211b1e2b203d1fcac6ccb526d2775ec1f5575d4018ab1a33272948ce0ae76775"
           },
           %{
-            "body" => "/*\nElectricDB Migration\n{\"metadata\": {\"name\": \"#{migration_name_2}\", \"sha256\": \"946f0f3a0d0338fa486d3d7da35c3b6032f837336fb9a08f933d44675bb264d3\"}}\n*/\nCREATE TABLE IF NOT EXISTS cat (\n  value TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;\n--ADD A TRIGGER FOR main.cat;\n\n--ADD A TRIGGER FOR main.items;\n",
+            "body" =>
+              "/*\nElectricDB Migration\n{\"metadata\": {\"name\": \"#{migration_name_2}\", \"sha256\": \"946f0f3a0d0338fa486d3d7da35c3b6032f837336fb9a08f933d44675bb264d3\"}}\n*/\nCREATE TABLE IF NOT EXISTS cat (\n  value TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;\n--ADD A TRIGGER FOR main.cat;\n\n--ADD A TRIGGER FOR main.items;\n",
             "name" => migration_name_2,
             "encoding" => "escaped",
             "sha256" => "946f0f3a0d0338fa486d3d7da35c3b6032f837336fb9a08f933d44675bb264d3"

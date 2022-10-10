@@ -27,7 +27,7 @@ defmodule MigrationsParseTest do
 
       migration = %Electric.Migration{name: "test1", original_body: sql_in}
 
-      {status, reason} = Electric.Migrations.Parse.sql_ast_from_migration_set([migration])
+      {_status, reason} = Electric.Migrations.Parse.sql_ast_from_migration_set([migration])
       assert reason == "In migration test1 SQL error: near \"SOME\": syntax error"
     end
 
