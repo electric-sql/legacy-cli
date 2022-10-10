@@ -11,7 +11,7 @@ defmodule MigrationsPostgresTest do
 
       migration = %Electric.Migration{name: "test1", original_body: sql}
 
-      {:ok, postgres_version} =
+      {:ok, postgres_version, _} =
         Electric.Migrations.Generation.postgres_for_ordered_migrations([migration])
 
       expected = "\nCREATE TABLE main.fish (\n  value text PRIMARY KEY);\n"
@@ -35,7 +35,7 @@ defmodule MigrationsPostgresTest do
       migration_1 = %Electric.Migration{name: "test_1", original_body: sql1}
       migration_2 = %Electric.Migration{name: "test_2", original_body: sql2}
 
-      {:ok, postgres_version} =
+      {:ok, postgres_version, _} =
         Electric.Migrations.Generation.postgres_for_ordered_migrations([migration_1, migration_2])
 
       expected = "\nCREATE TABLE main.goat (\n  name text PRIMARY KEY);\n"
@@ -60,7 +60,7 @@ defmodule MigrationsPostgresTest do
       migration_1 = %Electric.Migration{name: "test_1", original_body: sql1}
       migration_2 = %Electric.Migration{name: "test_2", original_body: sql2}
 
-      {:ok, postgres_version} =
+      {:ok, postgres_version, _} =
         Electric.Migrations.Generation.postgres_for_ordered_migrations([migration_1, migration_2])
 
       expected = """
@@ -89,7 +89,7 @@ defmodule MigrationsPostgresTest do
 
       migration = %Electric.Migration{name: "test1", original_body: sql_in}
 
-      {:ok, postgres_version} =
+      {:ok, postgres_version, _} =
         Electric.Migrations.Generation.postgres_for_ordered_migrations([migration])
 
       expected = """
@@ -118,7 +118,7 @@ defmodule MigrationsPostgresTest do
 
       migration = %Electric.Migration{name: "test1", original_body: sql_in}
 
-      {:ok, postgres_version} =
+      {:ok, postgres_version, _} =
         Electric.Migrations.Generation.postgres_for_ordered_migrations([migration])
 
       expected = """
@@ -142,7 +142,7 @@ defmodule MigrationsPostgresTest do
 
       migration = %Electric.Migration{name: "test1", original_body: sql_in}
 
-      {:ok, postgres_version} =
+      {:ok, postgres_version, _} =
         Electric.Migrations.Generation.postgres_for_ordered_migrations([migration])
 
       expected = """

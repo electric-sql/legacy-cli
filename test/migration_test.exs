@@ -27,12 +27,12 @@ defmodule MigrationsTest do
       ) STRICT, WITHOUT ROWID;
       """
 
-      expected = """
+      expected = {"""
       CREATE TABLE IF NOT EXISTS fish (
       value TEXT PRIMARY KEY
       ) STRICT, WITHOUT ROWID;
       --ADD A TRIGGER FOR main.fish;
-      """
+      """, nil}
 
       assert Electric.Migrations.Triggers.add_triggers_to_last_migration(
                [%Electric.Migration{name: "test1", original_body: sql}],
@@ -50,7 +50,7 @@ defmodule MigrationsTest do
 
       #      migration = %Electric.Migration{name: "test1", original_body: sql}
 
-      sql =
+      {sql, _warning} =
         Electric.Migrations.Triggers.add_triggers_to_last_migration(
           [%Electric.Migration{name: "test1", original_body: sql}],
           Electric.Migrations.get_template()
@@ -266,7 +266,7 @@ defmodule MigrationsTest do
       ) STRICT, WITHOUT ROWID;
       """
 
-      sql =
+    {sql, warning} =
         Electric.Migrations.Triggers.add_triggers_to_last_migration(
           [%Electric.Migration{name: "test1", original_body: sql}],
           Electric.Migrations.get_template()
@@ -318,7 +318,7 @@ defmodule MigrationsTest do
       ) STRICT, WITHOUT ROWID;
       """
 
-      sql =
+      {sql, _warning} =
         Electric.Migrations.Triggers.add_triggers_to_last_migration(
           [%Electric.Migration{name: "test1", original_body: sql}],
           Electric.Migrations.get_template()
@@ -351,7 +351,7 @@ defmodule MigrationsTest do
       ) STRICT, WITHOUT ROWID;
       """
 
-      sql =
+      {sql, _warning} =
         Electric.Migrations.Triggers.add_triggers_to_last_migration(
           [%Electric.Migration{name: "test1", original_body: sql}],
           Electric.Migrations.get_template()
@@ -401,7 +401,7 @@ defmodule MigrationsTest do
       ADD COLUMN colour TEXT;
       """
 
-      sql_out1 =
+    {sql_out1, warning} =
         Electric.Migrations.Triggers.add_triggers_to_last_migration(
           [%Electric.Migration{name: "test1", original_body: sql1}],
           Electric.Migrations.get_template()
@@ -410,7 +410,7 @@ defmodule MigrationsTest do
       migration_1 = %Electric.Migration{name: "test1", original_body: sql1}
       migration_2 = %Electric.Migration{name: "test2", original_body: sql2}
 
-      sql_out2 =
+      {sql_out2, warning} =
         Electric.Migrations.Triggers.add_triggers_to_last_migration(
           [migration_1, migration_2],
           Electric.Migrations.get_template()
@@ -600,12 +600,14 @@ defmodule MigrationsFileTest do
       dogs_content = """
       CREATE TABLE IF NOT EXISTS dogs (
         value TEXT PRIMARY KEY
-      ) STRICT, WITHOUT ROWID;
+      );
       """
 
       File.write!(migration, dogs_content, [:append])
 
-      {:ok, _msg} = Electric.Migrations.build_migrations(%{}, %{:dir => migrations_path})
+      {:ok, msg} = Electric.Migrations.build_migrations(%{}, %{:dir => migrations_path})
+      assert msg == "The table dogs is not WITHOUT ROWID.\nThe table dogs is not STRICT."
+
     end
   end
 

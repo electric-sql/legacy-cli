@@ -11,20 +11,19 @@ defmodule Electric.Migrations.Generation do
   """
   def postgres_for_ordered_migrations(ordered_migrations) do
     case before_and_after_ast(ordered_migrations) do
-      {:ok, before_ast, after_ast} ->
+      {:ok, before_ast, after_ast, warning_message} ->
         postgres_string = get_postgres_for_ast_changes(before_ast, after_ast)
-        {:ok, postgres_string}
-
+        {:ok, postgres_string, warning_message}
       {:error, reasons} ->
         {:error, reasons}
     end
   end
 
   defp before_and_after_ast(migration_set) do
-    with {:ok, after_ast} <- Parse.sql_ast_from_migration_set(migration_set),
+    with {:ok, after_ast, after_warnings} <- Parse.sql_ast_from_migration_set(migration_set),
          all_but_last_migration_set = Enum.drop(migration_set, -1),
-         {:ok, before_ast} <- Parse.sql_ast_from_migration_set(all_but_last_migration_set) do
-      {:ok, before_ast, after_ast}
+         {:ok, before_ast, _warnings} <- Parse.sql_ast_from_migration_set(all_but_last_migration_set) do
+      {:ok, before_ast, after_ast, after_warnings}
     end
   end
 
