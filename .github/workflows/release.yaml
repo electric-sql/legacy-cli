@@ -1,8 +1,9 @@
 name: Release
 on:
+  push:
+    tags:
+      - v*.*.**
   workflow_dispatch:
-  release:
-    types: ["published"]
 
 jobs:
   build_binary:
@@ -50,21 +51,29 @@ jobs:
         with:
           name: ${{ matrix.os }}-binary
           path: _build/prod/rel/bakeware/electric
-  attach_artifacts:
-    name: Attach artifacts to release
-    if: github.event_name == 'release'
+  create_draft_release:
+    name: Create a draft release with all the binaries
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-20.04
     needs: build_binary
     steps:
+      - uses: actions/checkout@v2
       - uses: actions/download-artifact@v3
         with:
           path: ./
+      - name: Set env
+        run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
       - run: |
-          mv ubuntu-18.04-binary/electic electricsql_cli_${{ github.event.release.tag_name }}_linux
-          mv macos-12-binary/electic electricsql_cli_${{ github.event.release.tag_name }}_intel_mac
-          mv macos-12-m1-binary/electic electricsql_cli_${{ github.event.release.tag_name }}_arm_mac
-      - uses: irongut/EditRelease@v1.2.0
+          mv ubuntu-18.04-binary/electric electricsql_cli_${{ env.RELEASE_VERSION }}_linux
+          mv macos-12-binary/electric electricsql_cli_${{ env.RELEASE_VERSION }}_intel_mac
+          mv macos-12-m1-binary/electric electricsql_cli_${{ env.RELEASE_VERSION }}_arm_mac
+          chmod +x electricsql_cli_*
+      - name: Publish the release
+        uses: softprops/action-gh-release@v1
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          id: ${{ github.event.release.id }}
-          files: "electricsql_cli_${{ github.event.release.tag_name }}_linux,electricsql_cli_${{ github.event.release.tag_name }}_intel_mac,electricsql_cli_${{ github.event.release.tag_name }}_arm_mac"
+          draft: true
+          generate_release_notes: true
+          files: |
+            electricsql_cli_${{ env.RELEASE_VERSION }}_arm_mac
+            electricsql_cli_${{ env.RELEASE_VERSION }}_intel_mac
+            electricsql_cli_${{ env.RELEASE_VERSION }}_linux
