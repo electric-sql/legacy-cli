@@ -47,7 +47,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-mix-
       - run: mix deps.get
-      - run: "dir env: ; mix release"
+      - run: mix release
       - uses: actions/upload-artifact@v3
         with:
           name: ${{ matrix.os }}-binary
