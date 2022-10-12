@@ -1,0 +1,69 @@
+name: Release
+on:
+  release:
+    types: ["created"]
+
+jobs:
+  build_binary:
+    name: Build the cli binary
+    strategy:
+      matrix:
+        # os: [windows-latest, ubuntu-20.04, ubuntu-18.04, macos-12, macos-12-m1]
+        os: [ubuntu-18.04, macos-12, macos-12-m1]
+    runs-on: ${{ matrix.os }}
+    env:
+      MIX_ENV: prod
+    steps:
+      - uses: actions/checkout@v2
+      - uses: erlef/setup-beam@v1
+        if: ${{ !startsWith(matrix.os, 'macos')}}
+        with:
+          otp-version: 24.3
+          elixir-version: 1.14
+      - name: Install build tools on windows
+        if: ${{ startsWith(matrix.os, 'windows')}}
+        run: |
+          choco install -y zstandard make
+          Add-Content -Path $env:GITHUB_ENV -Value "CC=gcc"
+      - name: Setup elixir on mac
+        if: ${{ startsWith(matrix.os, 'macos')}}
+        run: |
+          brew update --preinstall
+          brew install erlang@25
+          brew install elixir
+          mix local.hex --force
+          mix local.rebar --force
+      - name: Setup dependency caching
+        if: ${{ startsWith(matrix.os, 'macos')}}
+        uses: actions/cache@v3
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-mix-${{ hashfiles('**/mix.lock')}}
+          restore-keys: |
+            ${{ runner.os }}-mix-
+      - run: mix deps.get
+      - run: mix release
+      - uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.os }}-binary
+          path: _build/prod/rel/bakeware/electric
+  attach_artifacts:
+    name: Attach artifacts to release
+    if: github.event_name == 'release'
+    runs-on: ubuntu-20.04
+    needs: build_binary
+    steps:
+      - uses: actions/download-artifact@v3
+        with:
+          path: ./
+      - run: |
+          mv ubuntu-18.04-binary/electic electricsql_cli_${{ github.event.release.tag_name }}_linux
+          mv macos-12-binary/electic electricsql_cli_${{ github.event.release.tag_name }}_intel_mac
+          mv macos-12-m1-binary/electic electricsql_cli_${{ github.event.release.tag_name }}_arm_mac
+      - uses: irongut/EditRelease@v1.2.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          id: ${{ github.event.release.id }}
+          files: "electricsql_cli_${{ github.event.release.tag_name }}_linux,electricsql_cli_${{ github.event.release.tag_name }}_intel_mac,electricsql_cli_${{ github.event.release.tag_name }}_arm_mac"
