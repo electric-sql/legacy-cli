@@ -358,14 +358,14 @@ defmodule MigrationsTest do
           Electric.Migrations.get_template()
         )
 
-      IO.puts(sql)
+      #      IO.puts(sql)
 
       commands = Electric.Migration.split_body_into_commands(sql)
 
       {:ok, conn} = Exqlite.Sqlite3.open(":memory:")
 
       for command <- commands do
-        IO.puts(command)
+        #        IO.puts(command)
         :ok = Exqlite.Sqlite3.execute(conn, command)
       end
 

@@ -19,8 +19,8 @@ defmodule MigrationsLexerTest do
       result = Electric.Migrations.Lexer.get_statements(sql)
 
       expected = [
-        "CREATE TABLE IF NOT EXISTS fish (\nvalue TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;",
-        " \nCREATE TABLE IF NOT EXISTS dogs (\nvalue TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;"
+        "-- this is a comment\nCREATE TABLE IF NOT EXISTS fish (\nvalue TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;",
+        "/*\nThis is also a comment\n*/\nCREATE TABLE IF NOT EXISTS dogs (\nvalue TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;"
       ]
 
       assert result == expected
@@ -88,7 +88,7 @@ defmodule MigrationsLexerTest do
       END;
       """
 
-      [result1, result2] = Electric.Migrations.Lexer.get_statements(sql)
+      [_result1, result2] = Electric.Migrations.Lexer.get_statements(sql)
 
       expected = """
       CREATE TRIGGER update_ensure_main_fish_primarykey
