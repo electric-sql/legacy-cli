@@ -2,48 +2,22 @@ defmodule Electric.Migrations.Lexer do
   @moduledoc """
   """
   use LexLuthor
-  #  defrule ~r/^(?=BEGIN)/,                             fn(e) -> :BEGIN end
-  #  defrule ~r/^(?!CASE)[\s\S]*?((?=END)|(?=CASE))/, :BEGIN, fn(e) -> { :begin, e } end
-  #  defrule ~r/^END/,                                       :BEGIN, fn(e) -> nil end
 
   defrule(~r/^(?!BEGIN)(?!CASE)[\s\S]*?((?=BEGIN)|(?=CASE)|;)/, fn e -> {:statement, e} end)
   defrule(~r/^\n/, fn e -> {:whitespace, e} end)
-  defrule(~r/^(?=BEGIN)/, fn e -> :BEGIN end)
-  defrule(~r/^(?=CASE)/, fn e -> :CASE end)
+  defrule(~r/^(?=BEGIN)/, fn _ -> :BEGIN end)
+  defrule(~r/^(?=CASE)/, fn _ -> :CASE end)
 
   defrule(~r/^(?!END)(?!CASE)[\s\S]*?((?=CASE)|(?=END))/, :BEGIN, fn e -> {:begin, e <> "END"} end)
 
-  defrule(~r/^(?=CASE)/, :BEGIN, fn e -> :CASE end)
-  defrule(~r/^END/, :BEGIN, fn e -> nil end)
+  defrule(~r/^(?=CASE)/, :BEGIN, fn _ -> :CASE end)
+  defrule(~r/^END/, :BEGIN, fn _ -> nil end)
 
   defrule(~r/^(?!END)(?!BEGIN)[\s\S]*?((?=BEGIN)|(?=END))/, :CASE, fn e -> {:case, e <> "END"} end)
 
-  defrule(~r/^(?=BEGIN)/, :CASE, fn e -> :BEGIN end)
-  defrule(~r/^END/, :CASE, fn e -> nil end)
+  defrule(~r/^(?=BEGIN)/, :CASE, fn _ -> :BEGIN end)
+  defrule(~r/^END/, :CASE, fn _ -> nil end)
 
-  #  defrule ~r/^(?=BEGIN)/,                             fn(e) -> :BEGIN end
-  #  defrule ~r/^[\s\S]*?(END)/, :BEGIN, fn(e) -> { :begin, e } end
-  #  defrule ~r/^(?<=END)/,                                       :BEGIN, fn(e) -> nil end
-
-  #  defrule ~r/;\s*/,                              fn(e) -> { :statement, e } end
-
-  #  defrule ~r/^(?=CASE)/,                                      :BEGIN, fn(e) -> :CASE end
-
-  #
-  #  defrule ~r/^\n/,                       :BEGIN,        fn(e) -> nil end
-
-  #  defrule ~r/^(?=CASE)/,                                            fn(e) -> :CASE end
-  #  defrule ~r/^(?!BEGIN)[\s\S]*?(?=END)/,          :CASE,fn(e) -> { :case, e } end
-  #  defrule ~r/^END/,                                       :CASE,fn(e) -> nil end
-
-  #  defrule ~r/^(?=CASE)/,                                            fn(e) -> :CASE end
-  #  defrule ~r/^(?!BEGIN)[\s\S]*?(END;)/,          :CASE,fn(e) -> { :case, e } end
-  #  defrule ~r/^(?<=END;)./,                                       :CASE,fn(e) -> nil end
-  #  defrule ~r/^\n/,                            :CASE,   fn(e) -> { :case, e } end
-
-  #  defrule ~r/^\n/,                              fn(e) -> { :whitespace, e } end
-  #  defrule ~r/;/,                              fn(e) -> { :statement, e } end
-  #
   def get_statements(input) do
     cleaned = remove_comments(input)
     {:ok, tokens} = lex(cleaned)
