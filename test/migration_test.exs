@@ -344,6 +344,51 @@ defmodule MigrationsTest do
       assert oldRow == nil
     end
 
+    test "tests triggers work as statements" do
+      sql = """
+      CREATE TABLE IF NOT EXISTS fish (
+      value TEXT PRIMARY KEY,
+      colour TEXT
+      ) STRICT, WITHOUT ROWID;
+      """
+
+      {sql, _warning} =
+        Electric.Migrations.Triggers.add_triggers_to_last_migration(
+          [%Electric.Migration{name: "test1", original_body: sql}],
+          Electric.Migrations.get_template()
+        )
+
+      IO.puts(sql)
+
+      commands = Electric.Migration.split_body_into_commands(sql)
+
+      {:ok, conn} = Exqlite.Sqlite3.open(":memory:")
+
+      for command <- commands do
+        IO.puts(command)
+        :ok = Exqlite.Sqlite3.execute(conn, command)
+      end
+
+      ## adding a red fish
+      :ok =
+        Exqlite.Sqlite3.execute(
+          conn,
+          "insert into fish (value, colour) values ('abcdefg', 'red')"
+        )
+
+      {:ok, statement} = Exqlite.Sqlite3.prepare(conn, "SELECT * FROM _electric_oplog;")
+      ops = get_while_more(conn, statement, [])
+
+      [_rowid, _namespace, tablename, optype, primaryKey, newRow, oldRow, _timestamp] =
+        Enum.at(ops, 0)
+
+      assert tablename == "fish"
+      assert optype == "INSERT"
+      assert primaryKey == "{\"value\":\"abcdefg\"}"
+      assert newRow == "{\"value\":\"abcdefg\",\"colour\":\"red\"}"
+      assert oldRow == nil
+    end
+
     test "tests trigger has all columns" do
       sql = """
       CREATE TABLE IF NOT EXISTS fish (
@@ -370,15 +415,6 @@ defmodule MigrationsTest do
 
       {:ok, statement} = Exqlite.Sqlite3.prepare(conn, "SELECT * FROM _electric_oplog;")
       ops = get_while_more(conn, statement, [])
-      #        IO.puts(ops)
-
-      #        [table_name, op, row_id, new_value, old_value, _timestamp] = Enum.at(ops, 0)
-      #
-      #        assert table_name == "fish"
-      #        assert op == "INSERT"
-      #        assert row_id == 1
-      #        assert new_value == "{\"value\":\"abcdefg\",\"colour\":\"red\"}"
-      #        assert old_value == nil
 
       [_rowid, _namespace, tablename, optype, primaryKey, newRow, oldRow, _timestamp] =
         Enum.at(ops, 0)

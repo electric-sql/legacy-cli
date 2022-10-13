@@ -78,13 +78,8 @@ defmodule Electric.Migration do
     end
   end
 
-  defp split_body_into_commands(body) do
-    regex = ~r/(?:--[^\n]*\n)|(?:\/\*[\s\S]*?\*\/)|([^\s][^;]+;)/
-    matches = Regex.scan(regex, body)
-
-    for match <- matches, length(match) > 1 do
-      List.last(match)
-    end
+  def split_body_into_commands(body) do
+    Electric.Migrations.Lexer.get_statements(body)
   end
 
   @doc """

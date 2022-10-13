@@ -49,6 +49,7 @@ defmodule Electric.MixProject do
       {:optimus, [git: "git@github.com:thruflo/optimus.git"]},
       {:req, "~> 0.3.0"},
       {:exqlite, "~> 0.11.3"},
+      {:lex_luthor, "~> 0.1.2"},
       {:uuid, "~> 1.1.8"}
     ]
   end
