@@ -12,6 +12,8 @@ defmodule Electric.Migrations do
   @satellite_template EEx.compile_file("lib/electric/migrations/templates/satellite.sql.eex")
   @bundle_template EEx.compile_file("lib/electric/migrations/templates/index.js.eex")
 
+  @type body_style() :: :none | :text | :list
+
   @doc """
   Creates the migrations folder and adds in initial migration to it.
   optional argument:
@@ -67,11 +69,11 @@ defmodule Electric.Migrations do
     template = Map.get(options, :template, @satellite_template)
 
     with {:ok, folder} <- check_migrations_folder(options),
-         :ok <- folder |> ordered_migrations() |> add_triggers_to_migrations(template),
+         {:ok, msg} <- folder |> ordered_migrations() |> add_triggers_to_migrations(template),
          :ok <- optionally_write(&write_js_bundle/1, folder, flags[:bundle]),
          :ok <- optionally_write(&write_json_bundle/1, folder, flags[:json]),
          :ok <- optionally_write(&write_manifest/1, folder, flags[:manifest]) do
-      {:ok, "Migrations built"}
+      {:ok, msg}
     else
       {:error, msg} ->
         {:error, msg}
@@ -135,7 +137,7 @@ defmodule Electric.Migrations do
   @doc false
   def write_manifest(src_folder) do
     manifest_path = Path.join(src_folder, @manifest_file_name)
-    manifest = create_bundle(src_folder, false)
+    manifest = create_bundle(src_folder, :none)
 
     if File.exists?(manifest_path) do
       File.rm(manifest_path)
@@ -146,7 +148,7 @@ defmodule Electric.Migrations do
 
   @doc false
   def write_json_bundle(src_folder) do
-    migrations = create_bundle(src_folder, true)
+    migrations = create_bundle(src_folder, :text)
     bundle_path = Path.join(src_folder, @bundle_file_name)
 
     if File.exists?(bundle_path) do
@@ -158,7 +160,7 @@ defmodule Electric.Migrations do
 
   @doc false
   def write_js_bundle(src_folder) do
-    migrations = create_bundle(src_folder, true)
+    migrations = create_bundle(src_folder, :list)
     {result, _bindings} = Code.eval_quoted(@bundle_template, migrations: migrations)
     bundle_path = Path.join(src_folder, @js_bundle_file_name)
 
@@ -182,14 +184,14 @@ defmodule Electric.Migrations do
     end
   end
 
-  defp create_bundle(src_folder, with_body) do
-    migrations = all_migrations_as_maps(src_folder, with_body)
+  defp create_bundle(src_folder, body_style) do
+    migrations = all_migrations_as_maps(src_folder, body_style)
     Jason.encode!(%{"migrations" => migrations}) |> Jason.Formatter.pretty_print()
   end
 
-  defp all_migrations_as_maps(src_folder, with_body) do
+  defp all_migrations_as_maps(src_folder, body_style) do
     for migration <- ordered_migrations(src_folder) do
-      Electric.Migration.as_json_map(migration, with_body)
+      Electric.Migration.as_json_map(migration, body_style)
     end
   end
 
@@ -205,14 +207,22 @@ defmodule Electric.Migrations do
         Electric.Migration.ensure_original_body(migration)
       end
 
-    1..length(read_migrations)
-    |> Enum.map(&Enum.take(read_migrations, &1))
-    |> Enum.reduce_while(:ok, fn subset, _ ->
-      case add_triggers_to_migration(subset, template) do
-        :ok -> {:cont, :ok}
-        {:error, reason} -> {:halt, {:error, reason}}
-      end
-    end)
+    {status, message} =
+      1..length(read_migrations)
+      |> Enum.map(&Enum.take(read_migrations, &1))
+      |> Enum.reduce_while({:ok, ""}, fn subset, {_status, messages} ->
+        case add_triggers_to_migration(subset, template) do
+          {:ok, warning_message} -> {:cont, {:ok, "#{messages}#{warning_message}"}}
+          {:ok, nil} -> {:cont, {:ok, messages}}
+          {:error, reason} -> {:halt, {:error, reason}}
+        end
+      end)
+
+    if message == "" do
+      {status, "Migrations built"}
+    else
+      {status, message}
+    end
   end
 
   @doc false
@@ -223,7 +233,7 @@ defmodule Electric.Migrations do
       {:error, reasons} ->
         {:error, reasons}
 
-      with_triggers ->
+      {with_triggers, warnings} ->
         migration_fingerprint =
           if length(migration_set) > 1 do
             previous_migration = Enum.at(migration_set, -2)
@@ -233,7 +243,7 @@ defmodule Electric.Migrations do
             migration.original_body
           end
 
-        {:ok, postgres_version} =
+        {:ok, postgres_version, _message} =
           Electric.Migrations.Generation.postgres_for_ordered_migrations(migration_set)
 
         hash = calc_hash(migration_fingerprint)
@@ -262,9 +272,9 @@ defmodule Electric.Migrations do
 
           File.write!(satellite_file_path, header <> with_triggers)
           File.write!(postgres_file_path, header <> postgres_version)
-          :ok
+          {:ok, warnings}
         else
-          :ok
+          {:ok, warnings}
         end
     end
   end

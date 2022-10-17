@@ -9,10 +9,13 @@ defmodule Electric.Migrations.Parse do
   """
   def sql_ast_from_migration_set(migrations) do
     case ast_from_ordered_migrations(migrations) do
-      {ast, []} ->
-        {:ok, ast}
+      {ast, [], []} ->
+        {:ok, ast, nil}
 
-      {_ast, errors} ->
+      {ast, [], warnings} ->
+        {:ok, ast, Enum.join(warnings, "\n")}
+
+      {_ast, errors, warnings} ->
         {:error, Enum.join(errors, "\n")}
     end
   end
@@ -32,7 +35,7 @@ defmodule Electric.Migrations.Parse do
       end)
 
     if length(sql_errors) > 0 do
-      {:error, sql_errors}
+      {:error, sql_errors, []}
     else
       index_info = all_index_info_from_connection(conn)
 
@@ -55,7 +58,12 @@ defmodule Electric.Migrations.Parse do
           info.validation_fails
         end
 
-      {ast, List.flatten(validation_fails)}
+      warnings =
+        for {table_name, info} <- ast, length(info.warning_messages) > 0 do
+          info.warning_messages
+        end
+
+      {ast, List.flatten(validation_fails), List.flatten(warnings)}
     end
   end
 
@@ -69,6 +77,7 @@ defmodule Electric.Migrations.Parse do
     [type, name, tbl_name, rootpage, sql] = table_info
 
     validation_fails = check_sql(tbl_name, sql)
+    warning_messages = check_sql_warnings(tbl_name, sql)
 
     # column names
     {:ok, info_statement} = Exqlite.Sqlite3.prepare(conn, "PRAGMA table_info(#{tbl_name});")
@@ -144,31 +153,36 @@ defmodule Electric.Migrations.Parse do
       foreign_keys: foreign_keys,
       column_infos: column_infos,
       foreign_keys_info: foreign_keys_info,
-      validation_fails: validation_fails
+      validation_fails: validation_fails,
+      warning_messages: warning_messages
     }
   end
 
   defp check_sql(table_name, sql) do
-    validation_fails = []
+    []
+  end
+
+  defp check_sql_warnings(table_name, sql) do
+    warnings = []
     lower = String.downcase(sql)
 
-    validation_fails =
+    warnings =
       if not String.contains?(lower, "strict") do
         [
-          "The table #{table_name} is not STRICT. Add the STRICT option at the end of the create table statement"
-          | validation_fails
+          "The table #{table_name} is not STRICT."
+          | warnings
         ]
       else
-        validation_fails
+        warnings
       end
 
     if not String.contains?(lower, "without rowid") do
       [
-        "The table #{table_name} is not WITHOUT ROWID. Add the WITHOUT ROWID option at the end of the create table statement and make sure you also specify a primary key"
-        | validation_fails
+        "The table #{table_name} is not WITHOUT ROWID."
+        | warnings
       ]
     else
-      validation_fails
+      warnings
     end
   end
 
