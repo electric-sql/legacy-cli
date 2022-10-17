@@ -1,126 +1,62 @@
 defmodule Electric.Migrations.Lexer do
   @moduledoc """
   """
-  use LexLuthor
-
-  defrule(~r/^(?!BEGIN)(?!CASE)[\s\S]*?((?=BEGIN)|(?=CASE)|;)/, fn e -> {:statement, e} end)
-  defrule(~r/^\n/, fn e -> {:whitespace, e} end)
-  defrule(~r/^(?=BEGIN)/, fn _ -> :BEGIN end)
-  defrule(~r/^(?=CASE)/, fn _ -> :CASE end)
-
-  defrule(~r/^(?!END)(?!CASE)[\s\S]*?((?=CASE)|(?=END))/, :BEGIN, fn e -> {:begin, e <> "END"} end)
-
-  defrule(~r/^(?=CASE)/, :BEGIN, fn _ -> :CASE end)
-  defrule(~r/^END/, :BEGIN, fn _ -> nil end)
-
-  defrule(~r/^(?!END)(?!BEGIN)[\s\S]*?((?=BEGIN)|(?=END))/, :CASE, fn e -> {:case, e <> "END"} end)
-
-  defrule(~r/^(?=BEGIN)/, :CASE, fn _ -> :BEGIN end)
-  defrule(~r/^END/, :CASE, fn _ -> nil end)
 
   def get_statements(input) do
-    cleaned = remove_comments(input)
-    {:ok, tokens} = lex(cleaned)
-    extract_statements(tokens) |> remove_ends()
-  end
-
-  defp get_next_statement_tokens(tokens) do
-    with_index = Enum.with_index(tokens)
-
-    statement_token_count =
-      Enum.reduce_while(with_index, 0, fn {token, i}, counter ->
-        next =
-          if i == length(tokens) - 1 do
-            nil
-          else
-            Enum.at(tokens, i + 1)
-          end
-
-        if next == nil do
-          if token.name == :statement do
-            {:halt, counter + 1}
-          else
-            {:halt, counter}
-          end
-        else
-          case {token.name, next.name} do
-            {:begin, _} ->
-              {:cont, counter + 1}
-
-            {:case, _} ->
-              {:cont, counter + 1}
-
-            {:statement, :begin} ->
-              {:cont, counter + 1}
-
-            {:statement, :case} ->
-              {:cont, counter + 1}
-
-            {:statement, _} ->
-              {:halt, counter + 1}
-
-            _ ->
-              {:halt, counter}
-          end
-        end
+    {_stack, breaks} =
+      Enum.reduce(0..(String.length(input) - 1), {[], []}, fn index, {stack, breaks} ->
+        step(input, index, stack, breaks)
       end)
 
-    Enum.split(tokens, statement_token_count)
+    for break <- Enum.reverse(breaks) do
+      {start, finish} = break
+
+      String.slice(input, start..finish)
+      |> remove_comments()
+      |> String.trim()
+    end
   end
 
-  defp extract_statement_groups(tokens, groups) do
-    {next_group, remains} = get_next_statement_tokens(tokens)
-    extended_groups = groups ++ [next_group]
+  defp step(input, index, stack, breaks) do
+    {_done, next} = String.split_at(input, index)
 
-    if length(tokens) == length(remains) do
-      {:error, "failed to get next statement"}
-    else
-      if remains == [] do
-        {:ok, extended_groups}
+    stack =
+      if String.starts_with?(next, "BEGIN") do
+        [:begin | stack]
       else
-        extract_statement_groups(remains, extended_groups)
+        stack
       end
-    end
-  end
 
-  defp extract_statements(tokens) do
-    filtered_tokens =
-      Enum.filter(tokens, fn token ->
-        token.name == :statement or token.name == :begin or token.name == :case
-      end)
+    stack =
+      if String.starts_with?(next, "CASE") do
+        [:case | stack]
+      else
+        stack
+      end
 
-    case extract_statement_groups(filtered_tokens, []) do
-      {:ok, statements_groups} ->
-        for statements_group <- statements_groups do
-          Enum.reduce(statements_group, "", fn token, acc ->
-            segment = String.replace_leading(token.value, "\n", "")
+    stack =
+      if String.starts_with?(next, "END") do
+        List.delete_at(stack, 0)
+      else
+        stack
+      end
 
-            case token.name do
-              :statement ->
-                acc <> segment
-
-              :begin ->
-                "#{acc}#{segment}"
-
-              :case ->
-                "#{acc}#{segment}"
-            end
-          end)
+    breaks =
+      if String.starts_with?(next, ";") and length(stack) == 0 do
+        if length(breaks) == 0 do
+          [{0, index} | breaks]
+        else
+          {_, previous} = List.first(breaks)
+          [{previous + 1, index} | breaks]
         end
+      else
+        breaks
+      end
 
-      {:error, msg} ->
-        {:error, msg}
-    end
-  end
-
-  defp remove_ends(statements) do
-    for statement <- statements do
-      String.replace(statement, "ENDCASE", "CASE") |> String.replace("ENDBEGIN", "BEGIN")
-    end
+    {stack, breaks}
   end
 
   defp remove_comments(input) do
-    input
-    #    String.replace(input, ~r/--[^\n]*\n/, "\n") |> String.replace(~r/\/\*[\s\S]*?\*\//, " ")
+    String.replace(input, ~r/^--[^\n]*\n/, "\n") |> String.replace(~r/\/\*[\s\S]*?\*\//, " ")
   end
 end

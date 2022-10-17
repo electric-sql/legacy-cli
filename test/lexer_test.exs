@@ -2,7 +2,7 @@ defmodule MigrationsLexerTest do
   use ExUnit.Case
 
   describe "Can extract statements from SQL" do
-    test "Find simple statements and comments" do
+    test "Find simple statements with comments" do
       sql = """
       -- this is a comment
       CREATE TABLE IF NOT EXISTS fish (
@@ -19,8 +19,28 @@ defmodule MigrationsLexerTest do
       result = Electric.Migrations.Lexer.get_statements(sql)
 
       expected = [
-        "-- this is a comment\nCREATE TABLE IF NOT EXISTS fish (\nvalue TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;",
-        "/*\nThis is also a comment\n*/\nCREATE TABLE IF NOT EXISTS dogs (\nvalue TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;"
+        "CREATE TABLE IF NOT EXISTS fish (\nvalue TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;",
+        "CREATE TABLE IF NOT EXISTS dogs (\nvalue TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;"
+      ]
+
+      assert result == expected
+    end
+
+    test "Find simple without statements" do
+      sql = """
+      CREATE TABLE IF NOT EXISTS fish (
+      value TEXT PRIMARY KEY
+      ) STRICT, WITHOUT ROWID;
+      CREATE TABLE IF NOT EXISTS dogs (
+      value TEXT PRIMARY KEY
+      ) STRICT, WITHOUT ROWID;
+      """
+
+      result = Electric.Migrations.Lexer.get_statements(sql)
+
+      expected = [
+        "CREATE TABLE IF NOT EXISTS fish (\nvalue TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;",
+        "CREATE TABLE IF NOT EXISTS dogs (\nvalue TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;"
       ]
 
       assert result == expected
@@ -74,7 +94,7 @@ defmodule MigrationsLexerTest do
              """
     end
 
-    test "Find nested nested statements" do
+    test "Find CASE inside BEGIN statements" do
       sql = """
       DROP TRIGGER IF EXISTS update_ensure_main_fish_primarykey;
       CREATE TRIGGER update_ensure_main_fish_primarykey
@@ -97,6 +117,45 @@ defmodule MigrationsLexerTest do
         SELECT
           CASE
             WHEN old.value != new.value THEN
+              RAISE (ABORT,'cannot change the value of column value as it belongs to the primary key')
+          END;
+      END;
+      """
+
+      assert result2 <> "\n" == expected
+    end
+
+    test "Find CASE inside CASE statements" do
+      sql = """
+      DROP TRIGGER IF EXISTS update_ensure_main_fish_primarykey;
+      CREATE TRIGGER update_ensure_main_fish_primarykey
+         BEFORE UPDATE ON main.fish
+      BEGIN
+        SELECT
+          CASE
+            WHEN old.value != new.value THEN
+              CASE
+                WHEN old.value == "hello" THEN
+                  RAISE (ABORT,'cannot change the value of column value as it belongs to the primary key')
+              END
+              RAISE (ABORT,'cannot change the value of column value as it belongs to the primary key')
+          END;
+      END;
+      """
+
+      [_result1, result2] = Electric.Migrations.Lexer.get_statements(sql)
+
+      expected = """
+      CREATE TRIGGER update_ensure_main_fish_primarykey
+         BEFORE UPDATE ON main.fish
+      BEGIN
+        SELECT
+          CASE
+            WHEN old.value != new.value THEN
+              CASE
+                WHEN old.value == "hello" THEN
+                  RAISE (ABORT,'cannot change the value of column value as it belongs to the primary key')
+              END
               RAISE (ABORT,'cannot change the value of column value as it belongs to the primary key')
           END;
       END;

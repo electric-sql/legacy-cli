@@ -54,11 +54,13 @@ defmodule Electric.Migration do
     migration
   end
 
+  @spec as_json_map(%__MODULE__{}, :none | :text | :list) :: map()
   @doc """
   reads the satellite metadata from the file header and returns the metadata as a json serialisable map
   with_body: is a bool to ask for the satellite migration body itself to be included
   """
-  def as_json_map(migration, body_style) do
+  def as_json_map(%__MODULE__{} = migration, body_style)
+      when body_style in [:none, :text, :list] do
     with_satellite_body = ensure_satellite_body(migration)
     metadata = get_satellite_metadata(with_satellite_body)
 
