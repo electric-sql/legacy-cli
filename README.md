@@ -1,10 +1,20 @@
-![Status](https://img.shields.io/badge/status-alpha-red.svg)
-[![License](https://img.shields.io/badge/license-Apache-green.svg)](LICENSE.md)
-[![CircleCI](https://circleci.com/gh/electric-sql/electric-sql-cli/tree/main.svg?style=shield&circle-token=67d43361b7c2aa039a0eef39d3617a9f481e54c5)](https://circleci.com/gh/electric-sql/electric-sql-cli/tree/main)
+<a href="https://electric-sql.com">
+  <picture>
+    <source media="(prefers-color-scheme: dark)"
+        srcset="https://raw.githubusercontent.com/electric-sql/meta/main/identity/ElectricSQL-logo-light-trans.svg"
+    />
+    <source media="(prefers-color-scheme: light)"
+        srcset="https://raw.githubusercontent.com/electric-sql/meta/main/identity/ElectricSQL-logo-black.svg"
+    />
+    <img alt="ElectricSQL logo"
+        src="https://raw.githubusercontent.com/electric-sql/meta/main/identity/ElectricSQL-logo-black.svg"
+    />
+  </picture>
+</a>
 
-# Electric SQL CLI
+# ElectricSQL CLI
 
-The Electric SQL CLI is the command line interface utility for the [Electric SQL](https://electricdb-sql.com) service. It's developed in Elixir using [Optimus](https://github.com/funbox/optimus) and [Bakeware](https://github.com/bake-bake-bake/bakeware) and is published under the [Apache 2.0 License](https://github.com/electric-sql/electric-sql-cli/blob/master/LICENSE) at [github.com/electric-sql/electric-sql-cli](https://github.com/electric-sql/electric-sql-cli).
+The ElectricSQL CLI is the command line interface utility for the [ElectricSQL](https://electric-sql.com) service. It's developed in Elixir using [Optimus](https://github.com/funbox/optimus) and [Bakeware](https://github.com/bake-bake-bake/bakeware) and is published under the [Apache 2.0 License](https://github.com/electric-sql/electric-sql-cli/blob/master/LICENSE) at [github.com/electric-sql/cli](https://github.com/electric-sql/cli).
 
 ## Dependencies
 
@@ -58,7 +68,9 @@ And run it:
 This creates a binary at `./dist/electric` and needs to be run on the OS you are targetting.
 See also https://github.com/bake-bake-bake/bakeware#static-compiling-openssl-into-erlang-distribution
 
+## Usage
 
-## Migration commands
-
+```sh
+./dist/electric --help
+```
 
