@@ -1,4 +1,4 @@
-defmodule MigrationsParseTest do
+defmodule PostgreParseTest do
   use ExUnit.Case
 
   describe "Parse sql" do
@@ -11,7 +11,7 @@ defmodule MigrationsParseTest do
       """
 
       migration = %Electric.Migration{name: "test1", original_body: sql_in}
-      {:ok, info, _} = Electric.Migrations.Parse.sql_ast_from_migrations([migration])
+      {:ok, info, _} = Electric.Postgre.Parse.sql_ast_from_migrations([migration])
 
       column_names = info["main.fish"][:columns]
       assert column_names == ["value", "colour"]
@@ -27,7 +27,7 @@ defmodule MigrationsParseTest do
 
       migration = %Electric.Migration{name: "test1", original_body: sql_in}
 
-      {_status, reason} = Electric.Migrations.Parse.sql_ast_from_migrations([migration])
+      {_status, reason} = Electric.Postgre.Parse.sql_ast_from_migrations([migration])
       assert reason == ["In migration test1 SQL error: near \"SOME\": syntax error"]
     end
 
@@ -40,7 +40,7 @@ defmodule MigrationsParseTest do
     #      """
     #
     #      {:error, message} =
-    #        Electric.Migrations.Parse.sql_ast_from_migrations([
+    #        Electric.Postgre.Parse.sql_ast_from_migrations([
     #          %Electric.Migration{name: "test1", original_body: sql_in}
     #        ])
     #
@@ -65,7 +65,7 @@ defmodule MigrationsParseTest do
       """
 
       {:ok, info, _} =
-        Electric.Migrations.Parse.sql_ast_from_migrations([
+        Electric.Postgre.Parse.sql_ast_from_migrations([
           %Electric.Migration{name: "test1", original_body: sql_in}
         ])
 
@@ -184,7 +184,7 @@ defmodule MigrationsParseTest do
       """
 
       {:ok, info, _} =
-        Electric.Migrations.Parse.sql_ast_from_migrations([
+        Electric.Postgre.Parse.sql_ast_from_migrations([
           %Electric.Migration{name: "test1", original_body: sql_in}
         ])
 
@@ -293,6 +293,52 @@ defmodule MigrationsParseTest do
       }
 
       assert info == expected_info
+    end
+
+    test "tests getting SQL index structure" do
+      sql_in = """
+      CREATE TABLE IF NOT EXISTS parent (
+        id INTEGER PRIMARY KEY,
+        value TEXT,
+        email TEXT UNIQUE
+      ) STRICT, WITHOUT ROWID;
+
+      CREATE TABLE IF NOT EXISTS child (
+        id INTEGER PRIMARY KEY,
+        daddy INTEGER NOT NULL,
+        FOREIGN KEY(daddy) REFERENCES parent(id)
+      ) STRICT, WITHOUT ROWID;
+      """
+
+      index_info = Electric.Postgre.Parse.all_index_info([sql_in])
+
+      assert index_info == %{
+               "main.parent" => %{
+                 0 => %{
+                   columns: [
+                     %{cid: 0, coll: "BINARY", desc: 0, key: 1, name: "id", seqno: 0},
+                     %{cid: 1, coll: "BINARY", desc: 0, key: 0, name: "value", seqno: 1},
+                     %{cid: 2, coll: "BINARY", desc: 0, key: 0, name: "email", seqno: 2}
+                   ],
+                   name: "sqlite_autoindex_parent_2",
+                   origin: "pk",
+                   partial: 0,
+                   seq: 0,
+                   unique: 1
+                 },
+                 1 => %{
+                   columns: [
+                     %{cid: 2, coll: "BINARY", desc: 0, key: 1, name: "email", seqno: 0},
+                     %{cid: 0, coll: "BINARY", desc: 0, key: 0, name: "id", seqno: 1}
+                   ],
+                   name: "sqlite_autoindex_parent_1",
+                   origin: "u",
+                   partial: 0,
+                   seq: 1,
+                   unique: 1
+                 }
+               }
+             }
     end
   end
 end

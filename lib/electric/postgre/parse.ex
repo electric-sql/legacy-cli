@@ -1,4 +1,4 @@
-defmodule Electric.Migrations.Parse do
+defmodule Electric.Postgre.Parse do
   @moduledoc """
   Creates an AST from SQL migrations
   """
@@ -8,10 +8,14 @@ defmodule Electric.Migrations.Parse do
   Also validates the SQL and returns error messages if validation fails
   """
 
+  def sql_ast_from_migrations([]) do
+    {:ok, nil, []}
+  end
+
   def sql_ast_from_migrations(migrations) do
     case ast_from_ordered_migrations(migrations) do
       {ast, [], []} ->
-        {:ok, ast, nil}
+        {:ok, ast, []}
 
       {ast, [], warnings} ->
         {:ok, ast, warnings}
