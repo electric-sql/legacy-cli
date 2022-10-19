@@ -140,24 +140,41 @@ defmodule Electric.Commands.Migrations do
     end
   end
 
+  def format_messages(type_of_message, messages) do
+    "There were #{length(messages)} #{type_of_message}:\n" <> Enum.join(messages, "\n")
+  end
+
   def init(%{args: _args, flags: _flags, options: options, unknown: _unknown}) do
     case Electric.Migrations.init_migrations(options) do
-      {:ok, message} -> {:success, message}
-      {:error, message} -> {:error, message}
+      {:ok, nil} ->
+        {:success, "Migrations initialised"}
+
+      {:error, errors} ->
+        {:error, format_messages("errors", errors)}
     end
   end
 
   def new(%{args: args, flags: _flags, options: options, unknown: _unknown}) do
     case Electric.Migrations.new_migration(args.migration_name, options) do
-      {:ok, message} -> {:success, message}
-      {:error, message} -> {:error, message}
+      {:ok, nil} ->
+        {:success, "New migration created"}
+
+      {:error, errors} ->
+        {:error, format_messages("errors", errors)}
     end
   end
 
   def build(%{args: _args, flags: flags, options: options, unknown: _unknown}) do
     case Electric.Migrations.build_migrations(flags, options) do
-      {:ok, message} -> {:success, message}
-      {:error, message} -> {:error, message}
+      {:ok, nil} ->
+        {:success, "Migrations build successfully"}
+
+      {:ok, warnings} ->
+        IO.inspect(warnings)
+        {:success, format_messages("warnings", warnings)}
+
+      {:error, errors} ->
+        {:error, format_messages("errors", errors)}
     end
   end
 

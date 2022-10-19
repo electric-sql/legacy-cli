@@ -642,8 +642,13 @@ defmodule MigrationsFileTest do
 
       File.write!(migration, dogs_content, [:append])
 
-      {:ok, msg} = Electric.Migrations.build_migrations(%{}, %{:dir => migrations_path})
-      assert msg == "The table dogs is not WITHOUT ROWID.\nThe table dogs is not STRICT."
+      {:ok, msgs} = Electric.Migrations.build_migrations(%{}, %{:dir => migrations_path})
+      [_, msg2, msg3] = msgs
+
+      assert [msg2, msg3] == [
+               "The table dogs is not WITHOUT ROWID.",
+               "The table dogs is not STRICT."
+             ]
     end
   end
 
@@ -820,18 +825,29 @@ defmodule MigrationsFileTest do
       expected = %{
         "migrations" => [
           %{
-            "body" =>
-              "/*\nElectricDB Migration\n{\"metadata\": {\"name\": \"#{migration_name}\", \"sha256\": \"211b1e2b203d1fcac6ccb526d2775ec1f5575d4018ab1a33272948ce0ae76775\"}}\n*/\nCREATE TABLE IF NOT EXISTS items (\n  value TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;\n--ADD A TRIGGER FOR main.items;\n",
             "name" => migration_name,
+            "sha256" => "211b1e2b203d1fcac6ccb526d2775ec1f5575d4018ab1a33272948ce0ae76775",
             "encoding" => "escaped",
-            "sha256" => "211b1e2b203d1fcac6ccb526d2775ec1f5575d4018ab1a33272948ce0ae76775"
+            "original_body" =>
+              "CREATE TABLE IF NOT EXISTS items (\n  value TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;",
+            "satellite_body" => [
+              "CREATE TABLE IF NOT EXISTS items (\n  value TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;",
+              "--ADD A TRIGGER FOR main.items;"
+            ],
+            "title" => nil
           },
           %{
-            "body" =>
-              "/*\nElectricDB Migration\n{\"metadata\": {\"name\": \"#{migration_name_2}\", \"sha256\": \"946f0f3a0d0338fa486d3d7da35c3b6032f837336fb9a08f933d44675bb264d3\"}}\n*/\nCREATE TABLE IF NOT EXISTS cat (\n  value TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;\n--ADD A TRIGGER FOR main.cat;\n\n--ADD A TRIGGER FOR main.items;\n",
             "name" => migration_name_2,
+            "sha256" => "946f0f3a0d0338fa486d3d7da35c3b6032f837336fb9a08f933d44675bb264d3",
             "encoding" => "escaped",
-            "sha256" => "946f0f3a0d0338fa486d3d7da35c3b6032f837336fb9a08f933d44675bb264d3"
+            "original_body" =>
+              "CREATE TABLE IF NOT EXISTS cat (\n  value TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;",
+            "satellite_body" => [
+              "CREATE TABLE IF NOT EXISTS cat (\n  value TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;",
+              "--ADD A TRIGGER FOR main.cat;",
+              "--ADD A TRIGGER FOR main.items;"
+            ],
+            "title" => nil
           }
         ]
       }

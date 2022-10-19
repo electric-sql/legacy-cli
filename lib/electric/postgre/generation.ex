@@ -1,41 +1,42 @@
-defmodule Electric.Migrations.Generation do
+defmodule Electric.Postgre.Generation do
   @moduledoc """
   Generates PostgreSQL text from SQLite text
   """
 
   @type flavour() :: :postgresql | :sqlite
-  alias Electric.Migrations.Parse, as: Parse
+  alias Electric.Postgre.Parse, as: Parse
 
   @doc """
-  Given an ordered list of Electric.Migration objects creates a PostgreSQL file for the last migration in the list
+  Given an ordered list of SQLite migrations in the form of a List of Maps with %{original_body: <>, name: <>}
+  creates PostgreSQL SQL for the last migration in the list
   """
-  def postgres_for_ordered_migrations(ordered_migrations) do
-    case before_and_after_ast(ordered_migrations) do
-      {:ok, before_ast, after_ast, warning_message} ->
-        postgres_string = get_postgres_for_ast_changes(before_ast, after_ast)
-        {:ok, postgres_string, warning_message}
+  def postgre_for_migrations(migrations) do
+    case before_and_after_ast(migrations) do
+      {:ok, before_ast, after_ast, warnings} ->
+        postgres_string = get_postgre_for_ast_changes(before_ast, after_ast)
+        {:ok, postgres_string, warnings}
 
       {:error, reasons} ->
         {:error, reasons}
     end
   end
 
-  defp before_and_after_ast(migration_set) do
-    with {:ok, after_ast, after_warnings} <- Parse.sql_ast_from_migration_set(migration_set),
-         all_but_last_migration_set = Enum.drop(migration_set, -1),
+  defp before_and_after_ast(migrations) do
+    with {:ok, after_ast, after_warnings} <- Parse.sql_ast_from_migrations(migrations),
+         all_but_last_migration_set = Enum.drop(migrations, -1),
          {:ok, before_ast, _warnings} <-
-           Parse.sql_ast_from_migration_set(all_but_last_migration_set) do
+           Parse.sql_ast_from_migrations(all_but_last_migration_set) do
       {:ok, before_ast, after_ast, after_warnings}
     end
   end
 
-  defp get_postgres_for_ast_changes(before_ast, after_ast) do
+  defp get_postgre_for_ast_changes(before_ast, after_ast) do
     get_sql_for_ast_changes(before_ast, after_ast, :postgresql)
   end
 
-  #  defp _get_sqlite_for_ast_changes(before_ast, after_ast) do
-  #    get_sql_for_ast_changes(before_ast, after_ast, :sqlite)
-  #  end
+  defp get_sqlite_for_ast_changes(before_ast, after_ast) do
+    get_sql_for_ast_changes(before_ast, after_ast, :sqlite)
+  end
 
   defp get_sql_for_ast_changes(before_ast, after_ast, flavour) do
     for change <- table_changes(before_ast, after_ast), into: "" do

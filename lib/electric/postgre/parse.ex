@@ -1,4 +1,4 @@
-defmodule Electric.Migrations.Parse do
+defmodule Electric.Postgre.Parse do
   @moduledoc """
   Creates an AST from SQL migrations
   """
@@ -8,10 +8,14 @@ defmodule Electric.Migrations.Parse do
   Also validates the SQL and returns error messages if validation fails
   """
 
+  def sql_ast_from_migrations([]) do
+    {:ok, nil, []}
+  end
+
   def sql_ast_from_migrations(migrations) do
     case ast_from_ordered_migrations(migrations) do
       {ast, [], []} ->
-        {:ok, ast, nil}
+        {:ok, ast, []}
 
       {ast, [], warnings} ->
         {:ok, ast, warnings}
@@ -82,7 +86,6 @@ defmodule Electric.Migrations.Parse do
 
     # column names
     {:ok, info_statement} = Exqlite.Sqlite3.prepare(conn, "PRAGMA table_info(#{tbl_name});")
-
     columns = Enum.reverse(get_rows_while(conn, info_statement, []))
 
     column_names =
@@ -118,8 +121,7 @@ defmodule Electric.Migrations.Parse do
     foreign_keys_rows = get_rows_while(conn, foreign_statement, [])
 
     foreign_keys =
-      for [_id, _seq, table, from, to, _on_update, _on_delete, _match] <-
-            foreign_keys_rows do
+      for [_id, _seq, table, from, to, _on_update, _on_delete, _match] <- foreign_keys_rows do
         %{
           child_key: from,
           parent_key: to,
@@ -215,7 +217,6 @@ defmodule Electric.Migrations.Parse do
     for [_type, _name, tbl_name, _rootpage, _sql] <- info, into: %{} do
       # column names
       {:ok, info_statement} = Exqlite.Sqlite3.prepare(conn, "PRAGMA index_list(#{tbl_name});")
-
       indexes = Enum.reverse(get_rows_while(conn, info_statement, []))
 
       index_infos =
@@ -277,11 +278,7 @@ defmodule Electric.Migrations.Parse do
     Enum.any?(matching_unique_indexes)
   end
 
-  defp is_primary_desc(_column_name, nil) do
-    false
-  end
-
-  defp is_primary_desc(column_name, indexes) do
+  defp is_primary_desc(column_name, indexes) when indexes != nil do
     matching_desc_indexes =
       for {_, info} <- indexes,
           info.origin == "pk",
@@ -290,5 +287,9 @@ defmodule Electric.Migrations.Parse do
           do: true
 
     Enum.any?(matching_desc_indexes)
+  end
+
+  defp is_primary_desc(_column_name, indexes) when indexes == nil do
+    false
   end
 end

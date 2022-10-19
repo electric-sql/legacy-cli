@@ -7,7 +7,12 @@ defmodule Electric.Migration do
   @satellite_file_name "satellite.sql"
   @postgres_file_name "postgres.sql"
   @enforce_keys [:name]
-  defstruct name: "noname", src_folder: nil, original_body: nil, satellite_body: nil, error: nil
+  defstruct name: "noname",
+            title: nil,
+            src_folder: nil,
+            original_body: nil,
+            satellite_body: nil,
+            error: nil
 
   @doc """
   The file path for this migration's original source within the migrations folder
@@ -62,6 +67,7 @@ defmodule Electric.Migration do
   def as_json_map(%__MODULE__{} = migration, body_style)
       when body_style in [:none, :text, :list] do
     with_satellite_body = ensure_satellite_body(migration)
+    with_original_body = ensure_original_body(migration)
     metadata = get_satellite_metadata(with_satellite_body)
 
     case body_style do
@@ -69,14 +75,22 @@ defmodule Electric.Migration do
         metadata
 
       :text ->
+        body = with_satellite_body.satellite_body
+
         Map.merge(metadata, %{
-          "body" => with_satellite_body.satellite_body,
-          "encoding" => "escaped"
+          "satellite_body" => split_body_into_commands(body),
+          "original_body" => with_original_body.original_body,
+          "encoding" => "escaped",
+          "title" => with_original_body.title
         })
 
       :list ->
         body = with_satellite_body.satellite_body
-        Map.merge(metadata, %{"body" => split_body_into_commands(body), "encoding" => "escaped"})
+
+        Map.merge(metadata, %{
+          "satellite_body" => split_body_into_commands(body),
+          "encoding" => "escaped"
+        })
     end
   end
 
