@@ -133,7 +133,7 @@ defmodule MigrationsTest do
       );
 
       -- Initialisation of the metadata table
-      INSERT INTO _electric_meta (key, value) VALUES ('compensations', 0), ('lastAckdRowId','0'), ('lastSentRowId', '0'), ('lsn', '0');
+      INSERT INTO _electric_meta (key, value) VALUES ('compensations', 0), ('lastAckdRowId','0'), ('lastSentRowId', '0'), ('lsn', 'MA==');
 
 
       -- These are toggles for turning the triggers on and off
