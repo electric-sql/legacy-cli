@@ -32,3 +32,6 @@ electric-*.tar
 
 # JetBrains project files
 .idea/
+
+# Mac thing
+.DS_Store

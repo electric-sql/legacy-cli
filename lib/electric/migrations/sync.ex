@@ -13,7 +13,7 @@ defmodule Electric.Migrations.Sync do
   end
 
   def get_migrations_from_server(db_id) do
-    url = "app/#{db_id}/migrations"
+    url = "databases/#{db_id}/migrations"
 
     case Client.get(url) do
       {:ok, %Req.Response{status: 200, body: data}} ->
@@ -67,7 +67,7 @@ defmodule Electric.Migrations.Sync do
   end
 
   def upload_new_migrations(db_id, new_migrations) do
-    url = "app/#{db_id}/migrations"
+    url = "databases/#{db_id}/migrations"
     payload = Jason.encode!(%{"migrations" => new_migrations}) |> Jason.Formatter.pretty_print()
 
     case Client.put(url, payload) do

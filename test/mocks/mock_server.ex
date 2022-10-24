@@ -10,14 +10,14 @@ defmodule Electric.MockServer do
   plug(:match)
   plug(:dispatch)
 
-  get "api/v1/app/1234/migrations" do
+  get "api/v1/databases/1234/migrations" do
     data = %{"migrations" => []}
 
     Plug.Conn.resp(conn, 200, Jason.encode!(data))
     |> Plug.Conn.send_resp()
   end
 
-  get "api/v1/app/5555/migrations" do
+  get "api/v1/databases/5555/migrations" do
     server_manifest = %{
       "migrations" => [
         %{
@@ -32,12 +32,12 @@ defmodule Electric.MockServer do
     |> Plug.Conn.send_resp()
   end
 
-  put "api/v1/app/1234/migrations" do
+  put "api/v1/databases/1234/migrations" do
     Plug.Conn.resp(conn, 200, "ok")
     |> Plug.Conn.send_resp()
   end
 
-  put "api/v1/app/5555/migrations" do
+  put "api/v1/databases/5555/migrations" do
     Plug.Conn.resp(conn, 200, "ok")
     |> Plug.Conn.send_resp()
   end
