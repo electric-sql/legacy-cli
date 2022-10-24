@@ -5,15 +5,15 @@ defmodule Electric.Migrations.Sync do
 
   alias Electric.Client
 
-  def sync_migrations(app_id, local_bundle) do
-    with {:ok, server_manifest} <- get_migrations_from_server(app_id),
+  def sync_migrations(db_id, local_bundle) do
+    with {:ok, server_manifest} <- get_migrations_from_server(db_id),
          {:ok, new_migrations} <- compare_local_with_server(local_bundle, server_manifest) do
-      upload_new_migrations(app_id, new_migrations)
+      upload_new_migrations(db_id, new_migrations)
     end
   end
 
-  def get_migrations_from_server(app_id) do
-    url = "app/#{app_id}/migrations"
+  def get_migrations_from_server(db_id) do
+    url = "app/#{db_id}/migrations"
 
     case Client.get(url) do
       {:ok, %Req.Response{status: 200, body: data}} ->
@@ -66,8 +66,8 @@ defmodule Electric.Migrations.Sync do
     for migration <- bundle["migrations"], into: %{}, do: {migration["name"], migration}
   end
 
-  def upload_new_migrations(app_id, new_migrations) do
-    url = "app/#{app_id}/migrations"
+  def upload_new_migrations(db_id, new_migrations) do
+    url = "app/#{db_id}/migrations"
     payload = Jason.encode!(%{"migrations" => new_migrations}) |> Jason.Formatter.pretty_print()
 
     case Client.put(url, payload) do

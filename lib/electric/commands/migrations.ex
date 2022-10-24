@@ -140,8 +140,12 @@ defmodule Electric.Commands.Migrations do
     end
   end
 
-  def format_messages(type_of_message, messages) do
+  def format_messages(type_of_message, messages) when is_list(messages) do
     "There were #{length(messages)} #{type_of_message}:\n" <> Enum.join(messages, "\n")
+  end
+
+  def format_messages(type_of_message, messages) do
+    "There was 1 #{type_of_message}:\n" <> messages
   end
 
   def init(%{args: _args, flags: _flags, options: options, unknown: _unknown}) do
@@ -178,28 +182,17 @@ defmodule Electric.Commands.Migrations do
     end
   end
 
-  def sync(%{args: %{database_id: database_id}, options: %{dir: dir}}) do
-    path = "databases/#{database_id}/migrations"
+  def sync(%{args: %{database_id: database_id}, options: options}) do
+    case Electric.Migrations.sync_migrations(database_id, options) do
+      {:ok, nil} ->
+        {:success, "Migrations synchronized with server successfully"}
 
-    # XXX
-    data = :NotImplemented
-    IO.inspect({:deploy, data, dir})
+      {:ok, warnings} ->
+        IO.inspect(warnings)
+        {:success, format_messages("warnings", warnings)}
 
-    result =
-      Progress.run("Syncing migrations", false, fn ->
-        Client.post(path, data)
-      end)
-
-    case result do
-      {:ok, %Req.Response{status: 200, body: %{"data" => data}}} ->
-        {:results, data}
-
-      # XXX probably need to handle the response more carefully here.
-      # {:ok, %Req.Response{}} ->
-      #   {:error, "bad request"}
-
-      {:error, _exception} ->
-        {:error, "failed to connect"}
+      {:error, errors} ->
+        {:error, format_messages("errors", errors)}
     end
   end
 end
