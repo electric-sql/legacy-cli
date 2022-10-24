@@ -21,3 +21,8 @@ if config_env() == :dev do
       ]
     ]
 end
+
+if config_env() == :test do
+  config :electric_sql_cli,
+    base_url: "http://localhost:4003/api/v1/"
+end
