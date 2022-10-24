@@ -96,7 +96,24 @@ defmodule Electric.Migrations do
   @doc """
   Does nothing yet
   """
-  def sync_migrations(_db, _opts \\ []) do
+  def sync_migrations(db_id, options) do
+    template = Map.get(options, :template, @satellite_template)
+
+    with {:ok, folder} <- check_migrations_folder(options),
+         {:ok, warnings} <-
+           folder |> ordered_migrations() |> add_triggers_to_migrations(template),
+         migrations <- all_migrations_as_maps(folder, :text),
+         {:ok, _msg} <-
+           Electric.Migrations.Sync.sync_migrations(db_id, %{"migrations" => migrations}) do
+      if length(warnings) > 0 do
+        {:ok, warnings}
+      else
+        {:ok, nil}
+      end
+    else
+      {:error, errors} ->
+        {:error, errors}
+    end
   end
 
   defp check_migrations_folder(options) do
