@@ -1,8 +1,4 @@
 defmodule Electric.Migration do
-  @moduledoc """
-  A struct to hold information about a single migration
-  """
-
   @migration_file_name "migration.sql"
   @satellite_file_name "satellite.sql"
   @postgres_file_name "postgres.sql"
