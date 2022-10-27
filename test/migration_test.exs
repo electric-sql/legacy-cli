@@ -120,7 +120,7 @@ defmodule MigrationsTest do
 
       -- Somewhere to keep our metadata
       CREATE TABLE IF NOT EXISTS _electric_meta (
-        key TEXT,
+        key TEXT PRIMARY KEY,
         value BLOB
       );
 
@@ -133,7 +133,7 @@ defmodule MigrationsTest do
       );
 
       -- Initialisation of the metadata table
-      INSERT INTO _electric_meta (key, value) VALUES ('compensations', 0), ('lastAckdRowId','0'), ('lastSentRowId', '0'), ('lsn', 'MA==');
+      INSERT INTO _electric_meta (key, value) VALUES ('compensations', 0), ('lastAckdRowId','0'), ('lastSentRowId', '0'), ('lsn', 'MA=='), ('clientId', '');
 
 
       -- These are toggles for turning the triggers on and off
