@@ -212,8 +212,8 @@ defmodule Electric.Migrations do
       |> Enum.map(&Enum.take(read_migrations, &1))
       |> Enum.reduce_while({:ok, ""}, fn subset, {_status, messages} ->
         case add_triggers_to_migration(subset, template) do
-          {:ok, warning_message} -> {:cont, {:ok, "#{messages}#{warning_message}"}}
           {:ok, nil} -> {:cont, {:ok, messages}}
+          {:ok, warning_message} -> {:cont, {:ok, "#{messages}#{warning_message}"}}
           {:error, reason} -> {:halt, {:error, reason}}
         end
       end)
