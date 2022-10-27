@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS _electric_oplog (
 
 -- Somewhere to keep our metadata
 CREATE TABLE IF NOT EXISTS _electric_meta (
-  key TEXT,
+  key TEXT PRIMARY KEY,
   value BLOB
 );
 
