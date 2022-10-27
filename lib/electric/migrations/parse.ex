@@ -15,7 +15,7 @@ defmodule Electric.Migrations.Parse do
       {ast, [], warnings} ->
         {:ok, ast, Enum.join(warnings, "\n")}
 
-      {_ast, errors, warnings} ->
+      {_ast, errors, _warnings} ->
         {:error, Enum.join(errors, "\n")}
     end
   end
@@ -54,12 +54,12 @@ defmodule Electric.Migrations.Parse do
         |> Map.new(fn info -> {"#{namespace}.#{info.table_name}", info} end)
 
       validation_fails =
-        for {table_name, info} <- ast, length(info.validation_fails) > 0 do
+        for {_table_name, info} <- ast, length(info.validation_fails) > 0 do
           info.validation_fails
         end
 
       warnings =
-        for {table_name, info} <- ast, length(info.warning_messages) > 0 do
+        for {_table_name, info} <- ast, length(info.warning_messages) > 0 do
           info.warning_messages
         end
 
@@ -81,6 +81,7 @@ defmodule Electric.Migrations.Parse do
 
     # column names
     {:ok, info_statement} = Exqlite.Sqlite3.prepare(conn, "PRAGMA table_info(#{tbl_name});")
+
     columns = Enum.reverse(get_rows_while(conn, info_statement, []))
 
     column_names =
@@ -116,7 +117,8 @@ defmodule Electric.Migrations.Parse do
     foreign_keys_rows = get_rows_while(conn, foreign_statement, [])
 
     foreign_keys =
-      for [_id, _seq, table, from, to, _on_update, _on_delete, _match] <- foreign_keys_rows do
+      for [_id, _seq, table, from, to, _on_update, _on_delete, _match] <-
+            foreign_keys_rows do
         %{
           child_key: from,
           parent_key: to,
@@ -158,7 +160,7 @@ defmodule Electric.Migrations.Parse do
     }
   end
 
-  defp check_sql(table_name, sql) do
+  defp check_sql(_table_name, _sql) do
     []
   end
 
@@ -212,6 +214,7 @@ defmodule Electric.Migrations.Parse do
     for [_type, _name, tbl_name, _rootpage, _sql] <- info, into: %{} do
       # column names
       {:ok, info_statement} = Exqlite.Sqlite3.prepare(conn, "PRAGMA index_list(#{tbl_name});")
+
       indexes = Enum.reverse(get_rows_while(conn, info_statement, []))
 
       index_infos =
@@ -258,7 +261,7 @@ defmodule Electric.Migrations.Parse do
     end
   end
 
-  defp is_unique(column_name, nil) do
+  defp is_unique(_column_name, nil) do
     false
   end
 
@@ -273,7 +276,11 @@ defmodule Electric.Migrations.Parse do
     Enum.any?(matching_unique_indexes)
   end
 
-  defp is_primary_desc(column_name, indexes) when indexes != nil do
+  defp is_primary_desc(_column_name, nil) do
+    false
+  end
+
+  defp is_primary_desc(column_name, indexes) do
     matching_desc_indexes =
       for {_, info} <- indexes,
           info.origin == "pk",
@@ -282,9 +289,5 @@ defmodule Electric.Migrations.Parse do
           do: true
 
     Enum.any?(matching_desc_indexes)
-  end
-
-  defp is_primary_desc(column_name, indexes) when indexes == nil do
-    false
   end
 end

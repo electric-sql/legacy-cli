@@ -7,7 +7,6 @@ defmodule Electric.Client do
   alias Electric.Session.Credentials
 
   alias Electric.Util
-  alias Electric.Progress
 
   @default_base_url "https://console.electric-sql.com/api/v1/"
 
