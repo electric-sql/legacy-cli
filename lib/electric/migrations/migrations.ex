@@ -131,14 +131,27 @@ defmodule Electric.Migrations do
     end
   end
 
-  defp add_migration(migrations_folder, migration_title) do
-    name =
-      String.downcase(migration_title)
-      |> String.replace(~r/[\/\*"\\\[\]:\;\|,\.]/, "_")
-      |> String.slice(0..40)
 
-    ts = System.os_time(:second)
-    migration_name = "#{ts}_#{name}"
+  def slugify_title(migration_title, datetime) do
+
+    slug = String.downcase(migration_title)
+      |> String.replace(~r/[^a-z|\d]/, "_")
+      |> String.replace(~r/_{2,}/, "_")
+      |> String.replace_leading("_", "")
+      |> String.replace_trailing("_", "")
+
+    ts = DateTime.truncate(datetime, :millisecond)
+    |> DateTime.to_iso8601(:basic)
+    |> String.replace("T", "")
+    |> String.replace("Z", "")
+    |> String.replace(".", "")
+
+    "#{ts}_#{slug}" |> String.slice(0..64)
+  end
+
+  defp add_migration(migrations_folder, migration_title) do
+    datetime = DateTime.utc_now()
+    migration_name = slugify_title(migration_title, datetime)
     migration_folder = Path.join(migrations_folder, migration_name)
     File.mkdir_p!(migration_folder)
 

@@ -497,6 +497,20 @@ defmodule MigrationsTest do
       assert stripped == expected
     end
 
+    test "sluggifying title" do
+
+      dt = %DateTime{year: 1964, month: 12, day: 5, zone_abbr: "UTC",
+               hour: 9, minute: 30, second: 7, microsecond: {345678, 6},
+               utc_offset: 0, std_offset: 0, time_zone: "Etc/UTC"}
+
+      title = " Paul's birthday  yay!!!"
+
+      fixed = Electric.Migrations.slugify_title(title, dt)
+
+      assert fixed == "19641205093007345_paul_s_birthday_yay"
+
+    end
+
     test "tests trigger has all columns" do
       sql = """
       CREATE TABLE IF NOT EXISTS fish (
@@ -765,7 +779,7 @@ defmodule MigrationsFileTest do
       path = "test/support/migration.sql"
 
       ts = System.os_time(:second)
-      migration_name = "#{ts}_test_migration"
+      migration_name = Electric.Migrations.slugify_title("first_migration", DateTime.from_unix!(ts))
 
       temp = temp_folder()
 
@@ -808,7 +822,7 @@ defmodule MigrationsFileTest do
       path = "test/support/migration.sql"
 
       ts = System.os_time(:second)
-      migration_name = "#{ts}_test_migration"
+      migration_name = Electric.Migrations.slugify_title("first_migration", DateTime.from_unix!(ts))
       temp = temp_folder()
       migrations_folder = Path.join([temp, "migrations"])
       migration_folder = Path.join([migrations_folder, migration_name])
@@ -848,8 +862,8 @@ defmodule MigrationsFileTest do
 
       ts = System.os_time(:second)
       ts2 = ts + 100
-      migration_name = "#{ts}_test_migration"
-      migration_name_2 = "#{ts2}_test_migration"
+      migration_name = Electric.Migrations.slugify_title("first_migration", DateTime.from_unix!(ts))
+      migration_name_2 = Electric.Migrations.slugify_title("second_migration", DateTime.from_unix!(ts))
       temp = temp_folder()
       migrations_folder = Path.join([temp, "migrations"])
 
@@ -896,8 +910,8 @@ defmodule MigrationsFileTest do
 
       ts = System.os_time(:second)
       ts2 = ts + 100
-      migration_name = "#{ts}_test_migration"
-      migration_name_2 = "#{ts2}_test_migration"
+      migration_name = Electric.Migrations.slugify_title("first_migration", DateTime.from_unix!(ts))
+      migration_name_2 = Electric.Migrations.slugify_title("second_migration", DateTime.from_unix!(ts))
       temp = temp_folder()
       migrations_folder = Path.join([temp, "migrations"])
 
@@ -969,8 +983,9 @@ defmodule MigrationsFileTest do
 
       ts = System.os_time(:second)
       ts2 = ts + 100
-      migration_name = "#{ts}_test_migration"
-      migration_name_2 = "#{ts2}_test_migration"
+
+      migration_name = Electric.Migrations.slugify_title("first_migration", DateTime.from_unix!(ts))
+      migration_name_2 = Electric.Migrations.slugify_title("second_migration", DateTime.from_unix!(ts))
       temp = temp_folder()
       migrations_folder = Path.join([temp, "migrations"])
 
