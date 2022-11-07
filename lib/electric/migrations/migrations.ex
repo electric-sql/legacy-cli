@@ -131,20 +131,20 @@ defmodule Electric.Migrations do
     end
   end
 
-
   def slugify_title(migration_title, datetime) do
-
-    slug = String.downcase(migration_title)
+    slug =
+      String.downcase(migration_title)
       |> String.replace(~r/[^a-z|\d]/, "_")
       |> String.replace(~r/_{2,}/, "_")
       |> String.replace_leading("_", "")
       |> String.replace_trailing("_", "")
 
-    ts = DateTime.truncate(datetime, :millisecond)
-    |> DateTime.to_iso8601(:basic)
-    |> String.replace("T", "")
-    |> String.replace("Z", "")
-    |> String.replace(".", "")
+    ts =
+      DateTime.truncate(datetime, :millisecond)
+      |> DateTime.to_iso8601(:basic)
+      |> String.replace("T", "")
+      |> String.replace("Z", "")
+      |> String.replace(".", "")
 
     "#{ts}_#{slug}" |> String.slice(0..64)
   end
