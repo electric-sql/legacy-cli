@@ -389,6 +389,114 @@ defmodule MigrationsTest do
       assert oldRow == nil
     end
 
+    test "stripping comments" do
+      sql = """
+      -- This is a comment
+      CREATE TABLE IF NOT EXISTS fish (
+      value TEXT PRIMARY KEY,
+      colour TEXT
+      ) STRICT, WITHOUT ROWID;
+      /* a star comment */
+      CREATE TABLE IF NOT EXISTS cat (
+      value TEXT PRIMARY KEY,
+      colour TEXT
+      ) STRICT, WITHOUT ROWID;
+      /*
+      a multiline
+      star comment
+      */
+      -- Another one liner
+      CREATE TABLE IF NOT EXISTS dog (
+      value TEXT PRIMARY KEY,
+      colour TEXT
+      ) STRICT, WITHOUT ROWID;
+      """
+
+      sql2 = "--Yet another one liner"
+
+      sql = sql <> sql2
+
+      stripped = Electric.Migrations.strip_comments(sql)
+
+      expected = """
+
+      CREATE TABLE IF NOT EXISTS fish (
+      value TEXT PRIMARY KEY,
+      colour TEXT
+      ) STRICT, WITHOUT ROWID;
+
+
+      CREATE TABLE IF NOT EXISTS cat (
+      value TEXT PRIMARY KEY,
+      colour TEXT
+      ) STRICT, WITHOUT ROWID;
+
+
+
+      CREATE TABLE IF NOT EXISTS dog (
+      value TEXT PRIMARY KEY,
+      colour TEXT
+      ) STRICT, WITHOUT ROWID;
+
+      """
+
+      assert stripped == expected
+    end
+
+    test "stripping comments with unterminated * comments" do
+      sql = """
+      -- This is a comment
+      CREATE TABLE IF NOT EXISTS fish (
+      value TEXT PRIMARY KEY,
+      colour TEXT
+      ) STRICT, WITHOUT ROWID;
+      /* a star comment */
+      CREATE TABLE IF NOT EXISTS cat (
+      value TEXT PRIMARY KEY,
+      colour TEXT
+      ) STRICT, WITHOUT ROWID;
+      /*
+      a multiline
+      star comment
+      */
+      -- Another one liner
+      CREATE TABLE IF NOT EXISTS dog (
+      value TEXT PRIMARY KEY,
+      colour TEXT
+      ) STRICT, WITHOUT ROWID;
+      """
+
+      sql2 = "/*Yet another one liner"
+
+      sql = sql <> sql2
+
+      stripped = Electric.Migrations.strip_comments(sql)
+
+      expected = """
+
+      CREATE TABLE IF NOT EXISTS fish (
+      value TEXT PRIMARY KEY,
+      colour TEXT
+      ) STRICT, WITHOUT ROWID;
+
+
+      CREATE TABLE IF NOT EXISTS cat (
+      value TEXT PRIMARY KEY,
+      colour TEXT
+      ) STRICT, WITHOUT ROWID;
+
+
+
+      CREATE TABLE IF NOT EXISTS dog (
+      value TEXT PRIMARY KEY,
+      colour TEXT
+      ) STRICT, WITHOUT ROWID;
+
+      """
+
+      assert stripped == expected
+    end
+
     test "tests trigger has all columns" do
       sql = """
       CREATE TABLE IF NOT EXISTS fish (
@@ -774,7 +882,7 @@ defmodule MigrationsFileTest do
           },
           %{
             "name" => migration_name_2,
-            "sha256" => "946f0f3a0d0338fa486d3d7da35c3b6032f837336fb9a08f933d44675bb264d3"
+            "sha256" => "acd836d848fc247a80831e1f5be43ff62d9b2a768be2a8315568faaff740230d"
           }
         ]
       }
@@ -838,7 +946,7 @@ defmodule MigrationsFileTest do
           },
           %{
             "name" => migration_name_2,
-            "sha256" => "946f0f3a0d0338fa486d3d7da35c3b6032f837336fb9a08f933d44675bb264d3",
+            "sha256" => "acd836d848fc247a80831e1f5be43ff62d9b2a768be2a8315568faaff740230d",
             "encoding" => "escaped",
             "original_body" =>
               "CREATE TABLE IF NOT EXISTS cat (\n  value TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;",

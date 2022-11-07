@@ -258,69 +258,57 @@ defmodule Electric.Migrations do
     end
   end
 
+  def strip_comments(sql) do
+    String.replace(sql, ~r/--[^\n]*(?:\z|\n)/, "\n")
+    |> String.replace(~r/\/\*[\s\S]*?(?:\z|\*\/)/, "\n")
+  end
+
   @doc false
   def add_triggers_to_migration(migration_set, template) do
     migration = List.last(migration_set)
+
+    hash = strip_comments(migration.original_body) |> calc_hash()
 
     case Electric.Migrations.Triggers.add_triggers_to_last_migration(migration_set, template) do
       {:error, reasons} ->
         {:error, reasons}
 
       {with_triggers, warnings} ->
-        migration_fingerprint =
-          if length(migration_set) > 1 do
-            previous_migration = Enum.at(migration_set, -2)
-            previous_metadata = Electric.Migration.get_satellite_metadata(previous_migration)
-            "#{migration.original_body}#{previous_metadata["sha256"]}"
-          else
-            migration.original_body
-          end
-
         migrations =
           for migration <- migration_set do
             %{original_body: migration.original_body, name: migration.name}
           end
 
-        case Electric.Postgre.Generation.postgre_for_migrations(migrations) do
-          {:ok, postgres_version, _message} ->
-            hash = calc_hash(migration_fingerprint)
-            satellite_file_path = Electric.Migration.satellite_file_path(migration)
-            postgres_file_path = Electric.Migration.postgres_file_path(migration)
+        satellite_file_path = Electric.Migration.satellite_file_path(migration)
 
-            warnings =
-              if File.exists?(satellite_file_path) do
-                metadata = Electric.Migration.get_satellite_metadata(migration)
+        warnings =
+          if File.exists?(satellite_file_path) do
+            metadata = Electric.Migration.get_satellite_metadata(migration)
 
-                if metadata["sha256"] != hash do
-                  File.rm(satellite_file_path)
-                  File.rm(postgres_file_path)
-                  ["The migration #{migration.name} has been modified." | warnings]
-                else
-                  warnings
-                end
-              else
-                warnings
-              end
-
-            if not File.exists?(satellite_file_path) do
-              header =
-                case Electric.Migration.get_original_metadata(migration) do
-                  {:error, _reason} ->
-                    Electric.Migration.file_header(migration, hash, nil)
-
-                  existing_metadata ->
-                    Electric.Migration.file_header(migration, hash, existing_metadata["title"])
-                end
-
-              File.write!(satellite_file_path, header <> with_triggers)
-              File.write!(postgres_file_path, header <> postgres_version)
-              {:ok, warnings}
+            if metadata["sha256"] != hash do
+              File.rm(satellite_file_path)
+              ["The migration #{migration.name} has been modified." | warnings]
             else
-              {:ok, warnings}
+              warnings
+            end
+          else
+            warnings
+          end
+
+        if not File.exists?(satellite_file_path) do
+          header =
+            case Electric.Migration.get_original_metadata(migration) do
+              {:error, _reason} ->
+                Electric.Migration.file_header(migration, hash, nil)
+
+              existing_metadata ->
+                Electric.Migration.file_header(migration, hash, existing_metadata["title"])
             end
 
-          {:error, errors} ->
-            {:error, errors}
+          File.write!(satellite_file_path, header <> with_triggers)
+          {:ok, warnings}
+        else
+          {:ok, warnings}
         end
     end
   end
