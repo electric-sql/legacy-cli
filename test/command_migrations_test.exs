@@ -18,7 +18,7 @@ defmodule CommandMigrationsTest do
 
       {:success, msg} =
         Electric.Commands.Migrations.init(%{
-          args: nil,
+          args: %{app: "app-name"},
           flags: nil,
           options: %{:dir => temp},
           unknown: nil
@@ -34,7 +34,7 @@ defmodule CommandMigrationsTest do
 
       {:success, msg} =
         Electric.Commands.Migrations.init(%{
-          args: [],
+          args: %{app: "app-name"},
           flags: [],
           options: %{:dir => temp},
           unknown: nil
@@ -63,7 +63,7 @@ defmodule CommandMigrationsTest do
           unknown: nil
         })
 
-      assert File.exists?(Path.join([migration_folder, "satellite.sql"]))
+      assert File.exists?(Path.join([migrations_path, "manifest.json"]))
     end
 
     test "build migrations errors" do
@@ -72,7 +72,7 @@ defmodule CommandMigrationsTest do
 
       {:success, msg} =
         Electric.Commands.Migrations.init(%{
-          args: [],
+          args: %{app: "app-name"},
           flags: [],
           options: %{:dir => temp},
           unknown: nil
@@ -110,7 +110,7 @@ defmodule CommandMigrationsTest do
 
       {:success, msg} =
         Electric.Commands.Migrations.init(%{
-          args: [],
+          args: %{app: "app-name"},
           flags: [],
           options: %{:dir => temp},
           unknown: nil
@@ -133,7 +133,7 @@ defmodule CommandMigrationsTest do
 
       {:success, msg} =
         Electric.Commands.Migrations.sync(%{
-          args: %{app: "app-name", env: "production"},
+          args: %{env: "production"},
           flags: [],
           options: %{:dir => migrations_path},
           unknown: nil

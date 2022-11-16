@@ -31,6 +31,21 @@ defmodule Electric.Migrations.Sync do
     end
   end
 
+  def get_full_migration_from_server(app_name, environment, migration_name) do
+    url = "app/#{app_name}/env/#{environment}/migrations/#{migration_name}?body=all"
+
+    case Client.get(url) do
+      {:ok, %Req.Response{status: 200, body: data}} ->
+        {:ok, Jason.decode!(data)}
+
+      {:ok, _} ->
+        {:error, "invalid credentials"}
+
+      {:error, _exception} ->
+        {:error, "failed to connect"}
+    end
+  end
+
   def get_all_migrations_from_server(app_name) do
     with {:ok, environments} <- get_environment_names_from_server(app_name) do
       env_names = environments["environments"]

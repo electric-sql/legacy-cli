@@ -56,6 +56,32 @@ defmodule Electric.MockServer do
     ]
   }
 
+  @migration_fixtures %{
+    "second_migration_name" => %{
+      "encoding" => "escaped",
+      "name" => "second_migration_name",
+      "satellite_body" => ["-- reverted satellite code"],
+      "postgres_body" => "-- something",
+      "original_body" => """
+      /*
+      Electric SQL Migration
+      name: REVERTED VERSION OF THIS FILE
+      title": another
+
+      When you build or sync these migrations we will add some triggers and metadata
+      so that Electric Satellite can sync your data.
+
+      Write your SQLite migration below.
+      */
+      CREATE TABLE IF NOT EXISTS cats (
+        value TEXT PRIMARY KEY
+      ) STRICT, WITHOUT ROWID;
+      """,
+      "sha256" => "d0a52f739f137fc80fd67d9fd347cb4097bd6fb182e583f2c64d8de309393ad7",
+      "title" => "another"
+    }
+  }
+
   defp get_some_migrations(app_name) do
     looked_up = @fixtures[app_name]
     #    IO.inspect(looked_up)
@@ -66,9 +92,22 @@ defmodule Electric.MockServer do
     end
   end
 
+  defp get_a_migration(migration_name) do
+    @migration_fixtures[migration_name]
+  end
+
   get "api/v1/app/:app_name/env/:environment/migrations" do
     server_manifest = %{
       "migrations" => get_some_migrations(app_name)
+    }
+
+    Plug.Conn.resp(conn, 200, Jason.encode!(server_manifest))
+    |> Plug.Conn.send_resp()
+  end
+
+  get "api/v1/app/:app_name/env/:environment/migrations/:migration_name" do
+    server_manifest = %{
+      "migration" => get_a_migration(migration_name)
     }
 
     Plug.Conn.resp(conn, 200, Jason.encode!(server_manifest))

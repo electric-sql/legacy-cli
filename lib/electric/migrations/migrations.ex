@@ -19,7 +19,7 @@ defmodule Electric.Migrations do
   optional argument:
   - :dir where to create the migration rather than the current working directory
   """
-  def init_migrations(options) do
+  def init_migrations(app_name, options) do
     migrations_folder =
       case root_directory = Map.get(options, :dir) do
         nil ->
@@ -37,7 +37,7 @@ defmodule Electric.Migrations do
       {:error, ["Migrations folder at #{migrations_folder} already exists."]}
     else
       File.mkdir_p!(migrations_folder)
-      add_migration(migrations_folder, "init")
+      add_migration(migrations_folder, "init", app_name)
     end
   end
 
@@ -46,13 +46,10 @@ defmodule Electric.Migrations do
   optional arguments:
   - :migrations a folder of migrations to add too if not using one in the cwd, must be called "migrations"
   """
-  def new_migration(migration_name, opts) do
-    case check_migrations_folder(opts) do
-      {:ok, migrations_folder} ->
-        add_migration(migrations_folder, migration_name)
-
-      {:error, errors} ->
-        {:error, errors}
+  def new_migration(migration_name, options) do
+    with {:ok, src_folder} <- check_migrations_folder(options),
+         {:ok, app_name} <- check_app_name(src_folder) do
+      add_migration(src_folder, migration_name)
     end
   end
 
@@ -69,6 +66,7 @@ defmodule Electric.Migrations do
     template = Map.get(options, :template, @satellite_template)
 
     with {:ok, src_folder} <- check_migrations_folder(options),
+         {:ok, app_name} <- check_app_name(src_folder),
          {:ok, updated_manifest, warnings} = update_manifest(src_folder, template) do
       if length(warnings) > 0 do
         {:ok, warnings}
@@ -81,10 +79,11 @@ defmodule Electric.Migrations do
   @doc """
   Does nothing yet
   """
-  def sync_migrations(app_name, environment, options) do
+  def sync_migrations(environment, options) do
     template = Map.get(options, :template, @satellite_template)
 
     with {:ok, src_folder} <- check_migrations_folder(options),
+         {:ok, app_name} <- check_app_name(src_folder),
          {:ok, updated_manifest, warnings} = update_manifest(src_folder, template),
          {:ok, _msg} <-
            Electric.Migrations.Sync.sync_migrations(app_name, environment, updated_manifest),
@@ -99,27 +98,65 @@ defmodule Electric.Migrations do
     end
   end
 
-  def list_migrations(app_name, options) do
+  def list_migrations(options) do
     template = Map.get(options, :template, @satellite_template)
 
     with {:ok, src_folder} <- check_migrations_folder(options),
+         {:ok, app_name} <- check_app_name(src_folder),
          {:ok, updated_manifest, warnings} = update_manifest(src_folder, template),
          {:ok, all_environment_manifests} <-
            Electric.Migrations.Sync.get_all_migrations_from_server(app_name) do
       {listing, mismatched} = format_listing(updated_manifest, all_environment_manifests)
-      {:ok, listing}
+      {:ok, listing, mismatched}
     end
   end
 
-  def revert_migration(app_name, environment, migration_name, options) do
+  def revert_migration(environment, migration_name, options) do
     template = Map.get(options, :template, @satellite_template)
 
     with {:ok, src_folder} <- check_migrations_folder(options),
+         {:ok, app_name} <- check_app_name(src_folder),
          {:ok, updated_manifest, warnings} = update_manifest(src_folder, template),
          {:ok, all_environment_manifests} <-
            Electric.Migrations.Sync.get_all_migrations_from_server(app_name) do
       {listing, mismatched} = format_listing(updated_manifest, all_environment_manifests)
-      {:ok, listing}
+
+      if Enum.member?(mismatched, {migration_name, environment}) do
+        do_revert(src_folder, app_name, environment, migration_name, updated_manifest)
+      else
+        {:error,
+         "The migration #{migration_name} in environment #{environment} is not different. Nothing to revert."}
+      end
+    end
+  end
+
+  defp do_revert(src_folder, app_name, environment, migration_name, current_manifest) do
+    with {:ok, %{"migration" => server_migration}} <-
+           Electric.Migrations.Sync.get_full_migration_from_server(
+             app_name,
+             environment,
+             migration_name
+           ) do
+      manifest_revisions = %{
+        "satellite_body" => server_migration["satellite_body"],
+        "sha256" => server_migration["sha256"]
+      }
+
+      updated_migrations =
+        for current_migration <- current_manifest["migrations"] do
+          case current_migration["name"] do
+            ^migration_name ->
+              Map.merge(current_migration, manifest_revisions)
+
+            _ ->
+              current_migration
+          end
+        end
+
+      reverted_manifest = Map.put(current_manifest, "migrations", updated_migrations)
+      write_manifest(src_folder, remove_original_bodies(reverted_manifest))
+      write_migration_body(src_folder, migration_name, server_migration["original_body"])
+      {:ok, nil}
     end
   end
 
@@ -134,31 +171,32 @@ defmodule Electric.Migrations do
         %{"name" => environment_name, "lookup" => lookup}
       end
 
-    lines =
-      for migration <- local_manifest["migrations"], into: "" do
-        line =
-          for environment <- manifest_lookup, into: "#{migration["name"]}\t" do
+    {lines, mismatched} =
+      Enum.reduce(local_manifest["migrations"], {"", []}, fn migration, {lines, mismatched} ->
+        {line, mismatches} =
+          Enum.reduce(manifest_lookup, {"#{migration["name"]}", []}, fn environment,
+                                                                        {line, mismatches} ->
             sha256 = migration["sha256"]
 
-            status =
+            {status, mismatch} =
               case environment["lookup"][migration["name"]] do
                 nil ->
-                  "-"
+                  {"-", []}
 
                 %{"sha256" => ^sha256} ->
-                  IO.ANSI.green() <> "sync" <> IO.ANSI.reset()
+                  {IO.ANSI.green() <> "sync" <> IO.ANSI.reset(), []}
 
                 _ ->
-                  IO.ANSI.red() <> "different" <> IO.ANSI.reset()
+                  {IO.ANSI.red() <> "different" <> IO.ANSI.reset(),
+                   [{migration["name"], environment["name"]}]}
               end
 
-            "#{environment["name"]}: #{status}\t"
-          end
+            {line <> "\t#{environment["name"]}: #{status}", mismatches ++ mismatch}
+          end)
 
-        line <> "\n"
-      end
+        {lines <> line <> "\n", mismatched ++ mismatches}
+      end)
 
-    mismatched = []
     {"\n------ Electric SQL Migrations ------\n\n" <> lines, mismatched}
   end
 
@@ -167,7 +205,7 @@ defmodule Electric.Migrations do
            src_folder
            |> read_manifest()
            |> add_triggers_to_manifest(src_folder, template),
-         cleaned_manifest <- remove_original_bodies(updated_manifest, src_folder) do
+         cleaned_manifest <- remove_original_bodies(updated_manifest) do
       :ok <= write_manifest(src_folder, cleaned_manifest)
       :ok <= write_js_bundle(src_folder, cleaned_manifest)
       {:ok, updated_manifest, warnings}
@@ -177,6 +215,18 @@ defmodule Electric.Migrations do
 
       {:error, [], errors} ->
         {:error, errors}
+    end
+  end
+
+  defp check_app_name(src_folder) do
+    manifest = read_manifest(src_folder)
+
+    case manifest["app_name"] do
+      nil ->
+        {:error, "Please set the app name"}
+
+      app_name ->
+        {:ok, app_name}
     end
   end
 
@@ -212,7 +262,7 @@ defmodule Electric.Migrations do
     "#{ts}_#{slug}" |> String.slice(0..64)
   end
 
-  defp add_migration(migrations_folder, migration_title) do
+  defp add_migration(migrations_folder, migration_title, app_name \\ nil) do
     datetime = DateTime.utc_now()
     migration_name = slugify_title(migration_title, datetime)
     migration_folder = Path.join(migrations_folder, migration_name)
@@ -226,7 +276,7 @@ defmodule Electric.Migrations do
 
     migration_file_path = Path.join([migration_folder, @migration_file_name])
     File.write!(migration_file_path, body)
-    add_migration_to_manifest(migrations_folder, migration_name, migration_title, body)
+    add_migration_to_manifest(migrations_folder, migration_name, migration_title, body, app_name)
 
     {:ok, nil}
   end
@@ -235,7 +285,7 @@ defmodule Electric.Migrations do
     @satellite_template
   end
 
-  defp add_migration_to_manifest(src_folder, name, title, body) do
+  defp add_migration_to_manifest(src_folder, name, title, body, app_name) do
     current = read_manifest(src_folder)
 
     migrations_list =
@@ -250,7 +300,16 @@ defmodule Electric.Migrations do
           }
         ]
 
-    write_manifest(src_folder, %{"migrations" => migrations_list})
+    updated = Map.merge(current, %{"migrations" => migrations_list})
+
+    updated =
+      if app_name != nil do
+        Map.merge(updated, %{"app_name" => app_name})
+      else
+        updated
+      end
+
+    write_manifest(src_folder, updated)
   end
 
   defp read_manifest(src_folder) do
@@ -272,6 +331,16 @@ defmodule Electric.Migrations do
     end
 
     File.write!(manifest_path, Jason.encode!(manifest) |> Jason.Formatter.pretty_print())
+  end
+
+  defp write_migration_body(src_folder, migration_name, original_body) do
+    migration_path = Path.join([src_folder, migration_name, @migration_file_name])
+
+    if File.exists?(migration_path) do
+      File.rm(migration_path)
+    end
+
+    File.write!(migration_path, original_body)
   end
 
   defp write_js_bundle(src_folder, manifest, environment \\ nil) do
@@ -313,16 +382,16 @@ defmodule Electric.Migrations do
         Map.put(migration, "original_body", original_body)
       end
 
-    %{"migrations" => migrations}
+    Map.merge(manifest, %{"migrations" => migrations})
   end
 
-  defp remove_original_bodies(manifest, src_folder) do
+  defp remove_original_bodies(manifest) do
     migrations =
       for migration <- manifest["migrations"] do
         Map.delete(migration, "original_body")
       end
 
-    %{"migrations" => migrations}
+    Map.merge(manifest, %{"migrations" => migrations})
   end
 
   defp add_triggers_to_manifest(manifest, src_folder, template) do
@@ -346,7 +415,7 @@ defmodule Electric.Migrations do
         end
       end)
 
-    {status, %{"migrations" => migrations}, messages}
+    {status, Map.merge(manifest, %{"migrations" => migrations}), messages}
   end
 
   def strip_comments(sql) do

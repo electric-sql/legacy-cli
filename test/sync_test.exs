@@ -231,6 +231,7 @@ defmodule MigrationsSyncTest do
 
   test "doing whole sync" do
     local_bundle = %{
+      "app_name" => "app-name-2",
       "migrations" => [
         %{
           "name" => "1666612306_test_migration",

@@ -148,8 +148,8 @@ defmodule Electric.Commands.Migrations do
     "There was 1 #{type_of_message}:\n" <> messages
   end
 
-  def init(%{args: _args, flags: _flags, options: options, unknown: _unknown}) do
-    case Electric.Migrations.init_migrations(options) do
+  def init(%{args: %{app: app_name}, flags: _flags, options: options, unknown: _unknown}) do
+    case Electric.Migrations.init_migrations(app_name, options) do
       {:ok, nil} ->
         {:success, "Migrations initialised"}
 
@@ -182,8 +182,8 @@ defmodule Electric.Commands.Migrations do
     end
   end
 
-  def sync(%{args: %{app: app_name, env: environment}, options: options}) do
-    case Electric.Migrations.sync_migrations(app_name, environment, options) do
+  def sync(%{args: %{env: environment}, options: options}) do
+    case Electric.Migrations.sync_migrations(environment, options) do
       {:ok, nil} ->
         {:success, "Migrations synchronized with server successfully"}
 

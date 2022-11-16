@@ -645,14 +645,14 @@ defmodule MigrationsFileTest do
     test "tests can init" do
       temp = temp_folder()
       migrations_path = Path.join([temp, "migrations"])
-      {:ok, _msg} = Electric.Migrations.init_migrations(%{:dir => temp})
+      {:ok, _msg} = Electric.Migrations.init_migrations("test_app", %{:dir => temp})
       assert File.exists?(migrations_path)
     end
 
     test "tests init adds migration to manifest" do
       temp = temp_folder()
       migrations_folder = Path.join([temp, "migrations"])
-      {:ok, _msg} = Electric.Migrations.init_migrations(%{:dir => temp})
+      {:ok, _msg} = Electric.Migrations.init_migrations("test_app", %{:dir => temp})
       assert File.exists?(migrations_folder)
 
       init_migration_name =
@@ -665,6 +665,7 @@ defmodule MigrationsFileTest do
       manifest = Jason.decode!(File.read!(manifest_path))
 
       expected = %{
+        "app_name" => "test_app",
         "migrations" => [
           %{
             "name" => init_migration_name,
@@ -682,7 +683,7 @@ defmodule MigrationsFileTest do
     test "init and then modify and then build updates manifest" do
       temp = temp_folder()
       migrations_path = Path.join([temp, "migrations"])
-      {:ok, _msg} = Electric.Migrations.init_migrations(%{:dir => temp})
+      {:ok, _msg} = Electric.Migrations.init_migrations("test_app", %{:dir => temp})
       assert File.exists?(migrations_path)
 
       sql_file_paths = Path.join([migrations_path, "*", "migration.sql"]) |> Path.wildcard()
@@ -707,6 +708,7 @@ defmodule MigrationsFileTest do
       sha = List.first(manifest["migrations"])["sha256"]
 
       expected = %{
+        "app_name" => "test_app",
         "migrations" => [
           %{
             "encoding" => "escaped",
@@ -741,7 +743,7 @@ defmodule MigrationsFileTest do
     test "init and then modify and then build creates index.js" do
       temp = temp_folder()
       migrations_path = Path.join([temp, "migrations"])
-      {:ok, _msg} = Electric.Migrations.init_migrations(%{:dir => temp})
+      {:ok, _msg} = Electric.Migrations.init_migrations("test_app", %{:dir => temp})
       assert File.exists?(migrations_path)
 
       sql_file_paths = Path.join([migrations_path, "*", "migration.sql"]) |> Path.wildcard()
@@ -767,6 +769,7 @@ defmodule MigrationsFileTest do
 
       expected = """
       export const data = {
+        "app_name": "test_app",
         "migrations": [
           {
             "encoding": "escaped",
@@ -818,14 +821,14 @@ defmodule MigrationsFileTest do
           end
         end
 
-      updated = %{"migrations" => updated_migrations}
+      updated = Map.merge(manifest, %{"migrations" => updated_migrations})
 
       File.write!(manifest_path, Jason.encode!(updated) |> Jason.Formatter.pretty_print())
     end
 
-    def init_and_add_migration(temp) do
+    def init_and_add_migration(app_name, temp) do
       migrations_path = Path.join([temp, "migrations"])
-      {:ok, _msg} = Electric.Migrations.init_migrations(%{:dir => temp})
+      {:ok, _msg} = Electric.Migrations.init_migrations(app_name, %{:dir => temp})
 
       my_new_migration = most_recent_migration_file(migrations_path)
 
@@ -860,19 +863,22 @@ defmodule MigrationsFileTest do
       temp = temp_folder()
       migrations_path = Path.join([temp, "migrations"])
 
-      [first_migration, second_migration] = init_and_add_migration(temp)
+      [first_migration, second_migration] = init_and_add_migration("test", temp)
+
+      manifest_path = Path.join([migrations_path, "manifest.json"])
+      assert File.exists?(manifest_path)
+      manifest = Jason.decode!(File.read!(manifest_path))
 
       first_migration_name = Path.dirname(first_migration) |> Path.basename()
       second_migration_name = Path.dirname(second_migration) |> Path.basename()
 
       {:ok, _msg} = Electric.Migrations.build_migrations(%{}, %{:dir => migrations_path})
 
-      manifest_path = Path.join([migrations_path, "manifest.json"])
-      assert File.exists?(manifest_path)
       manifest = Jason.decode!(File.read!(manifest_path))
       sha = List.first(manifest["migrations"])["sha256"]
 
       expected = %{
+        "app_name" => "test",
         "migrations" => [
           %{
             "encoding" => "escaped",
@@ -936,7 +942,7 @@ defmodule MigrationsFileTest do
     test "test build warning" do
       temp = temp_folder()
       migrations_path = Path.join([temp, "migrations"])
-      init_and_add_migration(temp)
+      init_and_add_migration("test", temp)
 
       {:ok, _msg} = Electric.Migrations.build_migrations(%{}, %{:dir => migrations_path})
 
@@ -963,15 +969,14 @@ defmodule MigrationsFileTest do
       temp = temp_folder()
       migrations_path = Path.join([temp, "migrations"])
 
-      [first_migration, second_migration] = init_and_add_migration(temp)
+      [first_migration, second_migration] = init_and_add_migration("test", temp)
 
       first_migration_name = Path.dirname(first_migration) |> Path.basename()
       second_migration_name = Path.dirname(second_migration) |> Path.basename()
       change_migrations_name(migrations_path, first_migration_name, "first_migration_name")
       change_migrations_name(migrations_path, second_migration_name, "second_migration_name")
 
-      {:ok, _msg} =
-        Electric.Migrations.sync_migrations("test", "default", %{:dir => migrations_path})
+      {:ok, _msg} = Electric.Migrations.sync_migrations("default", %{:dir => migrations_path})
 
       js_path = Path.join([migrations_path, "build", "default", "index.js"])
       assert File.exists?(js_path)
@@ -1010,15 +1015,14 @@ defmodule MigrationsFileTest do
       temp = temp_folder()
       migrations_path = Path.join([temp, "migrations"])
 
-      [first_migration, second_migration] = init_and_add_migration(temp)
+      [first_migration, second_migration] = init_and_add_migration("test2", temp)
 
       first_migration_name = Path.dirname(first_migration) |> Path.basename()
       second_migration_name = Path.dirname(second_migration) |> Path.basename()
       change_migrations_name(migrations_path, first_migration_name, "first_migration_name")
       change_migrations_name(migrations_path, second_migration_name, "second_migration_name")
 
-      {:error, msg} =
-        Electric.Migrations.sync_migrations("test2", "default", %{:dir => migrations_path})
+      {:error, msg} = Electric.Migrations.sync_migrations("default", %{:dir => migrations_path})
 
       assert msg == "The migration second_migration_name has been changed locally"
     end
@@ -1027,32 +1031,134 @@ defmodule MigrationsFileTest do
       temp = temp_folder()
       migrations_path = Path.join([temp, "migrations"])
 
-      [first_migration, second_migration] = init_and_add_migration(temp)
+      [first_migration, second_migration] = init_and_add_migration("test", temp)
       first_migration_name = Path.dirname(first_migration) |> Path.basename()
       second_migration_name = Path.dirname(second_migration) |> Path.basename()
       change_migrations_name(migrations_path, first_migration_name, "first_migration_name")
       change_migrations_name(migrations_path, second_migration_name, "second_migration_name")
 
-      {:ok, listing} = Electric.Migrations.list_migrations("test", %{:dir => migrations_path})
+      {:ok, listing, mismatched} = Electric.Migrations.list_migrations(%{:dir => migrations_path})
 
       assert listing ==
-               "\n------ Electric SQL Migrations ------\n\nfirst_migration_name\tdefault: \e[32msync\e[0m\t\nsecond_migration_name\tdefault: \e[32msync\e[0m\t\n"
+               "\n------ Electric SQL Migrations ------\n\nfirst_migration_name\tdefault: \e[32msync\e[0m\nsecond_migration_name\tdefault: \e[32msync\e[0m\n"
     end
 
     test "test lists with error" do
       temp = temp_folder()
       migrations_path = Path.join([temp, "migrations"])
 
-      [first_migration, second_migration] = init_and_add_migration(temp)
+      [first_migration, second_migration] = init_and_add_migration("test2", temp)
       first_migration_name = Path.dirname(first_migration) |> Path.basename()
       second_migration_name = Path.dirname(second_migration) |> Path.basename()
       change_migrations_name(migrations_path, first_migration_name, "first_migration_name")
       change_migrations_name(migrations_path, second_migration_name, "second_migration_name")
 
-      {:ok, listing} = Electric.Migrations.list_migrations("test2", %{:dir => migrations_path})
+      {:ok, listing, mismatched} = Electric.Migrations.list_migrations(%{:dir => migrations_path})
 
       assert listing ==
-               "\n------ Electric SQL Migrations ------\n\nfirst_migration_name\tdefault: \e[32msync\e[0m\t\nsecond_migration_name\tdefault: \e[31mdifferent\e[0m\t\n"
+               "\n------ Electric SQL Migrations ------\n\nfirst_migration_name\tdefault: \e[32msync\e[0m\nsecond_migration_name\tdefault: \e[31mdifferent\e[0m\n"
+
+      assert mismatched == [{"second_migration_name", "default"}]
+    end
+
+    test "test revert unchanged" do
+      temp = temp_folder()
+      migrations_path = Path.join([temp, "migrations"])
+
+      [first_migration, second_migration] = init_and_add_migration("test", temp)
+      first_migration_name = Path.dirname(first_migration) |> Path.basename()
+      second_migration_name = Path.dirname(second_migration) |> Path.basename()
+      change_migrations_name(migrations_path, first_migration_name, "first_migration_name")
+      change_migrations_name(migrations_path, second_migration_name, "second_migration_name")
+
+      {status, msg} =
+        Electric.Migrations.revert_migration("default", "second_migration_name", %{
+          :dir => migrations_path
+        })
+
+      assert status == :error
+    end
+
+    test "test revert" do
+      temp = temp_folder()
+      migrations_path = Path.join([temp, "migrations"])
+
+      [first_migration, second_migration] = init_and_add_migration("test2", temp)
+      first_migration_name = Path.dirname(first_migration) |> Path.basename()
+      second_migration_name = Path.dirname(second_migration) |> Path.basename()
+      change_migrations_name(migrations_path, first_migration_name, "first_migration_name")
+      change_migrations_name(migrations_path, second_migration_name, "second_migration_name")
+
+      {status, nil} =
+        Electric.Migrations.revert_migration("default", "second_migration_name", %{
+          :dir => migrations_path
+        })
+
+      assert status == :ok
+      manifest_path = Path.join([migrations_path, "manifest.json"])
+      manifest = Jason.decode!(File.read!(manifest_path))
+
+      expected = %{
+        "app_name" => "test2",
+        "migrations" => [
+          %{
+            "encoding" => "escaped",
+            "name" => "first_migration_name",
+            "satellite_body" => [
+              "CREATE TABLE IF NOT EXISTS items (\n  value TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;",
+              "CREATE TABLE IF NOT EXISTS _electric_oplog (\n  rowid INTEGER PRIMARY KEY AUTOINCREMENT,\n  namespace String NOT NULL,\n  tablename String NOT NULL,\n  optype String NOT NULL,\n  primaryKey String NOT NULL,\n  newRow String,\n  oldRow String,\n  timestamp TEXT\n);",
+              "CREATE TABLE IF NOT EXISTS _electric_meta (\n  key TEXT PRIMARY KEY,\n  value BLOB\n);",
+              "CREATE TABLE IF NOT EXISTS _electric_migrations (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  name TEXT NOT NULL UNIQUE,\n  sha256 TEXT NOT NULL,\n  applied_at TEXT NOT NULL\n);",
+              "INSERT INTO _electric_meta (key, value) VALUES ('compensations', 0), ('lastAckdRowId','0'), ('lastSentRowId', '0'), ('lsn', 'MA=='), ('clientId', '');",
+              "DROP TABLE IF EXISTS _electric_trigger_settings;",
+              "CREATE TABLE _electric_trigger_settings(tablename STRING PRIMARY KEY, flag INTEGER);",
+              "INSERT INTO _electric_trigger_settings(tablename,flag) VALUES ('main.items', 1);",
+              "DROP TRIGGER IF EXISTS update_ensure_main_items_primarykey;",
+              "CREATE TRIGGER update_ensure_main_items_primarykey\n   BEFORE UPDATE ON main.items\nBEGIN\n  SELECT\n    CASE\n      WHEN old.value != new.value THEN\n        RAISE (ABORT,'cannot change the value of column value as it belongs to the primary key')\n    END;\nEND;",
+              "DROP TRIGGER IF EXISTS insert_main_items_into_oplog;",
+              "CREATE TRIGGER insert_main_items_into_oplog\n   AFTER INSERT ON main.items\n   WHEN 1 == (SELECT flag from _electric_trigger_settings WHERE tablename == 'main.items')\nBEGIN\n  INSERT INTO _electric_oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)\n  VALUES ('main', 'items', 'INSERT', json_object('value', new.value), json_object('value', new.value), NULL, NULL);\nEND;",
+              "DROP TRIGGER IF EXISTS update_main_items_into_oplog;",
+              "CREATE TRIGGER update_main_items_into_oplog\n   AFTER UPDATE ON main.items\n   WHEN 1 == (SELECT flag from _electric_trigger_settings WHERE tablename == 'main.items')\nBEGIN\n  INSERT INTO _electric_oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)\n  VALUES ('main', 'items', 'UPDATE', json_object('value', new.value), json_object('value', new.value), json_object('value', old.value), NULL);\nEND;",
+              "DROP TRIGGER IF EXISTS delete_main_items_into_oplog;",
+              "CREATE TRIGGER delete_main_items_into_oplog\n   AFTER DELETE ON main.items\n   WHEN 1 == (SELECT flag from _electric_trigger_settings WHERE tablename == 'main.items')\nBEGIN\n  INSERT INTO _electric_oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)\n  VALUES ('main', 'items', 'DELETE', json_object('value', old.value), NULL, json_object('value', old.value), NULL);\nEND;"
+            ],
+            "sha256" => "2a97d825e41ae70705381016921c55a3b086a813649e4da8fcba040710055747",
+            "title" => "init"
+          },
+          %{
+            "encoding" => "escaped",
+            "name" => "second_migration_name",
+            "satellite_body" => ["-- reverted satellite code"],
+            "sha256" => "d0a52f739f137fc80fd67d9fd347cb4097bd6fb182e583f2c64d8de309393ad7",
+            "title" => "another"
+          }
+        ]
+      }
+
+      assert manifest == expected
+
+      reverted_migration_path =
+        Path.join([migrations_path, "second_migration_name", "migration.sql"])
+
+      reverted_body = File.read!(reverted_migration_path)
+
+      expected = """
+      /*
+      Electric SQL Migration
+      name: REVERTED VERSION OF THIS FILE
+      title": another
+
+      When you build or sync these migrations we will add some triggers and metadata
+      so that Electric Satellite can sync your data.
+
+      Write your SQLite migration below.
+      */
+      CREATE TABLE IF NOT EXISTS cats (
+        value TEXT PRIMARY KEY
+      ) STRICT, WITHOUT ROWID;
+      """
+
+      assert reverted_body == expected
     end
   end
 end
