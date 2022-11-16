@@ -133,7 +133,7 @@ defmodule CommandMigrationsTest do
 
       {:success, msg} =
         Electric.Commands.Migrations.sync(%{
-          args: %{database_id: "1234"},
+          args: %{app: "app-name", env: "production"},
           flags: [],
           options: %{:dir => migrations_path},
           unknown: nil

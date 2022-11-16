@@ -17,6 +17,11 @@ defmodule Electric.Migrations.Lexer do
     end
   end
 
+  def clean_up_sql(input) do
+    Enum.join(get_statements(input), "\n\n") <> "\n"
+  end
+
+
   defp step(input, index, stack, breaks) do
     {_done, next} = String.split_at(input, index)
 
@@ -56,7 +61,10 @@ defmodule Electric.Migrations.Lexer do
     {stack, breaks}
   end
 
-  defp remove_comments(input) do
-    String.replace(input, ~r/^--[^\n]*\n/, "\n") |> String.replace(~r/\/\*[\s\S]*?\*\//, " ")
+  def remove_comments(input) do
+    String.replace(input, ~r/\/\*[\s\S]*?(?:\z|\*\/)/, "\n")
+    |> String.replace(~r/--[^\n]*(?:\z|\n)/, "\n")
   end
+
+
 end

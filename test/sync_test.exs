@@ -2,7 +2,7 @@ defmodule MigrationsSyncTest do
   use ExUnit.Case, async: false
 
   test "gets an empty set of migrations" do
-    {:ok, data} = Electric.Migrations.Sync.get_migrations_from_server("1234")
+    {:ok, data} = Electric.Migrations.Sync.get_migrations_from_server("app-name", "production")
     assert data == %{"migrations" => []}
   end
 
@@ -37,7 +37,9 @@ defmodule MigrationsSyncTest do
       ]
     }
 
-    {:ok, msg} = Electric.Migrations.Sync.upload_new_migrations("1234", migrations)
+    {:ok, msg} =
+      Electric.Migrations.Sync.upload_new_migrations("app-name", "production", migrations)
+
     assert msg == "Synchronized 2 new migrations successfully"
   end
 
@@ -258,7 +260,8 @@ defmodule MigrationsSyncTest do
       ]
     }
 
-    {:ok, msg} = Electric.Migrations.Sync.sync_migrations("5555", local_bundle)
+    {:ok, msg} =
+      Electric.Migrations.Sync.sync_migrations("app-name-2", "production", local_bundle)
 
     assert msg == "Synchronized 1 new migrations successfully"
   end

@@ -10,7 +10,7 @@ defmodule MigrationsParseTest do
       ) STRICT, WITHOUT ROWID;;
       """
 
-      migration = %Electric.Migration{name: "test1", original_body: sql_in}
+      migration = %{name: "test1", original_body: sql_in}
       {:ok, info, _} = Electric.Migrations.Parse.sql_ast_from_migrations([migration])
 
       column_names = info["main.fish"][:columns]
@@ -25,7 +25,7 @@ defmodule MigrationsParseTest do
       SOME BOLLOCKS;
       """
 
-      migration = %Electric.Migration{name: "test1", original_body: sql_in}
+      migration = %{name: "test1", original_body: sql_in}
 
       {_status, reason} = Electric.Migrations.Parse.sql_ast_from_migrations([migration])
       assert reason == ["In migration test1 SQL error: near \"SOME\": syntax error"]
@@ -66,7 +66,7 @@ defmodule MigrationsParseTest do
 
       {:ok, info, _} =
         Electric.Migrations.Parse.sql_ast_from_migrations([
-          %Electric.Migration{name: "test1", original_body: sql_in}
+          %{name: "test1", original_body: sql_in}
         ])
 
       expected_info = %{
@@ -185,7 +185,7 @@ defmodule MigrationsParseTest do
 
       {:ok, info, _} =
         Electric.Migrations.Parse.sql_ast_from_migrations([
-          %Electric.Migration{name: "test1", original_body: sql_in}
+          %{name: "test1", original_body: sql_in}
         ])
 
       expected_info = %{

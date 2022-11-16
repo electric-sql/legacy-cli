@@ -4,7 +4,7 @@ defmodule Electric.Migrations.Parse do
   """
 
   @doc """
-  Given a set of Electric.Migration and returns an ugly map of maps containing info about the DB structure.
+  Given a set of Maps and returns an ugly map of maps containing info about the DB structure.
   Also validates the SQL and returns error messages if validation fails
   """
 

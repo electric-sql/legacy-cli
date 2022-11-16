@@ -67,54 +67,109 @@ defmodule Electric.Migrations do
   """
   def build_migrations(flags, options) do
     template = Map.get(options, :template, @satellite_template)
-
-    with {:ok, folder} <- check_migrations_folder(options),
-         {:ok, warnings} <-
-           folder |> ordered_migrations() |> add_triggers_to_migrations(template),
-         :ok <- optionally_write(&write_js_bundle/1, folder, flags[:bundle]),
-         :ok <- optionally_write(&write_json_bundle/1, folder, flags[:json]),
-         :ok <- optionally_write(&write_manifest/1, folder, flags[:manifest]) do
+    with {:ok, src_folder} <- check_migrations_folder(options),
+         {:ok, updated_manifest, warnings} = update_manifest(src_folder, template) do
       if length(warnings) > 0 do
         {:ok, warnings}
       else
         {:ok, nil}
       end
-    else
-      {:error, errors} ->
-        {:error, errors}
     end
-  end
-
-  defp optionally_write(_func, _folder, flag) when flag !== true do
-    :ok
-  end
-
-  defp optionally_write(func, folder, _flag) do
-    func.(folder)
   end
 
   @doc """
   Does nothing yet
   """
-  def sync_migrations(db_id, options) do
+  def sync_migrations(app_name, environment, options) do
+
     template = Map.get(options, :template, @satellite_template)
 
-    with {:ok, folder} <- check_migrations_folder(options),
-         {:ok, warnings} <-
-           folder |> ordered_migrations() |> add_triggers_to_migrations(template),
-         migrations <- all_migrations_as_maps(folder, :text),
-         {:ok, _msg} <-
-           Electric.Migrations.Sync.sync_migrations(db_id, %{"migrations" => migrations}) do
+    with {:ok, src_folder} <- check_migrations_folder(options),
+         {:ok, updated_manifest, warnings} = update_manifest(src_folder, template),
+         {:ok, _msg} <- Electric.Migrations.Sync.sync_migrations(app_name, environment, updated_manifest),
+         {:ok, server_manifest} <- Electric.Migrations.Sync.get_migrations_from_server(app_name, environment, true),
+         :ok <- write_js_bundle(src_folder, server_manifest, environment) do
       if length(warnings) > 0 do
         {:ok, warnings}
       else
         {:ok, nil}
       end
+    end
+  end
+
+  def list_migrations(app_name, options) do
+
+    template = Map.get(options, :template, @satellite_template)
+
+    with {:ok, src_folder} <- check_migrations_folder(options),
+         {:ok, updated_manifest, warnings} = update_manifest(src_folder, template),
+         {:ok, all_environment_manifests} <- Electric.Migrations.Sync.get_all_migrations_from_server(app_name) do
+      {listing, mismatched} = format_listing(updated_manifest, all_environment_manifests)
+      {:ok, listing}
+    end
+  end
+
+
+  def revert_migration(app_name, environment, migration_name, options) do
+
+    template = Map.get(options, :template, @satellite_template)
+
+    with {:ok, src_folder} <- check_migrations_folder(options),
+         {:ok, updated_manifest, warnings} = update_manifest(src_folder, template),
+         {:ok, all_environment_manifests} <- Electric.Migrations.Sync.get_all_migrations_from_server(app_name) do
+      {listing, mismatched} = format_listing(updated_manifest, all_environment_manifests)
+      {:ok, listing}
+    end
+  end
+
+
+  defp format_listing(local_manifest, all_environment_manifests) do
+
+    manifest_lookup = for {environment_name, manifest} <- all_environment_manifests do
+      lookup = for migration <- manifest["migrations"], into: %{} do
+         {migration["name"], migration}
+      end
+
+      %{"name" => environment_name, "lookup" => lookup}
+    end
+
+    lines = for migration <- local_manifest["migrations"], into: "" do
+      line = for environment <- manifest_lookup, into: "#{migration["name"]}\t" do
+        sha256 = migration["sha256"]
+        status = case environment["lookup"][migration["name"]] do
+          nil ->
+            "-"
+          %{"sha256" => ^sha256} ->
+            IO.ANSI.green() <> "sync"<> IO.ANSI.reset()
+          _ ->
+            IO.ANSI.red() <> "different"<> IO.ANSI.reset()
+        end
+        "#{environment["name"]}: #{status}\t"
+      end
+      line <> "\n"
+    end
+    mismatched = []
+    {"\n------ Electric SQL Migrations ------\n\n" <> lines, mismatched}
+  end
+
+  defp update_manifest(src_folder, template) do
+
+    with {:ok, updated_manifest, warnings} <-
+           src_folder
+           |> read_manifest()
+           |> add_triggers_to_manifest(src_folder, template),
+         cleaned_manifest <- remove_original_bodies(updated_manifest, src_folder) do
+      :ok <= write_manifest(src_folder, cleaned_manifest)
+      :ok <= write_js_bundle(src_folder, cleaned_manifest)
+      {:ok, updated_manifest, warnings}
     else
       {:error, errors} ->
         {:error, errors}
+      {:error, [], errors} ->
+        {:error, errors}
     end
   end
+
 
   defp check_migrations_folder(options) do
     migrations_folder = Map.get(options, :dir, "migrations")
@@ -125,7 +180,6 @@ defmodule Electric.Migrations do
       if Path.basename(migrations_folder) == "migrations" do
         {:ok, migrations_folder}
       else
-        #        IO.inspect(migrations_folder)
         {:error, ["The migrations folder must be called \"migrations\""]}
       end
     end
@@ -163,6 +217,8 @@ defmodule Electric.Migrations do
 
     migration_file_path = Path.join([migration_folder, @migration_file_name])
     File.write!(migration_file_path, body)
+    add_migration_to_manifest(migrations_folder, migration_name, migration_title, body)
+
     {:ok, nil}
   end
 
@@ -170,35 +226,57 @@ defmodule Electric.Migrations do
     @satellite_template
   end
 
-  @doc false
-  def write_manifest(src_folder) do
+  defp add_migration_to_manifest(src_folder, name, title, body) do
+    current = read_manifest(src_folder)
+
+    migrations_list =
+      current["migrations"] ++
+        [
+          %{
+            "name" => name,
+            "title" => title,
+            "sha256" => strip_comments(body) |> calc_hash(),
+            "encoding" => "escaped",
+            "satellite_body" => []
+          }
+        ]
+
+    write_manifest(src_folder, %{"migrations" => migrations_list})
+  end
+
+  defp read_manifest(src_folder) do
     manifest_path = Path.join(src_folder, @manifest_file_name)
-    manifest = create_bundle(src_folder, :none)
+
+    if File.exists?(manifest_path) do
+      File.read!(manifest_path)
+      |> Jason.decode!()
+    else
+      %{"migrations" => []}
+    end
+  end
+
+
+  defp write_manifest(src_folder, manifest) do
+    manifest_path = Path.join(src_folder, @manifest_file_name)
 
     if File.exists?(manifest_path) do
       File.rm(manifest_path)
     end
 
-    File.write(manifest_path, manifest)
+    File.write!(manifest_path, Jason.encode!(manifest) |> Jason.Formatter.pretty_print())
   end
 
-  @doc false
-  def write_json_bundle(src_folder) do
-    migrations = create_bundle(src_folder, :text)
-    bundle_path = Path.join(src_folder, @bundle_file_name)
 
-    if File.exists?(bundle_path) do
-      File.rm(bundle_path)
-    end
+  defp write_js_bundle(src_folder, manifest, environment \\ nil) do
+    manifest_json = Jason.encode!(manifest) |> Jason.Formatter.pretty_print()
+    {result, _bindings} = Code.eval_quoted(@bundle_template, migrations: manifest_json)
 
-    File.write(bundle_path, migrations)
-  end
+    build_name = if environment == nil do "local" else environment end
 
-  @doc false
-  def write_js_bundle(src_folder) do
-    migrations = create_bundle(src_folder, :list)
-    {result, _bindings} = Code.eval_quoted(@bundle_template, migrations: migrations)
-    bundle_path = Path.join(src_folder, @js_bundle_file_name)
+    local_path = Path.join([src_folder, "build", build_name])
+    bundle_path = Path.join([local_path, @js_bundle_file_name])
+
+    File.mkdir_p!(local_path)
 
     if File.exists?(bundle_path) do
       File.rm(bundle_path)
@@ -207,122 +285,81 @@ defmodule Electric.Migrations do
     File.write!(bundle_path, result)
   end
 
-  defp ordered_migrations(src_folder) do
-    sql_file_paths = Path.join([src_folder, "*", @migration_file_name]) |> Path.wildcard()
-
-    migration_names =
-      for file_path <- sql_file_paths do
-        Path.dirname(file_path) |> Path.basename()
-      end
-
-    for migration_name <- Enum.sort(migration_names) do
-      migration = %Electric.Migration{name: migration_name, src_folder: src_folder}
-
-      case Electric.Migration.get_original_metadata(migration) do
-        {:error, _} -> migration
-        metadata -> %{migration | title: metadata["title"]}
-      end
-    end
-  end
-
-  defp create_bundle(src_folder, body_style) do
-    migrations = all_migrations_as_maps(src_folder, body_style)
-    Jason.encode!(%{"migrations" => migrations}) |> Jason.Formatter.pretty_print()
-  end
-
-  defp all_migrations_as_maps(src_folder, body_style) do
-    for migration <- ordered_migrations(src_folder) do
-      Electric.Migration.as_json_map(migration, body_style)
-    end
-  end
-
   defp calc_hash(with_triggers) do
     sha = :crypto.hash(:sha256, with_triggers)
     base16 = Base.encode16(sha)
     String.downcase(base16)
   end
 
-  defp add_triggers_to_migrations(ordered_migrations, template) do
-    read_migrations =
-      for migration <- ordered_migrations do
-        Electric.Migration.ensure_original_body(migration)
+  defp add_original_bodies(manifest, src_folder) do
+    migrations =
+      for migration <- manifest["migrations"] do
+        original_body =
+          Path.join([src_folder, migration["name"], @migration_file_name])
+          |> File.read!()
+
+        Map.put(migration, "original_body", original_body)
       end
 
-    {status, message} =
-      1..length(read_migrations)
-      |> Enum.map(&Enum.take(read_migrations, &1))
-      |> Enum.reduce_while({:ok, []}, fn subset, {_status, messages} ->
-        case add_triggers_to_migration(subset, template) do
-          {:ok, nil} ->
-            {:cont, {:ok, messages}}
+    %{"migrations" => migrations}
+  end
 
-          {:ok, warnings} ->
-            {:cont, {:ok, messages ++ warnings}}
+  defp remove_original_bodies(manifest, src_folder) do
+    migrations =
+      for migration <- manifest["migrations"] do
+        Map.delete(migration, "original_body")
+      end
+
+    %{"migrations" => migrations}
+  end
+
+  defp add_triggers_to_manifest(manifest, src_folder, template) do
+    manifest_with_original = add_original_bodies(manifest, src_folder)
+    migrations_with_original = manifest_with_original["migrations"]
+
+    {status, migrations, messages} =
+      1..length(migrations_with_original)
+      |> Enum.map(&Enum.take(migrations_with_original, &1))
+      |> Enum.reduce_while({:ok, [], []}, fn subset,
+                                             {_status, migrations_with_triggers, messages} ->
+        case add_triggers_to_migration(subset, template) do
+          {:ok, migration, nil} ->
+            {:cont, {:ok, migrations_with_triggers ++ [migration], messages}}
+
+          {:ok, migration, warnings} ->
+            {:cont, {:ok, migrations_with_triggers ++ [migration], messages ++ warnings}}
 
           {:error, errors} ->
-            {:halt, {:error, errors}}
+            {:halt, {:error, [], errors}}
         end
       end)
 
-    if message == "" do
-      {status, "Migrations built"}
-    else
-      {status, message}
-    end
+    {status, %{"migrations" => migrations}, messages}
   end
 
   def strip_comments(sql) do
-    String.replace(sql, ~r/--[^\n]*(?:\z|\n)/, "\n")
-    |> String.replace(~r/\/\*[\s\S]*?(?:\z|\*\/)/, "\n")
+    Electric.Migrations.Lexer.clean_up_sql(sql)
   end
 
   @doc false
   def add_triggers_to_migration(migration_set, template) do
     migration = List.last(migration_set)
+    hash = strip_comments(migration["original_body"]) |> calc_hash()
 
-    hash = strip_comments(migration.original_body) |> calc_hash()
+    if hash == migration["sha256"] do
+      {:ok, migration, []}
+    else
+      case Electric.Migrations.Triggers.add_triggers_to_last_migration(migration_set, template) do
+        {:error, reasons} ->
+          {:error, reasons}
 
-    case Electric.Migrations.Triggers.add_triggers_to_last_migration(migration_set, template) do
-      {:error, reasons} ->
-        {:error, reasons}
+        {satellite_sql, warnings} ->
+          satellite_body = Electric.Migrations.Lexer.get_statements(satellite_sql)
 
-      {with_triggers, warnings} ->
-        migrations =
-          for migration <- migration_set do
-            %{original_body: migration.original_body, name: migration.name}
-          end
-
-        satellite_file_path = Electric.Migration.satellite_file_path(migration)
-
-        warnings =
-          if File.exists?(satellite_file_path) do
-            metadata = Electric.Migration.get_satellite_metadata(migration)
-
-            if metadata["sha256"] != hash do
-              File.rm(satellite_file_path)
-              ["The migration #{migration.name} has been modified." | warnings]
-            else
-              warnings
-            end
-          else
-            warnings
-          end
-
-        if not File.exists?(satellite_file_path) do
-          header =
-            case Electric.Migration.get_original_metadata(migration) do
-              {:error, _reason} ->
-                Electric.Migration.file_header(migration, hash, nil)
-
-              existing_metadata ->
-                Electric.Migration.file_header(migration, hash, existing_metadata["title"])
-            end
-
-          File.write!(satellite_file_path, header <> with_triggers)
-          {:ok, warnings}
-        else
-          {:ok, warnings}
-        end
+          {:ok, Map.merge(migration, %{"satellite_body" => satellite_body, "sha256" => hash}),
+           warnings}
+      end
     end
   end
+
 end

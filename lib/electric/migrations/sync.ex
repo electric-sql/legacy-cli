@@ -5,15 +5,19 @@ defmodule Electric.Migrations.Sync do
 
   alias Electric.Client
 
-  def sync_migrations(db_id, local_bundle) do
-    with {:ok, server_manifest} <- get_migrations_from_server(db_id),
+  def sync_migrations(app_name, environment, local_bundle) do
+    with {:ok, server_manifest} <- get_migrations_from_server(app_name, environment),
          {:ok, new_migrations} <- compare_local_with_server(local_bundle, server_manifest) do
-      upload_new_migrations(db_id, new_migrations)
+      upload_new_migrations(app_name, environment, new_migrations)
     end
   end
 
-  def get_migrations_from_server(db_id) do
-    url = "databases/#{db_id}/migrations"
+  def get_migrations_from_server(app_name, environment, with_satellite \\ false) do
+    url = "app/#{app_name}/env/#{environment}/migrations"
+
+    if with_satellite do
+      url = url <> "?body=satellite"
+    end
 
     case Client.get(url) do
       {:ok, %Req.Response{status: 200, body: data}} ->
@@ -26,6 +30,40 @@ defmodule Electric.Migrations.Sync do
         {:error, "failed to connect"}
     end
   end
+
+  def get_all_migrations_from_server(app_name) do
+    with {:ok, environments} <- get_environment_names_from_server(app_name) do
+      env_names = environments["environments"]
+      Enum.reduce_while(env_names, {:ok, %{}}, fn env_name, {status, manifests} ->
+        case get_migrations_from_server(app_name, env_name) do
+          {:error, msg} ->
+            {:halt, {:error, msg}}
+          {:ok, manifest} ->
+            {:cont, {:ok, Map.put(manifests, env_name, manifest)}}
+        end
+      end)
+    end
+  end
+
+
+  def get_environment_names_from_server(app_name) do
+
+    url = "app/#{app_name}/envs"
+
+    case Client.get(url) do
+      {:ok, %Req.Response{status: 200, body: data}} ->
+        {:ok, Jason.decode!(data)}
+
+      {:ok, _} ->
+        {:error, "invalid credentials"}
+
+      {:error, _exception} ->
+        {:error, "failed to connect"}
+    end
+
+
+  end
+
 
   def compare_local_with_server(local_bundle, server_manifest) do
     local_migration_lookup = migration_lookup(local_bundle)
@@ -66,15 +104,37 @@ defmodule Electric.Migrations.Sync do
     for migration <- bundle["migrations"], into: %{}, do: {migration["name"], migration}
   end
 
-  def upload_new_migrations(db_id, new_migrations) do
-    url = "databases/#{db_id}/migrations"
-    payload = Jason.encode!(%{"migrations" => new_migrations}) |> Jason.Formatter.pretty_print()
+  def upload_new_migrations(app_name, environment, new_migrations) do
+    migrations = new_migrations["migrations"]
 
-    case Client.put(url, payload) do
-      {:ok, %Req.Response{status: 200}} ->
-        {:ok, "Synchronized #{length(new_migrations["migrations"])} new migrations successfully"}
+    Enum.reduce_while(
+      migrations,
+      {:ok, "Synchronized #{length(migrations)} new migrations successfully"},
+      fn migration, status ->
+        case upload_new_migration(app_name, environment, migration) do
+          {:ok, msg} ->
+            {:cont, status}
 
-      {:ok, _} ->
+          {:error, msg} ->
+            {:halt, {:error, msg}}
+        end
+      end
+    )
+  end
+
+  def upload_new_migration(app_name, environment, migration) do
+    #    url = "app/#{app_name}/env/#{environment}/migrations/#{migration["name"]}"
+    url = "app/#{app_name}/env/#{environment}/migrations"
+    payload = Jason.encode!(%{"migration" => migration}) |> Jason.Formatter.pretty_print()
+
+    case Client.post(url, payload) do
+      {:ok, %Req.Response{status: 201}} ->
+        {:ok, "ok"}
+
+      {:ok, %Req.Response{status: 422}} ->
+        {:error, "malformed request"}
+
+      {:ok, rsp} ->
         {:error, "invalid credentials"}
 
       {:error, _exception} ->

@@ -30,10 +30,10 @@ defmodule Electric.Commands.Migrations do
     ]
   ]
 
-  @database_id [
-    database_id: [
-      value_name: "DATABASE_ID",
-      help: "Database ID (e.g.: from `electric databases list`)",
+  @app [
+    app: [
+      value_name: "APP_SLUG",
+      help: "Globally unique slug generated when you create an application",
       required: true,
       parser: :string
     ]
@@ -112,7 +112,7 @@ defmodule Electric.Commands.Migrations do
           so they're applied to your cloud Postgres and propagated out to
           your live client applications.
           """,
-          args: @database_id,
+          args: @app,
           options: @dir,
           flags: default_flags()
         ]
@@ -174,7 +174,7 @@ defmodule Electric.Commands.Migrations do
         {:success, "Migrations build successfully"}
 
       {:ok, warnings} ->
-        IO.inspect(warnings)
+        #        IO.inspect(warnings)
         {:success, format_messages("warnings", warnings)}
 
       {:error, errors} ->
@@ -182,13 +182,13 @@ defmodule Electric.Commands.Migrations do
     end
   end
 
-  def sync(%{args: %{database_id: database_id}, options: options}) do
-    case Electric.Migrations.sync_migrations(database_id, options) do
+  def sync(%{args: %{app: app_name, env: environment}, options: options}) do
+    case Electric.Migrations.sync_migrations(app_name, environment, options) do
       {:ok, nil} ->
         {:success, "Migrations synchronized with server successfully"}
 
       {:ok, warnings} ->
-        IO.inspect(warnings)
+        #        IO.inspect(warnings)
         {:success, format_messages("warnings", warnings)}
 
       {:error, errors} ->

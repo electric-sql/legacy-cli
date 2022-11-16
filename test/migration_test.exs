@@ -5,19 +5,6 @@ defmodule MigrationsTest do
                       "<%= original_sql %><%= for {table_full_name, _table} <- tables do %>--ADD A TRIGGER FOR <%= table_full_name %>;<% end %>\n"
                     )
 
-  describe "Migration validation" do
-    test "tests valid SQL passes" do
-      sql = """
-      CREATE TABLE IF NOT EXISTS fish (
-      value TEXT PRIMARY KEY
-      ) STRICT, WITHOUT ROWID;
-      """
-
-      migration = %Electric.Migration{name: "test1", original_body: sql}
-
-      assert Electric.Migration.ensure_original_body(migration).error == nil
-    end
-  end
 
   describe "adds_triggers to sql" do
     test "add a trigger" do
@@ -36,7 +23,7 @@ defmodule MigrationsTest do
          """, nil}
 
       assert Electric.Migrations.Triggers.add_triggers_to_last_migration(
-               [%Electric.Migration{name: "test1", original_body: sql}],
+               [%{"name" => "test1", "original_body" => sql}],
                @trigger_template
              ) ==
                expected
@@ -53,7 +40,7 @@ defmodule MigrationsTest do
 
       {sql, _warning} =
         Electric.Migrations.Triggers.add_triggers_to_last_migration(
-          [%Electric.Migration{name: "test1", original_body: sql}],
+          [%{"name" => "test1", "original_body" => sql}],
           Electric.Migrations.get_template()
         )
 
@@ -269,7 +256,7 @@ defmodule MigrationsTest do
 
       {sql, _warning} =
         Electric.Migrations.Triggers.add_triggers_to_last_migration(
-          [%Electric.Migration{name: "test1", original_body: sql}],
+          [%{"name" => "test1", "original_body" => sql}],
           Electric.Migrations.get_template()
         )
 
@@ -321,7 +308,7 @@ defmodule MigrationsTest do
 
       {sql, _warning} =
         Electric.Migrations.Triggers.add_triggers_to_last_migration(
-          [%Electric.Migration{name: "test1", original_body: sql}],
+          [%{"name" => "test1", "original_body" => sql}],
           Electric.Migrations.get_template()
         )
 
@@ -354,13 +341,13 @@ defmodule MigrationsTest do
 
       {sql, _warning} =
         Electric.Migrations.Triggers.add_triggers_to_last_migration(
-          [%Electric.Migration{name: "test1", original_body: sql}],
+          [%{"name" => "test1", "original_body" => sql}],
           Electric.Migrations.get_template()
         )
 
       #      IO.puts(sql)
 
-      commands = Electric.Migration.split_body_into_commands(sql)
+      commands = Electric.Migrations.Lexer.get_statements(sql)
 
       {:ok, conn} = Exqlite.Sqlite3.open(":memory:")
 
@@ -419,25 +406,20 @@ defmodule MigrationsTest do
       stripped = Electric.Migrations.strip_comments(sql)
 
       expected = """
-
       CREATE TABLE IF NOT EXISTS fish (
       value TEXT PRIMARY KEY,
       colour TEXT
       ) STRICT, WITHOUT ROWID;
-
 
       CREATE TABLE IF NOT EXISTS cat (
       value TEXT PRIMARY KEY,
       colour TEXT
       ) STRICT, WITHOUT ROWID;
 
-
-
       CREATE TABLE IF NOT EXISTS dog (
       value TEXT PRIMARY KEY,
       colour TEXT
       ) STRICT, WITHOUT ROWID;
-
       """
 
       assert stripped == expected
@@ -473,28 +455,32 @@ defmodule MigrationsTest do
       stripped = Electric.Migrations.strip_comments(sql)
 
       expected = """
-
       CREATE TABLE IF NOT EXISTS fish (
       value TEXT PRIMARY KEY,
       colour TEXT
       ) STRICT, WITHOUT ROWID;
-
 
       CREATE TABLE IF NOT EXISTS cat (
       value TEXT PRIMARY KEY,
       colour TEXT
       ) STRICT, WITHOUT ROWID;
 
-
-
       CREATE TABLE IF NOT EXISTS dog (
       value TEXT PRIMARY KEY,
       colour TEXT
       ) STRICT, WITHOUT ROWID;
-
       """
 
       assert stripped == expected
+    end
+
+     test "tests stripping single line comments" do
+        str1 = "-- Somewhere to keep our metadata\nCREATE TABLE IF NOT EXISTS _electric_meta (\n  key TEXT PRIMARY KEY,\n  value BLOB\n);"
+        str2 = "\n\n/*---------------------------------------------\nBelow are templated triggers added by Satellite\n---------------------------------------------*/\n\n-- The ops log table\nCREATE TABLE IF NOT EXISTS _electric_oplog (\n  rowid INTEGER PRIMARY KEY AUTOINCREMENT,\n  namespace String NOT NULL,\n  tablename String NOT NULL,\n  optype String NOT NULL,\n  primaryKey String NOT NULL,\n  newRow String,\n  oldRow String,\n  timestamp TEXT\n);\n"
+        stripped_1 = Electric.Migrations.strip_comments(str1)
+        assert stripped_1 == "\CREATE TABLE IF NOT EXISTS _electric_meta (\n  key TEXT PRIMARY KEY,\n  value BLOB\n);\n"
+        stripped_2 = Electric.Migrations.strip_comments(str2)
+        assert stripped_2 == "CREATE TABLE IF NOT EXISTS _electric_oplog (\n  rowid INTEGER PRIMARY KEY AUTOINCREMENT,\n  namespace String NOT NULL,\n  tablename String NOT NULL,\n  optype String NOT NULL,\n  primaryKey String NOT NULL,\n  newRow String,\n  oldRow String,\n  timestamp TEXT\n);\n"
     end
 
     test "sluggifying title" do
@@ -529,7 +515,7 @@ defmodule MigrationsTest do
 
       {sql, _warning} =
         Electric.Migrations.Triggers.add_triggers_to_last_migration(
-          [%Electric.Migration{name: "test1", original_body: sql}],
+          [%{"name" => "test1", "original_body" => sql}],
           Electric.Migrations.get_template()
         )
 
@@ -556,6 +542,7 @@ defmodule MigrationsTest do
       assert oldRow == nil
     end
 
+
     test "tests trigger has all columns for multiple migrations" do
       sql1 = """
       CREATE TABLE IF NOT EXISTS fish (
@@ -570,12 +557,12 @@ defmodule MigrationsTest do
 
       {sql_out1, _warning} =
         Electric.Migrations.Triggers.add_triggers_to_last_migration(
-          [%Electric.Migration{name: "test1", original_body: sql1}],
+          [%{"name" => "test1", "original_body" => sql1}],
           Electric.Migrations.get_template()
         )
 
-      migration_1 = %Electric.Migration{name: "test1", original_body: sql1}
-      migration_2 = %Electric.Migration{name: "test2", original_body: sql2}
+      migration_1 = %{"name" => "test1", "original_body" => sql1}
+      migration_2 = %{"name" => "test2", "original_body" => sql2}
 
       {sql_out2, _warning} =
         Electric.Migrations.Triggers.add_triggers_to_last_migration(
@@ -655,7 +642,37 @@ defmodule MigrationsFileTest do
       assert File.exists?(migrations_path)
     end
 
-    test "init and then modify and then build" do
+    test "tests init adds migration to manifest" do
+      temp = temp_folder()
+      migrations_folder = Path.join([temp, "migrations"])
+      {:ok, _msg} = Electric.Migrations.init_migrations(%{:dir => temp})
+      assert File.exists?(migrations_folder)
+
+      init_migration_name =
+        most_recent_migration_file(migrations_folder)
+        |> Path.dirname()
+        |> Path.basename()
+
+      manifest_path = Path.join([migrations_folder, "manifest.json"])
+      assert File.exists?(manifest_path)
+      manifest = Jason.decode!(File.read!(manifest_path))
+
+      expected = %{
+        "migrations" => [
+          %{
+            "name" => init_migration_name,
+            "sha256" => "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+            "title" => "init",
+            "encoding" => "escaped",
+            "satellite_body" => []
+          }
+        ]
+      }
+
+      assert manifest == expected
+    end
+
+    test "init and then modify and then build updates manifest" do
       temp = temp_folder()
       migrations_path = Path.join([temp, "migrations"])
       {:ok, _msg} = Electric.Migrations.init_migrations(%{:dir => temp})
@@ -675,7 +692,129 @@ defmodule MigrationsFileTest do
 
       {:ok, _msg} = Electric.Migrations.build_migrations(%{}, %{:dir => migrations_path})
 
-      assert File.exists?(Path.join([migration_folder, "satellite.sql"]))
+      init_migration_name = Path.basename(migration_folder)
+
+      manifest_path = Path.join([migrations_path, "manifest.json"])
+      assert File.exists?(manifest_path)
+      manifest = Jason.decode!(File.read!(manifest_path))
+      sha = List.first(manifest["migrations"])["sha256"]
+
+      expected = %{
+        "migrations" => [
+          %{
+            "encoding" => "escaped",
+            "name" => init_migration_name,
+            "satellite_body" => [
+              "CREATE TABLE IF NOT EXISTS items (\n  value TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;",
+              "CREATE TABLE IF NOT EXISTS _electric_oplog (\n  rowid INTEGER PRIMARY KEY AUTOINCREMENT,\n  namespace String NOT NULL,\n  tablename String NOT NULL,\n  optype String NOT NULL,\n  primaryKey String NOT NULL,\n  newRow String,\n  oldRow String,\n  timestamp TEXT\n);",
+              "CREATE TABLE IF NOT EXISTS _electric_meta (\n  key TEXT PRIMARY KEY,\n  value BLOB\n);",
+              "CREATE TABLE IF NOT EXISTS _electric_migrations (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  name TEXT NOT NULL UNIQUE,\n  sha256 TEXT NOT NULL,\n  applied_at TEXT NOT NULL\n);",
+              "INSERT INTO _electric_meta (key, value) VALUES ('compensations', 0), ('lastAckdRowId','0'), ('lastSentRowId', '0'), ('lsn', 'MA=='), ('clientId', '');",
+              "DROP TABLE IF EXISTS _electric_trigger_settings;",
+              "CREATE TABLE _electric_trigger_settings(tablename STRING PRIMARY KEY, flag INTEGER);",
+              "INSERT INTO _electric_trigger_settings(tablename,flag) VALUES ('main.items', 1);",
+              "DROP TRIGGER IF EXISTS update_ensure_main_items_primarykey;",
+              "CREATE TRIGGER update_ensure_main_items_primarykey\n   BEFORE UPDATE ON main.items\nBEGIN\n  SELECT\n    CASE\n      WHEN old.value != new.value THEN\n        RAISE (ABORT,'cannot change the value of column value as it belongs to the primary key')\n    END;\nEND;",
+              "DROP TRIGGER IF EXISTS insert_main_items_into_oplog;",
+              "CREATE TRIGGER insert_main_items_into_oplog\n   AFTER INSERT ON main.items\n   WHEN 1 == (SELECT flag from _electric_trigger_settings WHERE tablename == 'main.items')\nBEGIN\n  INSERT INTO _electric_oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)\n  VALUES ('main', 'items', 'INSERT', json_object('value', new.value), json_object('value', new.value), NULL, NULL);\nEND;",
+              "DROP TRIGGER IF EXISTS update_main_items_into_oplog;",
+              "CREATE TRIGGER update_main_items_into_oplog\n   AFTER UPDATE ON main.items\n   WHEN 1 == (SELECT flag from _electric_trigger_settings WHERE tablename == 'main.items')\nBEGIN\n  INSERT INTO _electric_oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)\n  VALUES ('main', 'items', 'UPDATE', json_object('value', new.value), json_object('value', new.value), json_object('value', old.value), NULL);\nEND;",
+              "DROP TRIGGER IF EXISTS delete_main_items_into_oplog;",
+              "CREATE TRIGGER delete_main_items_into_oplog\n   AFTER DELETE ON main.items\n   WHEN 1 == (SELECT flag from _electric_trigger_settings WHERE tablename == 'main.items')\nBEGIN\n  INSERT INTO _electric_oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)\n  VALUES ('main', 'items', 'DELETE', json_object('value', old.value), NULL, json_object('value', old.value), NULL);\nEND;"
+            ],
+            "sha256" => sha,
+            "title" => "init"
+          }
+        ]
+      }
+
+
+      assert manifest == expected
+    end
+
+    test "init and then modify and then build creates index.js" do
+      temp = temp_folder()
+      migrations_path = Path.join([temp, "migrations"])
+      {:ok, _msg} = Electric.Migrations.init_migrations(%{:dir => temp})
+      assert File.exists?(migrations_path)
+
+      sql_file_paths = Path.join([migrations_path, "*", "migration.sql"]) |> Path.wildcard()
+      my_new_migration = List.first(sql_file_paths)
+      migration_folder = Path.dirname(my_new_migration)
+
+      new_content = """
+      CREATE TABLE IF NOT EXISTS items (
+        value TEXT PRIMARY KEY
+      ) STRICT, WITHOUT ROWID;
+      """
+
+      File.write!(my_new_migration, new_content, [:append])
+
+      {:ok, _msg} = Electric.Migrations.build_migrations(%{}, %{:dir => migrations_path})
+
+      init_migration_name = Path.basename(migration_folder)
+
+      js_path = Path.join([migrations_path, "build", "local", "index.js"])
+      assert File.exists?(js_path)
+
+      local_js = File.read!(js_path)
+
+      expected = """
+      export const data = {
+        "migrations": [
+          {
+            "encoding": "escaped",
+            "name": "#{init_migration_name}",
+            "satellite_body": [
+              "CREATE TABLE IF NOT EXISTS items (\\n  value TEXT PRIMARY KEY\\n) STRICT, WITHOUT ROWID;",
+              "CREATE TABLE IF NOT EXISTS _electric_oplog (\\n  rowid INTEGER PRIMARY KEY AUTOINCREMENT,\\n  namespace String NOT NULL,\\n  tablename String NOT NULL,\\n  optype String NOT NULL,\\n  primaryKey String NOT NULL,\\n  newRow String,\\n  oldRow String,\\n  timestamp TEXT\\n);",
+              "CREATE TABLE IF NOT EXISTS _electric_meta (\\n  key TEXT PRIMARY KEY,\\n  value BLOB\\n);",
+              "CREATE TABLE IF NOT EXISTS _electric_migrations (\\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\\n  name TEXT NOT NULL UNIQUE,\\n  sha256 TEXT NOT NULL,\\n  applied_at TEXT NOT NULL\\n);",
+              "INSERT INTO _electric_meta (key, value) VALUES ('compensations', 0), ('lastAckdRowId','0'), ('lastSentRowId', '0'), ('lsn', 'MA=='), ('clientId', '');",
+              "DROP TABLE IF EXISTS _electric_trigger_settings;",
+              "CREATE TABLE _electric_trigger_settings(tablename STRING PRIMARY KEY, flag INTEGER);",
+              "INSERT INTO _electric_trigger_settings(tablename,flag) VALUES ('main.items', 1);",
+              "DROP TRIGGER IF EXISTS update_ensure_main_items_primarykey;",
+              "CREATE TRIGGER update_ensure_main_items_primarykey\\n   BEFORE UPDATE ON main.items\\nBEGIN\\n  SELECT\\n    CASE\\n      WHEN old.value != new.value THEN\\n        RAISE (ABORT,'cannot change the value of column value as it belongs to the primary key')\\n    END;\\nEND;",
+              "DROP TRIGGER IF EXISTS insert_main_items_into_oplog;",
+              "CREATE TRIGGER insert_main_items_into_oplog\\n   AFTER INSERT ON main.items\\n   WHEN 1 == (SELECT flag from _electric_trigger_settings WHERE tablename == 'main.items')\\nBEGIN\\n  INSERT INTO _electric_oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)\\n  VALUES ('main', 'items', 'INSERT', json_object('value', new.value), json_object('value', new.value), NULL, NULL);\\nEND;",
+              "DROP TRIGGER IF EXISTS update_main_items_into_oplog;",
+              "CREATE TRIGGER update_main_items_into_oplog\\n   AFTER UPDATE ON main.items\\n   WHEN 1 == (SELECT flag from _electric_trigger_settings WHERE tablename == 'main.items')\\nBEGIN\\n  INSERT INTO _electric_oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)\\n  VALUES ('main', 'items', 'UPDATE', json_object('value', new.value), json_object('value', new.value), json_object('value', old.value), NULL);\\nEND;",
+              "DROP TRIGGER IF EXISTS delete_main_items_into_oplog;",
+              "CREATE TRIGGER delete_main_items_into_oplog\\n   AFTER DELETE ON main.items\\n   WHEN 1 == (SELECT flag from _electric_trigger_settings WHERE tablename == 'main.items')\\nBEGIN\\n  INSERT INTO _electric_oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)\\n  VALUES ('main', 'items', 'DELETE', json_object('value', old.value), NULL, json_object('value', old.value), NULL);\\nEND;"
+            ],
+            "sha256": "2a97d825e41ae70705381016921c55a3b086a813649e4da8fcba040710055747",
+            "title": "init"
+          }
+        ]
+      }
+      """
+      assert local_js == expected
+    end
+
+    def change_migrations_name(src_folder, from_name, to_name) do
+
+      from_dir = Path.join([src_folder, from_name])
+      to_dir = Path.join([src_folder, to_name])
+      File.rename!(from_dir, to_dir)
+
+      manifest_path = Path.join([src_folder, "manifest.json"])
+      manifest = Jason.decode!(File.read!(manifest_path))
+
+      migrations = manifest["migrations"]
+
+
+      updated_migrations = for migration <- migrations do
+        if migration["name"] == from_name do
+          Map.put(migration, "name", to_name)
+        else
+          migration
+        end
+      end
+
+      updated = %{"migrations" => updated_migrations}
+
+      File.write!(manifest_path,  Jason.encode!(updated) |> Jason.Formatter.pretty_print())
     end
 
     def init_and_add_migration(temp) do
@@ -703,6 +842,8 @@ defmodule MigrationsFileTest do
 
       second_migration = most_recent_migration_file(migrations_path)
       File.write!(second_migration, cats_content, [:append])
+
+      [my_new_migration, second_migration]
     end
 
     def most_recent_migration_file(migrations_path) do
@@ -712,47 +853,78 @@ defmodule MigrationsFileTest do
     test "init and then modify and then add and then build" do
       temp = temp_folder()
       migrations_path = Path.join([temp, "migrations"])
-      init_and_add_migration(temp)
-      second_migration_folder = Path.dirname(most_recent_migration_file(migrations_path))
+
+      [first_migration, second_migration] = init_and_add_migration(temp)
+
+      first_migration_name = Path.dirname(first_migration) |> Path.basename()
+      second_migration_name = Path.dirname(second_migration) |> Path.basename()
 
       {:ok, _msg} = Electric.Migrations.build_migrations(%{}, %{:dir => migrations_path})
 
-      assert File.exists?(Path.join([second_migration_folder, "satellite.sql"]))
-    end
+      manifest_path = Path.join([migrations_path, "manifest.json"])
+      assert File.exists?(manifest_path)
+      manifest = Jason.decode!(File.read!(manifest_path))
+      sha = List.first(manifest["migrations"])["sha256"]
 
-    test "test can build with manifest" do
-      temp = temp_folder()
-      migrations_path = Path.join([temp, "migrations"])
-      init_and_add_migration(temp)
+      expected = %{
+        "migrations" => [
+          %{
+            "encoding" => "escaped",
+            "name" => first_migration_name,
+            "satellite_body" => [
+              "CREATE TABLE IF NOT EXISTS items (\n  value TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;",
+              "CREATE TABLE IF NOT EXISTS _electric_oplog (\n  rowid INTEGER PRIMARY KEY AUTOINCREMENT,\n  namespace String NOT NULL,\n  tablename String NOT NULL,\n  optype String NOT NULL,\n  primaryKey String NOT NULL,\n  newRow String,\n  oldRow String,\n  timestamp TEXT\n);",
+              "CREATE TABLE IF NOT EXISTS _electric_meta (\n  key TEXT PRIMARY KEY,\n  value BLOB\n);",
+              "CREATE TABLE IF NOT EXISTS _electric_migrations (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  name TEXT NOT NULL UNIQUE,\n  sha256 TEXT NOT NULL,\n  applied_at TEXT NOT NULL\n);",
+              "INSERT INTO _electric_meta (key, value) VALUES ('compensations', 0), ('lastAckdRowId','0'), ('lastSentRowId', '0'), ('lsn', 'MA=='), ('clientId', '');",
+              "DROP TABLE IF EXISTS _electric_trigger_settings;",
+              "CREATE TABLE _electric_trigger_settings(tablename STRING PRIMARY KEY, flag INTEGER);",
+              "INSERT INTO _electric_trigger_settings(tablename,flag) VALUES ('main.items', 1);",
+              "DROP TRIGGER IF EXISTS update_ensure_main_items_primarykey;",
+              "CREATE TRIGGER update_ensure_main_items_primarykey\n   BEFORE UPDATE ON main.items\nBEGIN\n  SELECT\n    CASE\n      WHEN old.value != new.value THEN\n        RAISE (ABORT,'cannot change the value of column value as it belongs to the primary key')\n    END;\nEND;",
+              "DROP TRIGGER IF EXISTS insert_main_items_into_oplog;",
+              "CREATE TRIGGER insert_main_items_into_oplog\n   AFTER INSERT ON main.items\n   WHEN 1 == (SELECT flag from _electric_trigger_settings WHERE tablename == 'main.items')\nBEGIN\n  INSERT INTO _electric_oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)\n  VALUES ('main', 'items', 'INSERT', json_object('value', new.value), json_object('value', new.value), NULL, NULL);\nEND;",
+              "DROP TRIGGER IF EXISTS update_main_items_into_oplog;",
+              "CREATE TRIGGER update_main_items_into_oplog\n   AFTER UPDATE ON main.items\n   WHEN 1 == (SELECT flag from _electric_trigger_settings WHERE tablename == 'main.items')\nBEGIN\n  INSERT INTO _electric_oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)\n  VALUES ('main', 'items', 'UPDATE', json_object('value', new.value), json_object('value', new.value), json_object('value', old.value), NULL);\nEND;",
+              "DROP TRIGGER IF EXISTS delete_main_items_into_oplog;",
+              "CREATE TRIGGER delete_main_items_into_oplog\n   AFTER DELETE ON main.items\n   WHEN 1 == (SELECT flag from _electric_trigger_settings WHERE tablename == 'main.items')\nBEGIN\n  INSERT INTO _electric_oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)\n  VALUES ('main', 'items', 'DELETE', json_object('value', old.value), NULL, json_object('value', old.value), NULL);\nEND;"
+            ],
+            "sha256" => "2a97d825e41ae70705381016921c55a3b086a813649e4da8fcba040710055747",
+            "title" => "init"
+          },
+          %{
+            "encoding" => "escaped",
+            "name" => second_migration_name,
+            "satellite_body" => [
+              "CREATE TABLE IF NOT EXISTS cats (\n  value TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;",
+              "DROP TABLE IF EXISTS _electric_trigger_settings;",
+              "CREATE TABLE _electric_trigger_settings(tablename STRING PRIMARY KEY, flag INTEGER);",
+              "INSERT INTO _electric_trigger_settings(tablename,flag) VALUES ('main.cats', 1);",
+              "INSERT INTO _electric_trigger_settings(tablename,flag) VALUES ('main.items', 1);",
+              "DROP TRIGGER IF EXISTS update_ensure_main_cats_primarykey;",
+              "CREATE TRIGGER update_ensure_main_cats_primarykey\n   BEFORE UPDATE ON main.cats\nBEGIN\n  SELECT\n    CASE\n      WHEN old.value != new.value THEN\n        RAISE (ABORT,'cannot change the value of column value as it belongs to the primary key')\n    END;\nEND;",
+              "DROP TRIGGER IF EXISTS insert_main_cats_into_oplog;",
+              "CREATE TRIGGER insert_main_cats_into_oplog\n   AFTER INSERT ON main.cats\n   WHEN 1 == (SELECT flag from _electric_trigger_settings WHERE tablename == 'main.cats')\nBEGIN\n  INSERT INTO _electric_oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)\n  VALUES ('main', 'cats', 'INSERT', json_object('value', new.value), json_object('value', new.value), NULL, NULL);\nEND;",
+              "DROP TRIGGER IF EXISTS update_main_cats_into_oplog;",
+              "CREATE TRIGGER update_main_cats_into_oplog\n   AFTER UPDATE ON main.cats\n   WHEN 1 == (SELECT flag from _electric_trigger_settings WHERE tablename == 'main.cats')\nBEGIN\n  INSERT INTO _electric_oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)\n  VALUES ('main', 'cats', 'UPDATE', json_object('value', new.value), json_object('value', new.value), json_object('value', old.value), NULL);\nEND;",
+              "DROP TRIGGER IF EXISTS delete_main_cats_into_oplog;",
+              "CREATE TRIGGER delete_main_cats_into_oplog\n   AFTER DELETE ON main.cats\n   WHEN 1 == (SELECT flag from _electric_trigger_settings WHERE tablename == 'main.cats')\nBEGIN\n  INSERT INTO _electric_oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)\n  VALUES ('main', 'cats', 'DELETE', json_object('value', old.value), NULL, json_object('value', old.value), NULL);\nEND;",
+              "DROP TRIGGER IF EXISTS update_ensure_main_items_primarykey;",
+              "CREATE TRIGGER update_ensure_main_items_primarykey\n   BEFORE UPDATE ON main.items\nBEGIN\n  SELECT\n    CASE\n      WHEN old.value != new.value THEN\n        RAISE (ABORT,'cannot change the value of column value as it belongs to the primary key')\n    END;\nEND;",
+              "DROP TRIGGER IF EXISTS insert_main_items_into_oplog;",
+              "CREATE TRIGGER insert_main_items_into_oplog\n   AFTER INSERT ON main.items\n   WHEN 1 == (SELECT flag from _electric_trigger_settings WHERE tablename == 'main.items')\nBEGIN\n  INSERT INTO _electric_oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)\n  VALUES ('main', 'items', 'INSERT', json_object('value', new.value), json_object('value', new.value), NULL, NULL);\nEND;",
+              "DROP TRIGGER IF EXISTS update_main_items_into_oplog;",
+              "CREATE TRIGGER update_main_items_into_oplog\n   AFTER UPDATE ON main.items\n   WHEN 1 == (SELECT flag from _electric_trigger_settings WHERE tablename == 'main.items')\nBEGIN\n  INSERT INTO _electric_oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)\n  VALUES ('main', 'items', 'UPDATE', json_object('value', new.value), json_object('value', new.value), json_object('value', old.value), NULL);\nEND;",
+              "DROP TRIGGER IF EXISTS delete_main_items_into_oplog;",
+              "CREATE TRIGGER delete_main_items_into_oplog\n   AFTER DELETE ON main.items\n   WHEN 1 == (SELECT flag from _electric_trigger_settings WHERE tablename == 'main.items')\nBEGIN\n  INSERT INTO _electric_oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)\n  VALUES ('main', 'items', 'DELETE', json_object('value', old.value), NULL, json_object('value', old.value), NULL);\nEND;"
+            ],
+            "sha256" => "d0a52f739f137fc80fd67d9fd347cb4097bd6fb182e583f2c64d8de309393ad6",
+            "title" => "another"
+          }
+        ]
+      }
 
-      {:ok, _msg} =
-        Electric.Migrations.build_migrations(%{:manifest => true}, %{
-          :dir => migrations_path
-        })
-
-      assert File.exists?(Path.join([migrations_path, "manifest.json"]))
-    end
-
-    test "test can build with json bundle" do
-      temp = temp_folder()
-      migrations_path = Path.join([temp, "migrations"])
-      init_and_add_migration(temp)
-
-      {:ok, _msg} =
-        Electric.Migrations.build_migrations(%{:bundle => true}, %{:dir => migrations_path})
-
-      assert File.exists?(Path.join([migrations_path, "index.js"]))
-    end
-
-    test "test can build with js bundle" do
-      temp = temp_folder()
-      migrations_path = Path.join([temp, "migrations"])
-      init_and_add_migration(temp)
-
-      {:ok, _msg} =
-        Electric.Migrations.build_migrations(%{:bundle => true}, %{:dir => migrations_path})
-
-      assert File.exists?(Path.join([migrations_path, "index.js"]))
+      assert manifest == expected
     end
 
     test "test build warning" do
@@ -773,282 +945,107 @@ defmodule MigrationsFileTest do
       File.write!(migration, dogs_content, [:append])
 
       {:ok, msgs} = Electric.Migrations.build_migrations(%{}, %{:dir => migrations_path})
-      [_, msg2, msg3] = msgs
+      [msg2, msg3] = msgs
 
       assert [msg2, msg3] == [
                "The table dogs is not WITHOUT ROWID.",
                "The table dogs is not STRICT."
              ]
     end
-  end
 
-  describe "adds_triggers to sql files" do
-    test "add a trigger to a sql file" do
-      path = "test/support/migration.sql"
-
-      ts = System.os_time(:second)
-
-      migration_name =
-        Electric.Migrations.slugify_title("first_migration", DateTime.from_unix!(ts))
-
+    test "test can sync" do
       temp = temp_folder()
+      migrations_path = Path.join([temp, "migrations"])
 
-      migration_folder = Path.join([temp, "migrations", migration_name])
-      migration_file_path = "#{migration_folder}/migration.sql"
-      File.mkdir_p!(migration_folder)
-      File.copy(path, migration_file_path)
+      [first_migration, second_migration] = init_and_add_migration(temp)
 
-      dst_file_path = Path.join([migration_folder, "satellite.sql"])
+      first_migration_name = Path.dirname(first_migration) |> Path.basename()
+      second_migration_name = Path.dirname(second_migration) |> Path.basename()
+      change_migrations_name(migrations_path, first_migration_name, "first_migration_name")
+      change_migrations_name(migrations_path, second_migration_name, "second_migration_name")
 
-      {:ok, migration} = File.read(migration_file_path)
+      {:ok, _msg} = Electric.Migrations.sync_migrations("test", "default", %{:dir => migrations_path})
 
-      m = %Electric.Migration{
-        name: migration_name,
-        original_body: migration,
-        src_folder: Path.join([temp, "migrations"])
-      }
+      js_path = Path.join([migrations_path, "build", "default", "index.js"])
+      assert File.exists?(js_path)
 
-      Electric.Migrations.add_triggers_to_migration(
-        [m],
-        @trigger_template
-      )
+      default_js = File.read!(js_path)
 
       expected = """
-      /*
-      ElectricDB Migration
-      {"metadata": {"name": "#{migration_name}", "sha256": "211b1e2b203d1fcac6ccb526d2775ec1f5575d4018ab1a33272948ce0ae76775"}}
-      */
-      CREATE TABLE IF NOT EXISTS items (
-        value TEXT PRIMARY KEY
-      ) STRICT, WITHOUT ROWID;
-      --ADD A TRIGGER FOR main.items;
-      """
-
-      modified = File.read!(dst_file_path)
-      assert modified == expected
+export const data = {
+  "migrations": [
+    {
+      "encoding": "escaped",
+      "name": "first_migration_name",
+      "satellite_body": [
+        "something random"
+      ],
+      "sha256": "2a97d825e41ae70705381016921c55a3b086a813649e4da8fcba040710055747",
+      "title": "init"
+    },
+    {
+      "encoding": "escaped",
+      "name": "second_migration_name",
+      "satellite_body": [
+        "other stuff"
+      ],
+      "sha256": "d0a52f739f137fc80fd67d9fd347cb4097bd6fb182e583f2c64d8de309393ad6",
+      "title": "another"
+    }
+  ]
+}
+"""
+      assert default_js == expected
     end
 
-    test "add a trigger to all sql files in a folder" do
-      path = "test/support/migration.sql"
 
-      ts = System.os_time(:second)
-
-      migration_name =
-        Electric.Migrations.slugify_title("first_migration", DateTime.from_unix!(ts))
-
+    test "test sync fails if different sha" do
       temp = temp_folder()
-      migrations_folder = Path.join([temp, "migrations"])
-      migration_folder = Path.join([migrations_folder, migration_name])
-      migration_file_path = "#{migration_folder}/migration.sql"
-      File.mkdir_p!(migration_folder)
-      File.copy(path, migration_file_path)
+      migrations_path = Path.join([temp, "migrations"])
 
-      dst_file_path = Path.join([migration_folder, "satellite.sql"])
+      [first_migration, second_migration] = init_and_add_migration(temp)
 
-      Electric.Migrations.build_migrations(
-        %{},
-        %{
-          :dir => migrations_folder,
-          :template => @trigger_template
-        }
-      )
-
-      expected = """
-      /*
-      ElectricDB Migration
-      {"metadata": {"name": "#{migration_name}", "sha256": "211b1e2b203d1fcac6ccb526d2775ec1f5575d4018ab1a33272948ce0ae76775"}}
-      */
-      CREATE TABLE IF NOT EXISTS items (
-        value TEXT PRIMARY KEY
-      ) STRICT, WITHOUT ROWID;
-      --ADD A TRIGGER FOR main.items;
-      """
-
-      modified = File.read!(dst_file_path)
-      #      IO.puts modified
-      assert modified == expected
+      first_migration_name = Path.dirname(first_migration) |> Path.basename()
+      second_migration_name = Path.dirname(second_migration) |> Path.basename()
+      change_migrations_name(migrations_path, first_migration_name, "first_migration_name")
+      change_migrations_name(migrations_path, second_migration_name, "second_migration_name")
+      {:error, msg} = Electric.Migrations.sync_migrations("test2", "default", %{:dir => migrations_path})
+      assert msg == "The migration second_migration_name has been changed locally"
     end
 
-    test "creates a manifest" do
-      path = "test/support/migration.sql"
-      path_2 = "test/support/migration2.sql"
 
-      ts = System.os_time(:second)
-      ts2 = ts + 100
-
-      migration_name =
-        Electric.Migrations.slugify_title("first_migration", DateTime.from_unix!(ts))
-
-      migration_name_2 =
-        Electric.Migrations.slugify_title("second_migration", DateTime.from_unix!(ts))
-
+    test "test list" do
       temp = temp_folder()
-      migrations_folder = Path.join([temp, "migrations"])
+      migrations_path = Path.join([temp, "migrations"])
 
-      migration_folder = Path.join([migrations_folder, migration_name])
-      migration_folder_2 = Path.join([migrations_folder, migration_name_2])
-      migration_file_path = "#{migration_folder}/migration.sql"
-      migration_file_path_2 = "#{migration_folder_2}/migration.sql"
-      File.mkdir_p!(migration_folder)
-      File.mkdir_p!(migration_folder_2)
-      File.copy(path, migration_file_path)
-      File.copy(path_2, migration_file_path_2)
+      [first_migration, second_migration] = init_and_add_migration(temp)
+      first_migration_name = Path.dirname(first_migration) |> Path.basename()
+      second_migration_name = Path.dirname(second_migration) |> Path.basename()
+      change_migrations_name(migrations_path, first_migration_name, "first_migration_name")
+      change_migrations_name(migrations_path, second_migration_name, "second_migration_name")
 
-      manifest_path = Path.join([migrations_folder, "manifest.json"])
+      {:ok, listing} = Electric.Migrations.list_migrations("test", %{:dir => migrations_path})
 
-      Electric.Migrations.build_migrations(
-        %{},
-        %{
-          :dir => migrations_folder
-        }
-      )
-
-      Electric.Migrations.write_manifest(migrations_folder)
-      manifest = Jason.decode!(File.read!(manifest_path))
-
-      expected = %{
-        "migrations" => [
-          %{
-            "name" => migration_name,
-            "sha256" => "211b1e2b203d1fcac6ccb526d2775ec1f5575d4018ab1a33272948ce0ae76775"
-          },
-          %{
-            "name" => migration_name_2,
-            "sha256" => "acd836d848fc247a80831e1f5be43ff62d9b2a768be2a8315568faaff740230d"
-          }
-        ]
-      }
-
-      assert manifest == expected
+      assert listing == "\n------ Electric SQL Migrations ------\n\nfirst_migration_name\tdefault: \e[32msync\e[0m\t\nsecond_migration_name\tdefault: \e[32msync\e[0m\t\n"
     end
 
-    test "creates a bundle" do
-      path = "test/support/migration.sql"
-      path_2 = "test/support/migration2.sql"
-
-      ts = System.os_time(:second)
-      ts2 = ts + 100
-
-      migration_name =
-        Electric.Migrations.slugify_title("first_migration", DateTime.from_unix!(ts))
-
-      migration_name_2 =
-        Electric.Migrations.slugify_title("second_migration", DateTime.from_unix!(ts))
-
+    test "test lists with error" do
       temp = temp_folder()
-      migrations_folder = Path.join([temp, "migrations"])
+      migrations_path = Path.join([temp, "migrations"])
 
-      migration_folder = Path.join([migrations_folder, migration_name])
-      migration_folder_2 = Path.join([migrations_folder, migration_name_2])
-      migration_file_path = "#{migration_folder}/migration.sql"
-      migration_file_path_2 = "#{migration_folder_2}/migration.sql"
-      File.mkdir_p!(migration_folder)
-      File.mkdir_p!(migration_folder_2)
-      File.copy(path, migration_file_path)
-      File.copy(path_2, migration_file_path_2)
+      [first_migration, second_migration] = init_and_add_migration(temp)
+      first_migration_name = Path.dirname(first_migration) |> Path.basename()
+      second_migration_name = Path.dirname(second_migration) |> Path.basename()
+      change_migrations_name(migrations_path, first_migration_name, "first_migration_name")
+      change_migrations_name(migrations_path, second_migration_name, "second_migration_name")
 
-      File.mkdir_p!(migration_folder)
-      File.mkdir_p!(migration_folder_2)
-      File.copy(path, migration_file_path)
-      File.copy(path_2, migration_file_path_2)
+      {:ok, listing} = Electric.Migrations.list_migrations("test2", %{:dir => migrations_path})
 
-      bundle_path = Path.join([migrations_folder, "manifest.bundle.json"])
-
-      Electric.Migrations.build_migrations(
-        %{},
-        %{
-          :dir => migrations_folder,
-          :template => @trigger_template
-        }
-      )
-
-      Electric.Migrations.write_json_bundle(migrations_folder)
-
-      bundle = Jason.decode!(File.read!(bundle_path))
-      #      IO.inspect(bundle)
-
-      expected = %{
-        "migrations" => [
-          %{
-            "name" => migration_name,
-            "sha256" => "211b1e2b203d1fcac6ccb526d2775ec1f5575d4018ab1a33272948ce0ae76775",
-            "encoding" => "escaped",
-            "original_body" =>
-              "CREATE TABLE IF NOT EXISTS items (\n  value TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;",
-            "satellite_body" => [
-              "CREATE TABLE IF NOT EXISTS items (\n  value TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;",
-              "--ADD A TRIGGER FOR main.items;"
-            ],
-            "title" => nil
-          },
-          %{
-            "name" => migration_name_2,
-            "sha256" => "acd836d848fc247a80831e1f5be43ff62d9b2a768be2a8315568faaff740230d",
-            "encoding" => "escaped",
-            "original_body" =>
-              "CREATE TABLE IF NOT EXISTS cat (\n  value TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;",
-            "satellite_body" => [
-              "CREATE TABLE IF NOT EXISTS cat (\n  value TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;",
-              "--ADD A TRIGGER FOR main.cat;",
-              "--ADD A TRIGGER FOR main.items;"
-            ],
-            "title" => nil
-          }
-        ]
-      }
-
-      assert bundle == expected
+      assert listing == "\n------ Electric SQL Migrations ------\n\nfirst_migration_name\tdefault: \e[32msync\e[0m\t\nsecond_migration_name\tdefault: \e[31mdifferent\e[0m\t\n"
     end
 
-    test "creates a js bundle" do
-      path = "test/support/migration.sql"
-      path_2 = "test/support/migration2.sql"
-
-      ts = System.os_time(:second)
-      ts2 = ts + 100
-
-      migration_name =
-        Electric.Migrations.slugify_title("first_migration", DateTime.from_unix!(ts))
-
-      migration_name_2 =
-        Electric.Migrations.slugify_title("second_migration", DateTime.from_unix!(ts))
-
-      temp = temp_folder()
-      migrations_folder = Path.join([temp, "migrations"])
-
-      migration_folder = Path.join([migrations_folder, migration_name])
-      migration_folder_2 = Path.join([migrations_folder, migration_name_2])
-      migration_file_path = "#{migration_folder}/migration.sql"
-      migration_file_path_2 = "#{migration_folder_2}/migration.sql"
-      File.mkdir_p!(migration_folder)
-      File.mkdir_p!(migration_folder_2)
-      File.copy(path, migration_file_path)
-      File.copy(path_2, migration_file_path_2)
-
-      File.mkdir_p!(migration_folder)
-      File.mkdir_p!(migration_folder_2)
-      File.copy(path, migration_file_path)
-      File.copy(path_2, migration_file_path_2)
-
-      bundle_path = Path.join([migrations_folder, "index.js"])
-
-      _result =
-        Electric.Migrations.build_migrations(
-          %{},
-          %{
-            :dir => migrations_folder,
-            :template => @trigger_template
-          }
-        )
-
-      #      IO.puts("wtf")
-      #      IO.inspect(result)
-      Electric.Migrations.write_js_bundle(migrations_folder)
-
-      #      bundle = File.read!(bundle_path)
-      #      IO.inspect(bundle)
-
-      assert File.exists?(bundle_path)
-    end
   end
+
+
+
 end
