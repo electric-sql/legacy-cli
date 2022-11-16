@@ -34,10 +34,12 @@ defmodule Electric.Migrations.Sync do
   def get_all_migrations_from_server(app_name) do
     with {:ok, environments} <- get_environment_names_from_server(app_name) do
       env_names = environments["environments"]
+
       Enum.reduce_while(env_names, {:ok, %{}}, fn env_name, {status, manifests} ->
         case get_migrations_from_server(app_name, env_name) do
           {:error, msg} ->
             {:halt, {:error, msg}}
+
           {:ok, manifest} ->
             {:cont, {:ok, Map.put(manifests, env_name, manifest)}}
         end
@@ -45,9 +47,7 @@ defmodule Electric.Migrations.Sync do
     end
   end
 
-
   def get_environment_names_from_server(app_name) do
-
     url = "app/#{app_name}/envs"
 
     case Client.get(url) do
@@ -60,10 +60,7 @@ defmodule Electric.Migrations.Sync do
       {:error, _exception} ->
         {:error, "failed to connect"}
     end
-
-
   end
-
 
   def compare_local_with_server(local_bundle, server_manifest) do
     local_migration_lookup = migration_lookup(local_bundle)

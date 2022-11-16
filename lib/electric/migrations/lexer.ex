@@ -21,7 +21,6 @@ defmodule Electric.Migrations.Lexer do
     Enum.join(get_statements(input), "\n\n") <> "\n"
   end
 
-
   defp step(input, index, stack, breaks) do
     {_done, next} = String.split_at(input, index)
 
@@ -65,6 +64,4 @@ defmodule Electric.Migrations.Lexer do
     String.replace(input, ~r/\/\*[\s\S]*?(?:\z|\*\/)/, "\n")
     |> String.replace(~r/--[^\n]*(?:\z|\n)/, "\n")
   end
-
-
 end

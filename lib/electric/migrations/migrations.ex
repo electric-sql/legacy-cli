@@ -67,6 +67,7 @@ defmodule Electric.Migrations do
   """
   def build_migrations(flags, options) do
     template = Map.get(options, :template, @satellite_template)
+
     with {:ok, src_folder} <- check_migrations_folder(options),
          {:ok, updated_manifest, warnings} = update_manifest(src_folder, template) do
       if length(warnings) > 0 do
@@ -81,13 +82,14 @@ defmodule Electric.Migrations do
   Does nothing yet
   """
   def sync_migrations(app_name, environment, options) do
-
     template = Map.get(options, :template, @satellite_template)
 
     with {:ok, src_folder} <- check_migrations_folder(options),
          {:ok, updated_manifest, warnings} = update_manifest(src_folder, template),
-         {:ok, _msg} <- Electric.Migrations.Sync.sync_migrations(app_name, environment, updated_manifest),
-         {:ok, server_manifest} <- Electric.Migrations.Sync.get_migrations_from_server(app_name, environment, true),
+         {:ok, _msg} <-
+           Electric.Migrations.Sync.sync_migrations(app_name, environment, updated_manifest),
+         {:ok, server_manifest} <-
+           Electric.Migrations.Sync.get_migrations_from_server(app_name, environment, true),
          :ok <- write_js_bundle(src_folder, server_manifest, environment) do
       if length(warnings) > 0 do
         {:ok, warnings}
@@ -98,62 +100,69 @@ defmodule Electric.Migrations do
   end
 
   def list_migrations(app_name, options) do
-
     template = Map.get(options, :template, @satellite_template)
 
     with {:ok, src_folder} <- check_migrations_folder(options),
          {:ok, updated_manifest, warnings} = update_manifest(src_folder, template),
-         {:ok, all_environment_manifests} <- Electric.Migrations.Sync.get_all_migrations_from_server(app_name) do
+         {:ok, all_environment_manifests} <-
+           Electric.Migrations.Sync.get_all_migrations_from_server(app_name) do
       {listing, mismatched} = format_listing(updated_manifest, all_environment_manifests)
       {:ok, listing}
     end
   end
-
 
   def revert_migration(app_name, environment, migration_name, options) do
-
     template = Map.get(options, :template, @satellite_template)
 
     with {:ok, src_folder} <- check_migrations_folder(options),
          {:ok, updated_manifest, warnings} = update_manifest(src_folder, template),
-         {:ok, all_environment_manifests} <- Electric.Migrations.Sync.get_all_migrations_from_server(app_name) do
+         {:ok, all_environment_manifests} <-
+           Electric.Migrations.Sync.get_all_migrations_from_server(app_name) do
       {listing, mismatched} = format_listing(updated_manifest, all_environment_manifests)
       {:ok, listing}
     end
   end
 
-
   defp format_listing(local_manifest, all_environment_manifests) do
+    manifest_lookup =
+      for {environment_name, manifest} <- all_environment_manifests do
+        lookup =
+          for migration <- manifest["migrations"], into: %{} do
+            {migration["name"], migration}
+          end
 
-    manifest_lookup = for {environment_name, manifest} <- all_environment_manifests do
-      lookup = for migration <- manifest["migrations"], into: %{} do
-         {migration["name"], migration}
+        %{"name" => environment_name, "lookup" => lookup}
       end
 
-      %{"name" => environment_name, "lookup" => lookup}
-    end
+    lines =
+      for migration <- local_manifest["migrations"], into: "" do
+        line =
+          for environment <- manifest_lookup, into: "#{migration["name"]}\t" do
+            sha256 = migration["sha256"]
 
-    lines = for migration <- local_manifest["migrations"], into: "" do
-      line = for environment <- manifest_lookup, into: "#{migration["name"]}\t" do
-        sha256 = migration["sha256"]
-        status = case environment["lookup"][migration["name"]] do
-          nil ->
-            "-"
-          %{"sha256" => ^sha256} ->
-            IO.ANSI.green() <> "sync"<> IO.ANSI.reset()
-          _ ->
-            IO.ANSI.red() <> "different"<> IO.ANSI.reset()
-        end
-        "#{environment["name"]}: #{status}\t"
+            status =
+              case environment["lookup"][migration["name"]] do
+                nil ->
+                  "-"
+
+                %{"sha256" => ^sha256} ->
+                  IO.ANSI.green() <> "sync" <> IO.ANSI.reset()
+
+                _ ->
+                  IO.ANSI.red() <> "different" <> IO.ANSI.reset()
+              end
+
+            "#{environment["name"]}: #{status}\t"
+          end
+
+        line <> "\n"
       end
-      line <> "\n"
-    end
+
     mismatched = []
     {"\n------ Electric SQL Migrations ------\n\n" <> lines, mismatched}
   end
 
   defp update_manifest(src_folder, template) do
-
     with {:ok, updated_manifest, warnings} <-
            src_folder
            |> read_manifest()
@@ -165,11 +174,11 @@ defmodule Electric.Migrations do
     else
       {:error, errors} ->
         {:error, errors}
+
       {:error, [], errors} ->
         {:error, errors}
     end
   end
-
 
   defp check_migrations_folder(options) do
     migrations_folder = Map.get(options, :dir, "migrations")
@@ -255,7 +264,6 @@ defmodule Electric.Migrations do
     end
   end
 
-
   defp write_manifest(src_folder, manifest) do
     manifest_path = Path.join(src_folder, @manifest_file_name)
 
@@ -266,12 +274,16 @@ defmodule Electric.Migrations do
     File.write!(manifest_path, Jason.encode!(manifest) |> Jason.Formatter.pretty_print())
   end
 
-
   defp write_js_bundle(src_folder, manifest, environment \\ nil) do
     manifest_json = Jason.encode!(manifest) |> Jason.Formatter.pretty_print()
     {result, _bindings} = Code.eval_quoted(@bundle_template, migrations: manifest_json)
 
-    build_name = if environment == nil do "local" else environment end
+    build_name =
+      if environment == nil do
+        "local"
+      else
+        environment
+      end
 
     local_path = Path.join([src_folder, "build", build_name])
     bundle_path = Path.join([local_path, @js_bundle_file_name])
@@ -361,5 +373,4 @@ defmodule Electric.Migrations do
       end
     end
   end
-
 end

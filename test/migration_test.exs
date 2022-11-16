@@ -5,7 +5,6 @@ defmodule MigrationsTest do
                       "<%= original_sql %><%= for {table_full_name, _table} <- tables do %>--ADD A TRIGGER FOR <%= table_full_name %>;<% end %>\n"
                     )
 
-
   describe "adds_triggers to sql" do
     test "add a trigger" do
       sql = """
@@ -474,13 +473,22 @@ defmodule MigrationsTest do
       assert stripped == expected
     end
 
-     test "tests stripping single line comments" do
-        str1 = "-- Somewhere to keep our metadata\nCREATE TABLE IF NOT EXISTS _electric_meta (\n  key TEXT PRIMARY KEY,\n  value BLOB\n);"
-        str2 = "\n\n/*---------------------------------------------\nBelow are templated triggers added by Satellite\n---------------------------------------------*/\n\n-- The ops log table\nCREATE TABLE IF NOT EXISTS _electric_oplog (\n  rowid INTEGER PRIMARY KEY AUTOINCREMENT,\n  namespace String NOT NULL,\n  tablename String NOT NULL,\n  optype String NOT NULL,\n  primaryKey String NOT NULL,\n  newRow String,\n  oldRow String,\n  timestamp TEXT\n);\n"
-        stripped_1 = Electric.Migrations.strip_comments(str1)
-        assert stripped_1 == "\CREATE TABLE IF NOT EXISTS _electric_meta (\n  key TEXT PRIMARY KEY,\n  value BLOB\n);\n"
-        stripped_2 = Electric.Migrations.strip_comments(str2)
-        assert stripped_2 == "CREATE TABLE IF NOT EXISTS _electric_oplog (\n  rowid INTEGER PRIMARY KEY AUTOINCREMENT,\n  namespace String NOT NULL,\n  tablename String NOT NULL,\n  optype String NOT NULL,\n  primaryKey String NOT NULL,\n  newRow String,\n  oldRow String,\n  timestamp TEXT\n);\n"
+    test "tests stripping single line comments" do
+      str1 =
+        "-- Somewhere to keep our metadata\nCREATE TABLE IF NOT EXISTS _electric_meta (\n  key TEXT PRIMARY KEY,\n  value BLOB\n);"
+
+      str2 =
+        "\n\n/*---------------------------------------------\nBelow are templated triggers added by Satellite\n---------------------------------------------*/\n\n-- The ops log table\nCREATE TABLE IF NOT EXISTS _electric_oplog (\n  rowid INTEGER PRIMARY KEY AUTOINCREMENT,\n  namespace String NOT NULL,\n  tablename String NOT NULL,\n  optype String NOT NULL,\n  primaryKey String NOT NULL,\n  newRow String,\n  oldRow String,\n  timestamp TEXT\n);\n"
+
+      stripped_1 = Electric.Migrations.strip_comments(str1)
+
+      assert stripped_1 ==
+               "\CREATE TABLE IF NOT EXISTS _electric_meta (\n  key TEXT PRIMARY KEY,\n  value BLOB\n);\n"
+
+      stripped_2 = Electric.Migrations.strip_comments(str2)
+
+      assert stripped_2 ==
+               "CREATE TABLE IF NOT EXISTS _electric_oplog (\n  rowid INTEGER PRIMARY KEY AUTOINCREMENT,\n  namespace String NOT NULL,\n  tablename String NOT NULL,\n  optype String NOT NULL,\n  primaryKey String NOT NULL,\n  newRow String,\n  oldRow String,\n  timestamp TEXT\n);\n"
     end
 
     test "sluggifying title" do
@@ -541,7 +549,6 @@ defmodule MigrationsTest do
       assert newRow == "{\"value\":\"abcdefg\",\"colour\":\"red\"}"
       assert oldRow == nil
     end
-
 
     test "tests trigger has all columns for multiple migrations" do
       sql1 = """
@@ -728,7 +735,6 @@ defmodule MigrationsFileTest do
         ]
       }
 
-
       assert manifest == expected
     end
 
@@ -789,11 +795,11 @@ defmodule MigrationsFileTest do
         ]
       }
       """
+
       assert local_js == expected
     end
 
     def change_migrations_name(src_folder, from_name, to_name) do
-
       from_dir = Path.join([src_folder, from_name])
       to_dir = Path.join([src_folder, to_name])
       File.rename!(from_dir, to_dir)
@@ -803,18 +809,18 @@ defmodule MigrationsFileTest do
 
       migrations = manifest["migrations"]
 
-
-      updated_migrations = for migration <- migrations do
-        if migration["name"] == from_name do
-          Map.put(migration, "name", to_name)
-        else
-          migration
+      updated_migrations =
+        for migration <- migrations do
+          if migration["name"] == from_name do
+            Map.put(migration, "name", to_name)
+          else
+            migration
+          end
         end
-      end
 
       updated = %{"migrations" => updated_migrations}
 
-      File.write!(manifest_path,  Jason.encode!(updated) |> Jason.Formatter.pretty_print())
+      File.write!(manifest_path, Jason.encode!(updated) |> Jason.Formatter.pretty_print())
     end
 
     def init_and_add_migration(temp) do
@@ -964,7 +970,8 @@ defmodule MigrationsFileTest do
       change_migrations_name(migrations_path, first_migration_name, "first_migration_name")
       change_migrations_name(migrations_path, second_migration_name, "second_migration_name")
 
-      {:ok, _msg} = Electric.Migrations.sync_migrations("test", "default", %{:dir => migrations_path})
+      {:ok, _msg} =
+        Electric.Migrations.sync_migrations("test", "default", %{:dir => migrations_path})
 
       js_path = Path.join([migrations_path, "build", "default", "index.js"])
       assert File.exists?(js_path)
@@ -972,32 +979,32 @@ defmodule MigrationsFileTest do
       default_js = File.read!(js_path)
 
       expected = """
-export const data = {
-  "migrations": [
-    {
-      "encoding": "escaped",
-      "name": "first_migration_name",
-      "satellite_body": [
-        "something random"
-      ],
-      "sha256": "2a97d825e41ae70705381016921c55a3b086a813649e4da8fcba040710055747",
-      "title": "init"
-    },
-    {
-      "encoding": "escaped",
-      "name": "second_migration_name",
-      "satellite_body": [
-        "other stuff"
-      ],
-      "sha256": "d0a52f739f137fc80fd67d9fd347cb4097bd6fb182e583f2c64d8de309393ad6",
-      "title": "another"
-    }
-  ]
-}
-"""
+      export const data = {
+        "migrations": [
+          {
+            "encoding": "escaped",
+            "name": "first_migration_name",
+            "satellite_body": [
+              "something random"
+            ],
+            "sha256": "2a97d825e41ae70705381016921c55a3b086a813649e4da8fcba040710055747",
+            "title": "init"
+          },
+          {
+            "encoding": "escaped",
+            "name": "second_migration_name",
+            "satellite_body": [
+              "other stuff"
+            ],
+            "sha256": "d0a52f739f137fc80fd67d9fd347cb4097bd6fb182e583f2c64d8de309393ad6",
+            "title": "another"
+          }
+        ]
+      }
+      """
+
       assert default_js == expected
     end
-
 
     test "test sync fails if different sha" do
       temp = temp_folder()
@@ -1009,10 +1016,12 @@ export const data = {
       second_migration_name = Path.dirname(second_migration) |> Path.basename()
       change_migrations_name(migrations_path, first_migration_name, "first_migration_name")
       change_migrations_name(migrations_path, second_migration_name, "second_migration_name")
-      {:error, msg} = Electric.Migrations.sync_migrations("test2", "default", %{:dir => migrations_path})
+
+      {:error, msg} =
+        Electric.Migrations.sync_migrations("test2", "default", %{:dir => migrations_path})
+
       assert msg == "The migration second_migration_name has been changed locally"
     end
-
 
     test "test list" do
       temp = temp_folder()
@@ -1026,7 +1035,8 @@ export const data = {
 
       {:ok, listing} = Electric.Migrations.list_migrations("test", %{:dir => migrations_path})
 
-      assert listing == "\n------ Electric SQL Migrations ------\n\nfirst_migration_name\tdefault: \e[32msync\e[0m\t\nsecond_migration_name\tdefault: \e[32msync\e[0m\t\n"
+      assert listing ==
+               "\n------ Electric SQL Migrations ------\n\nfirst_migration_name\tdefault: \e[32msync\e[0m\t\nsecond_migration_name\tdefault: \e[32msync\e[0m\t\n"
     end
 
     test "test lists with error" do
@@ -1041,11 +1051,8 @@ export const data = {
 
       {:ok, listing} = Electric.Migrations.list_migrations("test2", %{:dir => migrations_path})
 
-      assert listing == "\n------ Electric SQL Migrations ------\n\nfirst_migration_name\tdefault: \e[32msync\e[0m\t\nsecond_migration_name\tdefault: \e[31mdifferent\e[0m\t\n"
+      assert listing ==
+               "\n------ Electric SQL Migrations ------\n\nfirst_migration_name\tdefault: \e[32msync\e[0m\t\nsecond_migration_name\tdefault: \e[31mdifferent\e[0m\t\n"
     end
-
   end
-
-
-
 end
