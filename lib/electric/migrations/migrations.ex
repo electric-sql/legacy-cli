@@ -55,7 +55,7 @@ defmodule Electric.Migrations do
   """
   def new_migration(migration_name, options) do
     with {:ok, src_folder} <- check_migrations_folder(options),
-         {:ok, app_name} <- check_app_name(src_folder) do
+         {:ok, _app_name} <- check_app_name(src_folder) do
       add_migration(src_folder, migration_name)
     end
   end
@@ -69,13 +69,13 @@ defmodule Electric.Migrations do
   - :manifest will also create a file called manifest.json in the migrations folder listing all migrations
   - :bundle will also create a index.js file in the migrations folder which exports a js object containing all the migrations
   """
-  def build_migrations(flags, options) do
+  def build_migrations(options) do
     template = Map.get(options, :template, @satellite_template)
 
     with {:ok, src_folder} <- check_migrations_folder(options),
          {:ok, app_name} <- check_app_name(src_folder),
          {:ok, updated_manifest, warnings} = update_manifest(src_folder, template) do
-      :ok <= write_js_bundle(src_folder, updated_manifest, app_name, "local")
+      write_js_bundle(src_folder, updated_manifest, app_name, "local")
 
       if length(warnings) > 0 do
         {:ok, warnings}
@@ -112,7 +112,7 @@ defmodule Electric.Migrations do
 
     with {:ok, src_folder} <- check_migrations_folder(options),
          {:ok, app_name} <- check_app_name(src_folder),
-         {:ok, updated_manifest, warnings} = update_manifest(src_folder, template),
+         {:ok, updated_manifest, _warnings} = update_manifest(src_folder, template),
          {:ok, all_environment_manifests} <-
            Electric.Migrations.Sync.get_all_migrations_from_server(app_name) do
       {listing, mismatched} = format_listing(updated_manifest, all_environment_manifests)
@@ -125,10 +125,10 @@ defmodule Electric.Migrations do
 
     with {:ok, src_folder} <- check_migrations_folder(options),
          {:ok, app_name} <- check_app_name(src_folder),
-         {:ok, updated_manifest, warnings} = update_manifest(src_folder, template),
+         {:ok, updated_manifest, _warnings} = update_manifest(src_folder, template),
          {:ok, all_environment_manifests} <-
            Electric.Migrations.Sync.get_all_migrations_from_server(app_name) do
-      {listing, mismatched} = format_listing(updated_manifest, all_environment_manifests)
+      {_listing, mismatched} = format_listing(updated_manifest, all_environment_manifests)
 
       if Enum.member?(mismatched, {migration_name, environment}) do
         do_revert(src_folder, app_name, environment, migration_name, updated_manifest)
@@ -214,7 +214,7 @@ defmodule Electric.Migrations do
            src_folder
            |> read_manifest()
            |> add_triggers_to_manifest(src_folder, template) do
-      :ok <= write_manifest(src_folder, updated_manifest)
+      write_manifest(src_folder, updated_manifest)
       {:ok, updated_manifest, warnings}
     else
       {:error, errors} ->

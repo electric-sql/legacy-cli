@@ -698,7 +698,7 @@ defmodule MigrationsFileTest do
 
       File.write!(my_new_migration, new_content, [:append])
 
-      {:ok, _msg} = Electric.Migrations.build_migrations(%{}, %{:dir => migrations_path})
+      {:ok, _msg} = Electric.Migrations.build_migrations(%{:dir => migrations_path})
 
       init_migration_name = Path.basename(migration_folder)
 
@@ -758,7 +758,7 @@ defmodule MigrationsFileTest do
 
       File.write!(my_new_migration, new_content, [:append])
 
-      {:ok, _msg} = Electric.Migrations.build_migrations(%{}, %{:dir => migrations_path})
+      {:ok, _msg} = Electric.Migrations.build_migrations(%{:dir => migrations_path})
 
       init_migration_name = Path.basename(migration_folder)
 
@@ -906,7 +906,7 @@ defmodule MigrationsFileTest do
       first_migration_name = Path.dirname(first_migration) |> Path.basename()
       second_migration_name = Path.dirname(second_migration) |> Path.basename()
 
-      {:ok, _msg} = Electric.Migrations.build_migrations(%{}, %{:dir => migrations_path})
+      {:ok, _msg} = Electric.Migrations.build_migrations(%{:dir => migrations_path})
 
       manifest = Jason.decode!(File.read!(manifest_path))
       #      sha = List.first(manifest["migrations"])["sha256"]
@@ -978,7 +978,7 @@ defmodule MigrationsFileTest do
       migrations_path = Path.join([temp, "migrations"])
       init_and_add_migration("test", temp)
 
-      {:ok, _msg} = Electric.Migrations.build_migrations(%{}, %{:dir => migrations_path})
+      {:ok, _msg} = Electric.Migrations.build_migrations(%{:dir => migrations_path})
 
       migration = most_recent_migration_file(migrations_path)
 
@@ -990,7 +990,7 @@ defmodule MigrationsFileTest do
 
       File.write!(migration, dogs_content, [:append])
 
-      {:ok, msgs} = Electric.Migrations.build_migrations(%{}, %{:dir => migrations_path})
+      {:ok, msgs} = Electric.Migrations.build_migrations(%{:dir => migrations_path})
       [msg2, msg3] = msgs
 
       assert [msg2, msg3] == [

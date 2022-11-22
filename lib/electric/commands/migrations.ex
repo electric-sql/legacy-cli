@@ -219,9 +219,9 @@ defmodule Electric.Commands.Migrations do
     end)
   end
 
-  def build(%{args: _args, flags: flags, options: options, unknown: _unknown}) do
+  def build(%{options: options, unknown: _unknown}) do
     Progress.run("Building satellite migrations", fn ->
-      case Electric.Migrations.build_migrations(flags, options) do
+      case Electric.Migrations.build_migrations(options) do
         {:ok, nil} ->
           {:success, "Migrations build successfully"}
 
@@ -255,7 +255,7 @@ defmodule Electric.Commands.Migrations do
 
   def list(%{options: options}) do
     case Electric.Migrations.list_migrations(options) do
-      {:ok, listing, mismatched} ->
+      {:ok, listing, _mismatched} ->
         {:success, listing}
 
       {:error, errors} ->
