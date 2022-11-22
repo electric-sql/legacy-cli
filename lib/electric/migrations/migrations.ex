@@ -220,7 +220,7 @@ defmodule Electric.Migrations do
       {:error, errors} ->
         {:error, errors}
 
-      {:error, [], errors} ->
+      {:error, _updated_manifest, errors} ->
         {:error, errors}
     end
   end
