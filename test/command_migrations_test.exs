@@ -45,7 +45,7 @@ defmodule CommandMigrationsTest do
 
       sql_file_paths = Path.join([migrations_path, "*", "migration.sql"]) |> Path.wildcard()
       my_new_migration = List.first(sql_file_paths)
-      migration_folder = Path.dirname(my_new_migration)
+      #      migration_folder = Path.dirname(my_new_migration)
 
       new_content = """
       CREATE TABLE IF NOT EXISTS items (
@@ -133,13 +133,127 @@ defmodule CommandMigrationsTest do
 
       {:success, msg} =
         Electric.Commands.Migrations.sync(%{
-          args: %{env: "production"},
+          args: %{},
+          flags: [],
+          options: %{:dir => migrations_path, :env => "production"},
+          unknown: nil
+        })
+
+      assert msg == "Migrations synchronized with server successfully"
+    end
+
+    test "new migrations" do
+      temp = temp_folder()
+      migrations_path = Path.join([temp, "migrations"])
+
+      {:success, msg} =
+        Electric.Commands.Migrations.init(%{
+          args: %{app: "app-name"},
+          flags: [],
+          options: %{:dir => temp},
+          unknown: nil
+        })
+
+      assert File.exists?(migrations_path)
+      assert msg == "Migrations initialised"
+
+      sql_file_paths = Path.join([migrations_path, "*", "migration.sql"]) |> Path.wildcard()
+      my_new_migration = List.first(sql_file_paths)
+
+      new_content = """
+      CREATE TABLE IF NOT EXISTS items (
+        value TEXT PRIMARY KEY
+      ) STRICT, WITHOUT ROWID;
+      """
+
+      File.write!(my_new_migration, new_content, [:append])
+
+      {:success, msg} =
+        Electric.Commands.Migrations.new(%{
+          args: %{migration_title: "Another migration"},
           flags: [],
           options: %{:dir => migrations_path},
           unknown: nil
         })
 
-      assert msg == "Migrations synchronized with server successfully"
+      assert msg == "New migration created"
+    end
+
+    test "list migrations" do
+      temp = temp_folder()
+      migrations_path = Path.join([temp, "migrations"])
+
+      {:success, msg} =
+        Electric.Commands.Migrations.init(%{
+          args: %{app: "app-name"},
+          flags: [],
+          options: %{:dir => temp},
+          unknown: nil
+        })
+
+      assert File.exists?(migrations_path)
+      assert msg == "Migrations initialised"
+
+      sql_file_paths = Path.join([migrations_path, "*", "migration.sql"]) |> Path.wildcard()
+      my_new_migration = List.first(sql_file_paths)
+      migration_name = Path.dirname(my_new_migration) |> Path.basename()
+
+      new_content = """
+      CREATE TABLE IF NOT EXISTS items (
+        value TEXT PRIMARY KEY
+      ) STRICT, WITHOUT ROWID;
+      """
+
+      File.write!(my_new_migration, new_content, [:append])
+
+      {:success, msg} =
+        Electric.Commands.Migrations.list(%{
+          args: %{},
+          flags: [],
+          options: %{:dir => migrations_path},
+          unknown: nil
+        })
+
+      assert msg == "\n------ Electric SQL Migrations ------\n\n#{migration_name}\tdefault: -\n"
+    end
+
+    test "revert migrations" do
+      temp = temp_folder()
+      migrations_path = Path.join([temp, "migrations"])
+
+      {:success, msg} =
+        Electric.Commands.Migrations.init(%{
+          args: %{app: "app-name"},
+          flags: [],
+          options: %{:dir => temp},
+          unknown: nil
+        })
+
+      assert File.exists?(migrations_path)
+      assert msg == "Migrations initialised"
+
+      sql_file_paths = Path.join([migrations_path, "*", "migration.sql"]) |> Path.wildcard()
+      my_new_migration = List.first(sql_file_paths)
+      migration_name = Path.dirname(my_new_migration) |> Path.basename()
+
+      new_content = """
+      CREATE TABLE IF NOT EXISTS items (
+        value TEXT PRIMARY KEY
+      ) STRICT, WITHOUT ROWID;
+      """
+
+      File.write!(my_new_migration, new_content, [:append])
+
+      {:error, msg} =
+        Electric.Commands.Migrations.revert(%{
+          args: %{migration_name: migration_name},
+          flags: [],
+          options: %{:dir => migrations_path, env: "default"},
+          unknown: nil
+        })
+
+      assert msg ==
+               "There was 1 errors:\nThe migration #{migration_name} in environment default is not different. Nothing to revert."
     end
   end
 end

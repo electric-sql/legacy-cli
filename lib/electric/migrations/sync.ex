@@ -13,11 +13,12 @@ defmodule Electric.Migrations.Sync do
   end
 
   def get_migrations_from_server(app_name, environment, with_satellite \\ false) do
-    url = "app/#{app_name}/env/#{environment}/migrations"
-
-    if with_satellite do
-      url = url <> "?body=satellite"
-    end
+    url =
+      if with_satellite do
+        "app/#{app_name}/env/#{environment}/migrations?body=satellite"
+      else
+        "app/#{app_name}/env/#{environment}/migrations"
+      end
 
     case Client.get(url) do
       {:ok, %Req.Response{status: 200, body: data}} ->
@@ -50,7 +51,7 @@ defmodule Electric.Migrations.Sync do
     with {:ok, environments} <- get_environment_names_from_server(app_name) do
       env_names = environments["environments"]
 
-      Enum.reduce_while(env_names, {:ok, %{}}, fn env_name, {status, manifests} ->
+      Enum.reduce_while(env_names, {:ok, %{}}, fn env_name, {_status, manifests} ->
         case get_migrations_from_server(app_name, env_name) do
           {:error, msg} ->
             {:halt, {:error, msg}}
@@ -124,7 +125,7 @@ defmodule Electric.Migrations.Sync do
       {:ok, "Synchronized #{length(migrations)} new migrations successfully"},
       fn migration, status ->
         case upload_new_migration(app_name, environment, migration) do
-          {:ok, msg} ->
+          {:ok, _msg} ->
             {:cont, status}
 
           {:error, msg} ->
@@ -146,7 +147,7 @@ defmodule Electric.Migrations.Sync do
       {:ok, %Req.Response{status: 422}} ->
         {:error, "malformed request"}
 
-      {:ok, rsp} ->
+      {:ok, _rsp} ->
         {:error, "invalid credentials"}
 
       {:error, _exception} ->

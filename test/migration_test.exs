@@ -627,9 +627,9 @@ end
 defmodule MigrationsFileTest do
   use ExUnit.Case
 
-  @trigger_template EEx.compile_string(
-                      "<%= original_sql %><%= for {table_full_name, _table} <- tables do %>\n--ADD A TRIGGER FOR <%= table_full_name %>;\n<% end %>"
-                    )
+  #  @trigger_template EEx.compile_string(
+  #                      "<%= original_sql %><%= for {table_full_name, _table} <- tables do %>\n--ADD A TRIGGER FOR <%= table_full_name %>;\n<% end %>"
+  #                    )
 
   setup_all do
     tmp_dir = "tmp"
@@ -762,7 +762,7 @@ defmodule MigrationsFileTest do
 
       init_migration_name = Path.basename(migration_folder)
 
-      js_path = Path.join([migrations_path, "build", "local", "index.js"])
+      js_path = Path.join([migrations_path, "dist", "index.js"])
       assert File.exists?(js_path)
 
       local_js = File.read!(js_path)
@@ -770,6 +770,7 @@ defmodule MigrationsFileTest do
       expected = """
       export const data = {
         "app_name": "test_app",
+        "env": "local",
         "migrations": [
           {
             "encoding": "escaped",
@@ -800,6 +801,39 @@ defmodule MigrationsFileTest do
       """
 
       assert local_js == expected
+    end
+
+    test "init and then change app slug" do
+      temp = temp_folder()
+      migrations_folder = Path.join([temp, "migrations"])
+      {:ok, _msg} = Electric.Migrations.init_migrations("test_app", %{:dir => temp})
+
+      {:ok, _msg} =
+        Electric.Migrations.update_app_name("test_app_changed", %{:dir => migrations_folder})
+
+      init_migration_name =
+        most_recent_migration_file(migrations_folder)
+        |> Path.dirname()
+        |> Path.basename()
+
+      manifest_path = Path.join([migrations_folder, "manifest.json"])
+      assert File.exists?(manifest_path)
+      manifest = Jason.decode!(File.read!(manifest_path))
+
+      expected = %{
+        "app_name" => "test_app_changed",
+        "migrations" => [
+          %{
+            "name" => init_migration_name,
+            "sha256" => "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+            "title" => "init",
+            "encoding" => "escaped",
+            "satellite_body" => []
+          }
+        ]
+      }
+
+      assert manifest == expected
     end
 
     def change_migrations_name(src_folder, from_name, to_name) do
@@ -867,7 +901,7 @@ defmodule MigrationsFileTest do
 
       manifest_path = Path.join([migrations_path, "manifest.json"])
       assert File.exists?(manifest_path)
-      manifest = Jason.decode!(File.read!(manifest_path))
+      #      manifest = Jason.decode!(File.read!(manifest_path))
 
       first_migration_name = Path.dirname(first_migration) |> Path.basename()
       second_migration_name = Path.dirname(second_migration) |> Path.basename()
@@ -875,7 +909,7 @@ defmodule MigrationsFileTest do
       {:ok, _msg} = Electric.Migrations.build_migrations(%{}, %{:dir => migrations_path})
 
       manifest = Jason.decode!(File.read!(manifest_path))
-      sha = List.first(manifest["migrations"])["sha256"]
+      #      sha = List.first(manifest["migrations"])["sha256"]
 
       expected = %{
         "app_name" => "test",
@@ -978,13 +1012,15 @@ defmodule MigrationsFileTest do
 
       {:ok, _msg} = Electric.Migrations.sync_migrations("default", %{:dir => migrations_path})
 
-      js_path = Path.join([migrations_path, "build", "default", "index.js"])
+      js_path = Path.join([migrations_path, "dist", "index.js"])
       assert File.exists?(js_path)
 
       default_js = File.read!(js_path)
 
       expected = """
       export const data = {
+        "app_name": "test",
+        "env": "default",
         "migrations": [
           {
             "encoding": "escaped",
@@ -1037,7 +1073,8 @@ defmodule MigrationsFileTest do
       change_migrations_name(migrations_path, first_migration_name, "first_migration_name")
       change_migrations_name(migrations_path, second_migration_name, "second_migration_name")
 
-      {:ok, listing, mismatched} = Electric.Migrations.list_migrations(%{:dir => migrations_path})
+      {:ok, listing, _mismatched} =
+        Electric.Migrations.list_migrations(%{:dir => migrations_path})
 
       assert listing ==
                "\n------ Electric SQL Migrations ------\n\nfirst_migration_name\tdefault: \e[32msync\e[0m\nsecond_migration_name\tdefault: \e[32msync\e[0m\n"
@@ -1071,7 +1108,7 @@ defmodule MigrationsFileTest do
       change_migrations_name(migrations_path, first_migration_name, "first_migration_name")
       change_migrations_name(migrations_path, second_migration_name, "second_migration_name")
 
-      {status, msg} =
+      {status, _msg} =
         Electric.Migrations.revert_migration("default", "second_migration_name", %{
           :dir => migrations_path
         })

@@ -8,6 +8,7 @@ defmodule Electric.Migrations do
   @manifest_file_name "manifest.json"
   @bundle_file_name "manifest.bundle.json"
   @js_bundle_file_name "index.js"
+  @dist_folder_name "dist"
   @migration_template EEx.compile_file("lib/electric/migrations/templates/migration.sql.eex")
   @satellite_template EEx.compile_file("lib/electric/migrations/templates/satellite.sql.eex")
   @bundle_template EEx.compile_file("lib/electric/migrations/templates/index.js.eex")
@@ -41,6 +42,12 @@ defmodule Electric.Migrations do
     end
   end
 
+  def update_app_name(app_name, options) do
+    with {:ok, src_folder} <- check_migrations_folder(options) do
+      update_manifest_app_name(src_folder, app_name)
+    end
+  end
+
   @doc """
   Adds a new migration to the existing set of migrations.
   optional arguments:
@@ -68,6 +75,8 @@ defmodule Electric.Migrations do
     with {:ok, src_folder} <- check_migrations_folder(options),
          {:ok, app_name} <- check_app_name(src_folder),
          {:ok, updated_manifest, warnings} = update_manifest(src_folder, template) do
+      :ok <= write_js_bundle(src_folder, updated_manifest, app_name, "local")
+
       if length(warnings) > 0 do
         {:ok, warnings}
       else
@@ -89,7 +98,7 @@ defmodule Electric.Migrations do
            Electric.Migrations.Sync.sync_migrations(app_name, environment, updated_manifest),
          {:ok, server_manifest} <-
            Electric.Migrations.Sync.get_migrations_from_server(app_name, environment, true),
-         :ok <- write_js_bundle(src_folder, server_manifest, environment) do
+         :ok <- write_js_bundle(src_folder, server_manifest, app_name, environment) do
       if length(warnings) > 0 do
         {:ok, warnings}
       else
@@ -154,7 +163,7 @@ defmodule Electric.Migrations do
         end
 
       reverted_manifest = Map.put(current_manifest, "migrations", updated_migrations)
-      write_manifest(src_folder, remove_original_bodies(reverted_manifest))
+      write_manifest(src_folder, reverted_manifest)
       write_migration_body(src_folder, migration_name, server_migration["original_body"])
       {:ok, nil}
     end
@@ -204,10 +213,8 @@ defmodule Electric.Migrations do
     with {:ok, updated_manifest, warnings} <-
            src_folder
            |> read_manifest()
-           |> add_triggers_to_manifest(src_folder, template),
-         cleaned_manifest <- remove_original_bodies(updated_manifest) do
-      :ok <= write_manifest(src_folder, cleaned_manifest)
-      :ok <= write_js_bundle(src_folder, cleaned_manifest)
+           |> add_triggers_to_manifest(src_folder, template) do
+      :ok <= write_manifest(src_folder, updated_manifest)
       {:ok, updated_manifest, warnings}
     else
       {:error, errors} ->
@@ -216,6 +223,13 @@ defmodule Electric.Migrations do
       {:error, [], errors} ->
         {:error, errors}
     end
+  end
+
+  defp update_manifest_app_name(src_folder, app_name) do
+    manifest = read_manifest(src_folder)
+    updated_manifest = Map.merge(manifest, %{"app_name" => app_name})
+    write_manifest(src_folder, updated_manifest)
+    {:ok, nil}
   end
 
   defp check_app_name(src_folder) do
@@ -330,7 +344,7 @@ defmodule Electric.Migrations do
       File.rm(manifest_path)
     end
 
-    File.write!(manifest_path, Jason.encode!(manifest) |> Jason.Formatter.pretty_print())
+    File.write!(manifest_path, manifest_json(manifest))
   end
 
   defp write_migration_body(src_folder, migration_name, original_body) do
@@ -343,21 +357,21 @@ defmodule Electric.Migrations do
     File.write!(migration_path, original_body)
   end
 
-  defp write_js_bundle(src_folder, manifest, environment \\ nil) do
-    manifest_json = Jason.encode!(manifest) |> Jason.Formatter.pretty_print()
-    {result, _bindings} = Code.eval_quoted(@bundle_template, migrations: manifest_json)
+  def manifest_json(manifest) do
+    manifest
+    |> remove_original_bodies()
+    |> Jason.encode!()
+    |> Jason.Formatter.pretty_print()
+  end
 
-    build_name =
-      if environment == nil do
-        "local"
-      else
-        environment
-      end
+  defp write_js_bundle(src_folder, manifest, app_name, environment) do
+    updated = Map.merge(manifest, %{"app_name" => app_name, "env" => environment})
 
-    local_path = Path.join([src_folder, "build", build_name])
-    bundle_path = Path.join([local_path, @js_bundle_file_name])
+    {result, _bindings} = Code.eval_quoted(@bundle_template, migrations: manifest_json(updated))
 
-    File.mkdir_p!(local_path)
+    dist_folder = Path.join([src_folder, @dist_folder_name])
+    File.mkdir_p!(dist_folder)
+    bundle_path = Path.join([dist_folder, @js_bundle_file_name])
 
     if File.exists?(bundle_path) do
       File.rm(bundle_path)
