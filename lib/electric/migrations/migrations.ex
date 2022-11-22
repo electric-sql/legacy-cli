@@ -6,7 +6,6 @@ defmodule Electric.Migrations do
 
   @migration_file_name "migration.sql"
   @manifest_file_name "manifest.json"
-  @bundle_file_name "manifest.bundle.json"
   @js_bundle_file_name "index.js"
   @dist_folder_name "dist"
   @migration_template EEx.compile_file("lib/electric/migrations/templates/migration.sql.eex")
