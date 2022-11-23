@@ -107,7 +107,7 @@ defmodule Electric.Migrations.Parse do
       end
 
     type_errors =
-      for {cid, info} <- column_infos,
+      for {_cid, info} <- column_infos,
           not Enum.member?(@allowed_sql_types, String.downcase(info.type)) do
         "The type given for column #{info.name} in table #{name} is not allowed. Please use one of INTEGER, REAL, TEXT, BLOB"
       end
