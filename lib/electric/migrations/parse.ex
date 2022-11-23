@@ -3,11 +3,12 @@ defmodule Electric.Migrations.Parse do
   Creates an AST from SQL migrations
   """
 
+  @allowed_sql_types ["integer", "real", "text", "blob"]
+
   @doc """
   Given a set of Maps and returns an ugly map of maps containing info about the DB structure.
   Also validates the SQL and returns error messages if validation fails
   """
-
   def sql_ast_from_migrations(migrations) do
     case ast_from_ordered_migrations(migrations) do
       {ast, [], []} ->
@@ -104,6 +105,14 @@ defmodule Electric.Migrations.Parse do
            pk: pk
          }}
       end
+
+    type_errors =
+      for {cid, info} <- column_infos,
+          not Enum.member?(@allowed_sql_types, String.downcase(info.type)) do
+        "The type given for column #{info.name} in table #{name} is not allowed. Please use one of INTEGER, REAL, TEXT, BLOB"
+      end
+
+    validation_fails = validation_fails ++ type_errors
 
     # private keys columns
     private_key_column_names =

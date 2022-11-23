@@ -998,6 +998,29 @@ defmodule MigrationsFileTest do
              ]
     end
 
+    test "test build type warning" do
+      temp = temp_folder()
+      migrations_path = Path.join([temp, "migrations"])
+      init_and_add_migration("test", temp)
+
+      {:ok, _msg} = Electric.Migrations.build_migrations(%{:dir => migrations_path})
+
+      migration = most_recent_migration_file(migrations_path)
+
+      dogs_content = """
+      CREATE TABLE IF NOT EXISTS dogs (
+        value INT PRIMARY KEY
+      )STRICT, WITHOUT ROWID;
+      """
+
+      File.write!(migration, dogs_content, [:append])
+      {:error, msgs} = Electric.Migrations.build_migrations(%{:dir => migrations_path})
+
+      assert msgs == [
+               "The type given for column value in table dogs is not allowed. Please use one of INTEGER, REAL, TEXT, BLOB"
+             ]
+    end
+
     test "test can sync" do
       temp = temp_folder()
       migrations_path = Path.join([temp, "migrations"])

@@ -15,16 +15,17 @@ defmodule Electric.Migrations.Sync do
   def get_migrations_from_server(app_name, environment, with_satellite \\ false) do
     url =
       if with_satellite do
-        "app/#{app_name}/env/#{environment}/migrations?body=satellite"
+        "apps/#{app_name}/environment/#{environment}/migrations?body=satellite"
       else
-        "app/#{app_name}/env/#{environment}/migrations"
+        "apps/#{app_name}/environment/#{environment}/migrations"
       end
 
     case Client.get(url) do
       {:ok, %Req.Response{status: 200, body: data}} ->
         {:ok, Jason.decode!(data)}
 
-      {:ok, _} ->
+      {:ok, stuff} ->
+        IO.inspect(stuff)
         {:error, "invalid credentials"}
 
       {:error, _exception} ->
@@ -33,7 +34,7 @@ defmodule Electric.Migrations.Sync do
   end
 
   def get_full_migration_from_server(app_name, environment, migration_name) do
-    url = "app/#{app_name}/env/#{environment}/migrations/#{migration_name}?body=all"
+    url = "apps/#{app_name}/environment/#{environment}/migrations/#{migration_name}?body=all"
 
     case Client.get(url) do
       {:ok, %Req.Response{status: 200, body: data}} ->
@@ -48,9 +49,7 @@ defmodule Electric.Migrations.Sync do
   end
 
   def get_all_migrations_from_server(app_name) do
-    with {:ok, environments} <- get_environment_names_from_server(app_name) do
-      env_names = environments["environments"]
-
+    with {:ok, env_names} <- get_environment_names_from_server(app_name) do
       Enum.reduce_while(env_names, {:ok, %{}}, fn env_name, {_status, manifests} ->
         case get_migrations_from_server(app_name, env_name) do
           {:error, msg} ->
@@ -64,11 +63,18 @@ defmodule Electric.Migrations.Sync do
   end
 
   def get_environment_names_from_server(app_name) do
-    url = "app/#{app_name}/envs"
+    url = "apps/#{app_name}"
 
     case Client.get(url) do
       {:ok, %Req.Response{status: 200, body: data}} ->
-        {:ok, Jason.decode!(data)}
+        as_json = Jason.decode!(data)
+
+        names =
+          for database <- as_json["databases"] do
+            database["slug"]
+          end
+
+        {:ok, names}
 
       {:ok, _} ->
         {:error, "invalid credentials"}
@@ -137,7 +143,7 @@ defmodule Electric.Migrations.Sync do
 
   def upload_new_migration(app_name, environment, migration) do
     #    url = "app/#{app_name}/env/#{environment}/migrations/#{migration["name"]}"
-    url = "app/#{app_name}/env/#{environment}/migrations"
+    url = "apps/#{app_name}/environment/#{environment}/migrations"
     payload = Jason.encode!(%{"migration" => migration}) |> Jason.Formatter.pretty_print()
 
     case Client.post(url, payload) do

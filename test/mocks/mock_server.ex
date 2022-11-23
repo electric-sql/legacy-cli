@@ -96,7 +96,7 @@ defmodule Electric.MockServer do
     @migration_fixtures[migration_name]
   end
 
-  get "api/v1/app/:app_name/env/:environment/migrations" do
+  get "api/v1/apps/:app_name/environment/:environment/migrations" do
     server_manifest = %{
       "migrations" => get_some_migrations(app_name)
     }
@@ -105,7 +105,7 @@ defmodule Electric.MockServer do
     |> Plug.Conn.send_resp()
   end
 
-  get "api/v1/app/:app_name/env/:environment/migrations/:migration_name" do
+  get "api/v1/apps/:app_name/environment/:environment/migrations/:migration_name" do
     server_manifest = %{
       "migration" => get_a_migration(migration_name)
     }
@@ -114,17 +114,24 @@ defmodule Electric.MockServer do
     |> Plug.Conn.send_resp()
   end
 
-  post "api/v1/app/:app_name/env/:environment/migrations" do
+  post "api/v1/apps/:app_id/environment/:environment/migrations" do
     Plug.Conn.resp(conn, 201, "ok")
     |> Plug.Conn.send_resp()
   end
 
-  get "api/v1/app/:app_name/envs" do
-    server_manifest = %{
-      "environments" => ["default"]
+  get "api/v1/apps/:app_id" do
+    app_info = %{
+      "databases" => [
+        %{
+          "slug" => "default"
+        }
+      ],
+      "id" => "tame-cut-4121",
+      "name" => "Example App",
+      "slug" => "example-app"
     }
 
-    Plug.Conn.resp(conn, 200, Jason.encode!(server_manifest))
+    Plug.Conn.resp(conn, 200, Jason.encode!(app_info))
     |> Plug.Conn.send_resp()
   end
 end
