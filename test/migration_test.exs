@@ -989,8 +989,7 @@ defmodule MigrationsFileTest do
       """
 
       File.write!(migration, dogs_content, [:append])
-
-      {:ok, msgs} = Electric.Migrations.build_migrations(%{:dir => migrations_path})
+      {:error, msgs} = Electric.Migrations.build_migrations(%{:dir => migrations_path})
       [msg2, msg3] = msgs
 
       assert [msg2, msg3] == [

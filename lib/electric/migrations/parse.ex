@@ -161,32 +161,32 @@ defmodule Electric.Migrations.Parse do
     }
   end
 
-  defp check_sql(_table_name, _sql) do
-    []
-  end
-
-  defp check_sql_warnings(table_name, sql) do
-    warnings = []
+  defp check_sql(table_name, sql) do
+    errors = []
     lower = String.downcase(sql)
 
-    warnings =
+    errors =
       if not String.contains?(lower, "strict") do
         [
           "The table #{table_name} is not STRICT."
-          | warnings
+          | errors
         ]
       else
-        warnings
+        errors
       end
 
     if not String.contains?(lower, "without rowid") do
       [
         "The table #{table_name} is not WITHOUT ROWID."
-        | warnings
+        | errors
       ]
     else
-      warnings
+      errors
     end
+  end
+
+  defp check_sql_warnings(_table_name, _sql) do
+    []
   end
 
   def all_index_info(all_migrations) do

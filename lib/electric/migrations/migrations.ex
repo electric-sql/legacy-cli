@@ -73,7 +73,7 @@ defmodule Electric.Migrations do
 
     with {:ok, src_folder} <- check_migrations_folder(options),
          {:ok, app_name} <- check_app_name(src_folder),
-         {:ok, updated_manifest, warnings} = update_manifest(src_folder, template) do
+         {:ok, updated_manifest, warnings} <- update_manifest(src_folder, template) do
       write_js_bundle(src_folder, updated_manifest, app_name, "local")
 
       if length(warnings) > 0 do
