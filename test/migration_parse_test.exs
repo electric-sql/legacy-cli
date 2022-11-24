@@ -7,7 +7,7 @@ defmodule MigrationsParseTest do
       CREATE TABLE IF NOT EXISTS fish (
       value TEXT PRIMARY KEY,
       colour TEXT
-      ) STRICT, WITHOUT ROWID;;
+      ) STRICT, WITHOUT ROWID;
       """
 
       migration = %{name: "test1", original_body: sql_in}
@@ -31,24 +31,88 @@ defmodule MigrationsParseTest do
       assert reason == ["In migration test1 SQL error: near \"SOME\": syntax error"]
     end
 
-    #    test "tests can check for strictness and rowid" do
-    #      sql_in = """
-    #      CREATE TABLE IF NOT EXISTS fish (
-    #      value TEXT PRIMARY KEY,
-    #      colour TEXT
-    #      );
-    #      """
-    #
-    #      {:error, message} =
-    #        Electric.Migrations.Parse.sql_ast_from_migrations([
-    #          %Electric.Migration{name: "test1", original_body: sql_in}
-    #        ])
-    #
-    #      expected =
-    #        "The table fish is not WITHOUT ROWID. Add the WITHOUT ROWID option at the end of the create table statement and make sure you also specify a primary key\nThe table fish is not STRICT. Add the STRICT option at the end of the create table statement"
-    #
-    #      assert message == expected
-    #    end
+    test "tests can check for strictness and rowid" do
+      sql_in = """
+      CREATE TABLE IF NOT EXISTS fish (
+      value TEXT PRIMARY KEY,
+      colour TEXT
+      );
+      """
+
+      {:error, message} =
+        Electric.Migrations.Parse.sql_ast_from_migrations([
+          %{name: "test1", original_body: sql_in}
+        ])
+
+      expected = ["The table fish is not WITHOUT ROWID.", "The table fish is not STRICT."]
+      assert message == expected
+    end
+
+    test "test doesn't allow main namespace" do
+      sql_in = """
+      CREATE TABLE IF NOT EXISTS main.fish (
+      value TEXT PRIMARY KEY,
+      colour TEXT
+      )STRICT, WITHOUT ROWID;
+      """
+
+      {:error, message} =
+        Electric.Migrations.Parse.sql_ast_from_migrations([
+          %{name: "test1", original_body: sql_in}
+        ])
+
+      expected = [
+        "The table main.fish has a database name. Please leave this out and only give the table name."
+      ]
+
+      assert message == expected
+    end
+
+    test "text find_table_names" do
+      sql_in = """
+      CREATE TABLE IF NOT EXISTS main.fish (
+      value TEXT PRIMARY KEY,
+      colour TEXT
+      )STRICT, WITHOUT ROWID;
+
+      CREATE TABLE  goat
+      (
+      value TEXT PRIMARY KEY,
+      colour TEXT
+      )STRICT, WITHOUT ROWID;
+
+      create table  apples.house
+      (
+      value TEXT PRIMARY KEY,
+      colour TEXT
+      )STRICT, WITHOUT ROWID;
+
+      """
+
+      names = Electric.Migrations.Parse.namespaced_table_names(sql_in)
+
+      assert names == ["main.fish", "apples.house"]
+    end
+
+    test "test doesn't allow any namespaces" do
+      sql_in = """
+      CREATE TABLE IF NOT EXISTS apple.fish (
+      value TEXT PRIMARY KEY,
+      colour TEXT
+      )STRICT, WITHOUT ROWID;
+      """
+
+      {:error, message} =
+        Electric.Migrations.Parse.sql_ast_from_migrations([
+          %{name: "test1", original_body: sql_in}
+        ])
+
+      expected = [
+        "The table apple.fish has a database name. Please leave this out and only give the table name."
+      ]
+
+      assert message == expected
+    end
 
     test "tests getting SQL structure for templating" do
       sql_in = """

@@ -4,6 +4,7 @@ defmodule Electric.Migrations.Parse do
   """
 
   @allowed_sql_types ["integer", "real", "text", "blob"]
+  @default_namespace "main"
 
   @doc """
   Given a set of Maps and returns an ugly map of maps containing info about the DB structure.
@@ -22,12 +23,34 @@ defmodule Electric.Migrations.Parse do
     end
   end
 
-  @doc false
-  def ast_from_ordered_migrations(migrations) do
-    namespace = "main"
-    # get all the table names
-    {:ok, conn} = Exqlite.Sqlite3.open(":memory:")
+  defp check_for_namespaces(migrations) do
+    namespaced =
+      for migration <- migrations do
+        namespaced_table_names(migration.original_body)
+      end
 
+    case List.flatten(namespaced) do
+      [] ->
+        :ok
+
+      namespaced ->
+        errors =
+          for name <- namespaced do
+            "The table #{name} has a database name. Please leave this out and only give the table name."
+          end
+
+        {:error, errors, []}
+    end
+  end
+
+  def namespaced_table_names(sql) do
+    for [_match, capture] <-
+          Regex.scan(~r/create table[^(]*\ ([\w]+\.[\w]+)\W*\(/, String.downcase(sql)) do
+      capture
+    end
+  end
+
+  def apply_migrations(conn, migrations) do
     sql_errors =
       Enum.flat_map(migrations, fn migration ->
         case Exqlite.Sqlite3.execute(conn, migration.original_body) do
@@ -36,9 +59,23 @@ defmodule Electric.Migrations.Parse do
         end
       end)
 
-    if length(sql_errors) > 0 do
-      {:error, sql_errors, []}
-    else
+    case List.flatten(sql_errors) do
+      [] ->
+        :ok
+
+      errors ->
+        {:error, errors, []}
+    end
+  end
+
+  @doc false
+  def ast_from_ordered_migrations(migrations) do
+    namespace = @default_namespace
+    # get all the table names
+    {:ok, conn} = Exqlite.Sqlite3.open(":memory:")
+
+    with :ok <- check_for_namespaces(migrations),
+         :ok <- apply_migrations(conn, migrations) do
       index_info = all_index_info_from_connection(conn)
 
       {:ok, statement} =
@@ -209,7 +246,7 @@ defmodule Electric.Migrations.Parse do
   end
 
   defp all_index_info_from_connection(conn) do
-    namespace = "main"
+    namespace = @default_namespace
 
     {:ok, statement} =
       Exqlite.Sqlite3.prepare(
