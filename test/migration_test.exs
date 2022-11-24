@@ -665,7 +665,7 @@ defmodule MigrationsFileTest do
       manifest = Jason.decode!(File.read!(manifest_path))
 
       expected = %{
-        "app_name" => "test_app",
+        "app_id" => "test_app",
         "migrations" => [
           %{
             "name" => init_migration_name,
@@ -708,7 +708,7 @@ defmodule MigrationsFileTest do
       sha = List.first(manifest["migrations"])["sha256"]
 
       expected = %{
-        "app_name" => "test_app",
+        "app_id" => "test_app",
         "migrations" => [
           %{
             "encoding" => "escaped",
@@ -769,8 +769,8 @@ defmodule MigrationsFileTest do
 
       expected = """
       export const data = {
-        "app_name": "test_app",
-        "env": "local",
+        "app_id": "test_app",
+        "environment": "local",
         "migrations": [
           {
             "encoding": "escaped",
@@ -809,7 +809,7 @@ defmodule MigrationsFileTest do
       {:ok, _msg} = Electric.Migrations.init_migrations("test_app", %{:dir => temp})
 
       {:ok, _msg} =
-        Electric.Migrations.update_app_name("test_app_changed", %{:dir => migrations_folder})
+        Electric.Migrations.update_app_id("test_app_changed", %{:dir => migrations_folder})
 
       init_migration_name =
         most_recent_migration_file(migrations_folder)
@@ -821,7 +821,7 @@ defmodule MigrationsFileTest do
       manifest = Jason.decode!(File.read!(manifest_path))
 
       expected = %{
-        "app_name" => "test_app_changed",
+        "app_id" => "test_app_changed",
         "migrations" => [
           %{
             "name" => init_migration_name,
@@ -860,9 +860,9 @@ defmodule MigrationsFileTest do
       File.write!(manifest_path, Jason.encode!(updated) |> Jason.Formatter.pretty_print())
     end
 
-    def init_and_add_migration(app_name, temp) do
+    def init_and_add_migration(app_id, temp) do
       migrations_path = Path.join([temp, "migrations"])
-      {:ok, _msg} = Electric.Migrations.init_migrations(app_name, %{:dir => temp})
+      {:ok, _msg} = Electric.Migrations.init_migrations(app_id, %{:dir => temp})
 
       my_new_migration = most_recent_migration_file(migrations_path)
 
@@ -912,7 +912,7 @@ defmodule MigrationsFileTest do
       #      sha = List.first(manifest["migrations"])["sha256"]
 
       expected = %{
-        "app_name" => "test",
+        "app_id" => "test",
         "migrations" => [
           %{
             "encoding" => "escaped",
@@ -1017,7 +1017,7 @@ defmodule MigrationsFileTest do
       {:error, msgs} = Electric.Migrations.build_migrations(%{:dir => migrations_path})
 
       assert msgs == [
-               "The type given for column value in table dogs is not allowed. Please use one of INTEGER, REAL, TEXT, BLOB"
+               "The type INT for column value in table dogs is not allowed. Please use one of INTEGER, REAL, TEXT, BLOB"
              ]
     end
 
@@ -1041,8 +1041,8 @@ defmodule MigrationsFileTest do
 
       expected = """
       export const data = {
-        "app_name": "test",
-        "env": "default",
+        "app_id": "test",
+        "environment": "default",
         "migrations": [
           {
             "encoding": "escaped",
@@ -1158,7 +1158,7 @@ defmodule MigrationsFileTest do
       manifest = Jason.decode!(File.read!(manifest_path))
 
       expected = %{
-        "app_name" => "test2",
+        "app_id" => "test2",
         "migrations" => [
           %{
             "encoding" => "escaped",

@@ -5,19 +5,19 @@ defmodule Electric.Migrations.Sync do
 
   alias Electric.Client
 
-  def sync_migrations(app_name, environment, local_bundle) do
-    with {:ok, server_manifest} <- get_migrations_from_server(app_name, environment),
+  def sync_migrations(app_id, environment, local_bundle) do
+    with {:ok, server_manifest} <- get_migrations_from_server(app_id, environment),
          {:ok, new_migrations} <- compare_local_with_server(local_bundle, server_manifest) do
-      upload_new_migrations(app_name, environment, new_migrations)
+      upload_new_migrations(app_id, environment, new_migrations)
     end
   end
 
-  def get_migrations_from_server(app_name, environment, with_satellite \\ false) do
+  def get_migrations_from_server(app_id, environment, with_satellite \\ false) do
     url =
       if with_satellite do
-        "apps/#{app_name}/environment/#{environment}/migrations?body=satellite"
+        "apps/#{app_id}/environment/#{environment}/migrations?body=satellite"
       else
-        "apps/#{app_name}/environment/#{environment}/migrations"
+        "apps/#{app_id}/environment/#{environment}/migrations"
       end
 
     case Client.get(url) do
@@ -33,8 +33,8 @@ defmodule Electric.Migrations.Sync do
     end
   end
 
-  def get_full_migration_from_server(app_name, environment, migration_name) do
-    url = "apps/#{app_name}/environment/#{environment}/migrations/#{migration_name}?body=all"
+  def get_full_migration_from_server(app_id, environment, migration_name) do
+    url = "apps/#{app_id}/environment/#{environment}/migrations/#{migration_name}?body=all"
 
     case Client.get(url) do
       {:ok, %Req.Response{status: 200, body: data}} ->
@@ -48,10 +48,10 @@ defmodule Electric.Migrations.Sync do
     end
   end
 
-  def get_all_migrations_from_server(app_name) do
-    with {:ok, env_names} <- get_environment_names_from_server(app_name) do
+  def get_all_migrations_from_server(app_id) do
+    with {:ok, env_names} <- get_environment_names_from_server(app_id) do
       Enum.reduce_while(env_names, {:ok, %{}}, fn env_name, {_status, manifests} ->
-        case get_migrations_from_server(app_name, env_name) do
+        case get_migrations_from_server(app_id, env_name) do
           {:error, msg} ->
             {:halt, {:error, msg}}
 
@@ -62,8 +62,8 @@ defmodule Electric.Migrations.Sync do
     end
   end
 
-  def get_environment_names_from_server(app_name) do
-    url = "apps/#{app_name}"
+  def get_environment_names_from_server(app_id) do
+    url = "apps/#{app_id}"
 
     case Client.get(url) do
       {:ok, %Req.Response{status: 200, body: data}} ->
@@ -123,14 +123,14 @@ defmodule Electric.Migrations.Sync do
     for migration <- bundle["migrations"], into: %{}, do: {migration["name"], migration}
   end
 
-  def upload_new_migrations(app_name, environment, new_migrations) do
+  def upload_new_migrations(app_id, environment, new_migrations) do
     migrations = new_migrations["migrations"]
 
     Enum.reduce_while(
       migrations,
       {:ok, "Synchronized #{length(migrations)} new migrations successfully"},
       fn migration, status ->
-        case upload_new_migration(app_name, environment, migration) do
+        case upload_new_migration(app_id, environment, migration) do
           {:ok, _msg} ->
             {:cont, status}
 
@@ -141,9 +141,9 @@ defmodule Electric.Migrations.Sync do
     )
   end
 
-  def upload_new_migration(app_name, environment, migration) do
-    #    url = "app/#{app_name}/env/#{environment}/migrations/#{migration["name"]}"
-    url = "apps/#{app_name}/environment/#{environment}/migrations"
+  def upload_new_migration(app_id, environment, migration) do
+    #    url = "app/#{app_id}/env/#{environment}/migrations/#{migration["name"]}"
+    url = "apps/#{app_id}/environment/#{environment}/migrations"
     payload = Jason.encode!(%{"migration" => migration}) |> Jason.Formatter.pretty_print()
 
     case Client.post(url, payload) do

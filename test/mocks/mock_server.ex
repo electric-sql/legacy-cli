@@ -82,8 +82,8 @@ defmodule Electric.MockServer do
     }
   }
 
-  defp get_some_migrations(app_name) do
-    looked_up = @fixtures[app_name]
+  defp get_some_migrations(app_id) do
+    looked_up = @fixtures[app_id]
     #    IO.inspect(looked_up)
     if looked_up == nil do
       []
@@ -96,16 +96,16 @@ defmodule Electric.MockServer do
     @migration_fixtures[migration_name]
   end
 
-  get "api/v1/apps/:app_name/environment/:environment/migrations" do
+  get "api/v1/apps/:app_id/environment/:environment/migrations" do
     server_manifest = %{
-      "migrations" => get_some_migrations(app_name)
+      "migrations" => get_some_migrations(app_id)
     }
 
     Plug.Conn.resp(conn, 200, Jason.encode!(server_manifest))
     |> Plug.Conn.send_resp()
   end
 
-  get "api/v1/apps/:app_name/environment/:environment/migrations/:migration_name" do
+  get "api/v1/apps/:app_id/environment/:environment/migrations/:migration_name" do
     server_manifest = %{
       "migration" => get_a_migration(migration_name)
     }
