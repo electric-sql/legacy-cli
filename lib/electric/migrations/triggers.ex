@@ -4,18 +4,26 @@ defmodule Electric.Migrations.Triggers do
   """
 
   @doc """
-  Given an ordered set of Electric.Migration returns a templated version of the final migration
+  Given an ordered set of Maps returns a templated version of the final migration
   SQL with all the triggers needed by Satellite added.
   """
   def add_triggers_to_last_migration(migration_set, template) do
-    case Electric.Migrations.Parse.sql_ast_from_migration_set(migration_set) do
+    migrations =
+      for migration <- migration_set do
+        #      IO.puts("**************")
+        #      IO.inspect(migration)
+
+        %{original_body: migration["original_body"], name: migration["name"]}
+      end
+
+    case Electric.Migrations.Parse.sql_ast_from_migrations(migrations) do
       {:ok, ast, warnings} ->
-        sql_in = List.last(migration_set).original_body
+        sql_in = List.last(migration_set)["original_body"]
         is_init = length(migration_set) == 1
         {template_all_the_things(sql_in, ast, template, is_init), warnings}
 
-      {:error, reasons} ->
-        {:error, reasons}
+      {:error, errors} ->
+        {:error, errors}
     end
   end
 

@@ -49,7 +49,8 @@ defmodule Electric.MixProject do
       {:optimus, [github: "thruflo/optimus"]},
       {:req, "~> 0.3.0"},
       {:exqlite, "~> 0.11.3"},
-      {:uuid, "~> 1.1.8"}
+      {:uuid, "~> 1.1.8"},
+      {:plug_cowboy, "~> 2.0", only: :test}
     ]
   end
 

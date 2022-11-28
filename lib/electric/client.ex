@@ -39,6 +39,16 @@ defmodule Electric.Client do
   end
 
   @doc """
+  Send an authenticated PUT.request to the API with a JSON payload.
+  """
+  def put("/" <> path, payload), do: put(path, payload)
+
+  def put(path, payload) do
+    base_req()
+    |> request(method: :put, url: path, json: payload)
+  end
+
+  @doc """
   Make an authenticated request to the API..
   """
   def request(%Req.Request{} = req, options \\ [], should_refresh \\ true) do
