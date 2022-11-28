@@ -7,8 +7,10 @@ defmodule Electric.Migrations.Sync do
 
   def sync_migrations(app_id, environment, local_bundle) do
     with {:ok, server_manifest} <- get_migrations_from_server(app_id, environment),
-         {:ok, new_migrations} <- compare_local_with_server(local_bundle, server_manifest) do
-      upload_new_migrations(app_id, environment, new_migrations)
+         {:ok, new_migrations} <- compare_local_with_server(local_bundle, server_manifest),
+         {:ok, msg} <- upload_new_migrations(app_id, environment, new_migrations),
+         {:ok, "ok"} <- apply_all_migrations(app_id, environment) do
+      {:ok, msg}
     end
   end
 
@@ -24,8 +26,7 @@ defmodule Electric.Migrations.Sync do
       {:ok, %Req.Response{status: 200, body: data}} ->
         {:ok, Jason.decode!(data)}
 
-      {:ok, stuff} ->
-        IO.inspect(stuff)
+      {:ok, _stuff} ->
         {:error, "invalid credentials"}
 
       {:error, _exception} ->
@@ -39,6 +40,21 @@ defmodule Electric.Migrations.Sync do
     case Client.get(url) do
       {:ok, %Req.Response{status: 200, body: data}} ->
         {:ok, Jason.decode!(data)}
+
+      {:ok, _} ->
+        {:error, "invalid credentials"}
+
+      {:error, _exception} ->
+        {:error, "failed to connect"}
+    end
+  end
+
+  def apply_all_migrations(app_id, environment) do
+    url = "apps/#{app_id}/environment/#{environment}/migrate"
+
+    case Client.post(url, nil) do
+      {:ok, %Req.Response{status: 200, body: _data}} ->
+        {:ok, "ok"}
 
       {:ok, _} ->
         {:error, "invalid credentials"}

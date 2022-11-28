@@ -119,6 +119,11 @@ defmodule Electric.MockServer do
     |> Plug.Conn.send_resp()
   end
 
+  post "api/v1/apps/:app_id/environment/:environment/migrate" do
+    Plug.Conn.resp(conn, 200, "ok")
+    |> Plug.Conn.send_resp()
+  end
+
   get "api/v1/apps/:app_id" do
     app_info = %{
       "databases" => [
