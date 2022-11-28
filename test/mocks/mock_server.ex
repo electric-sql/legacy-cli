@@ -102,7 +102,7 @@ defmodule Electric.MockServer do
     @migration_fixtures[migration_name]
   end
 
-  get "api/v1/apps/:app_id/environment/:environment/migrations" do
+  get "api/v1/apps/:app_id/environments/:environment/migrations" do
     server_manifest = %{
       "migrations" => get_some_migrations(app_id)
     }
@@ -112,7 +112,7 @@ defmodule Electric.MockServer do
     |> Plug.Conn.send_resp()
   end
 
-  get "api/v1/apps/:app_id/environment/:environment/migrations/:migration_name" do
+  get "api/v1/apps/:app_id/environments/:environment/migrations/:migration_name" do
     server_manifest = %{
       "migration" => get_a_migration(migration_name)
     }
@@ -122,13 +122,13 @@ defmodule Electric.MockServer do
     |> Plug.Conn.send_resp()
   end
 
-  post "api/v1/apps/:app_id/environment/:environment/migrations" do
+  post "api/v1/apps/:app_id/environments/:environment/migrations" do
     Plug.Conn.resp(conn, 201, "\"ok\"")
     |> Plug.Conn.put_resp_header("Content-Type", "application/json")
     |> Plug.Conn.send_resp()
   end
 
-  post "api/v1/apps/:app_id/environment/:environment/migrate" do
+  post "api/v1/apps/:app_id/environments/:environment/migrate" do
     Plug.Conn.resp(conn, 200, "\"ok\"")
     |> Plug.Conn.put_resp_header("Content-Type", "application/json")
     |> Plug.Conn.send_resp()

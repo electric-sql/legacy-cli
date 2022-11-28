@@ -17,9 +17,9 @@ defmodule Electric.Migrations.Sync do
   def get_migrations_from_server(app_id, environment, with_satellite \\ false) do
     url =
       if with_satellite do
-        "apps/#{app_id}/environment/#{environment}/migrations?body=satellite"
+        "apps/#{app_id}/environments/#{environment}/migrations?body=satellite"
       else
-        "apps/#{app_id}/environment/#{environment}/migrations"
+        "apps/#{app_id}/environments/#{environment}/migrations"
       end
 
     case Client.get(url) do
@@ -35,7 +35,7 @@ defmodule Electric.Migrations.Sync do
   end
 
   def get_full_migration_from_server(app_id, environment, migration_name) do
-    url = "apps/#{app_id}/environment/#{environment}/migrations/#{migration_name}?body=all"
+    url = "apps/#{app_id}/environments/#{environment}/migrations/#{migration_name}?body=all"
 
     case Client.get(url) do
       {:ok, %Req.Response{status: 200, body: data}} ->
@@ -50,7 +50,7 @@ defmodule Electric.Migrations.Sync do
   end
 
   def apply_all_migrations(app_id, environment) do
-    url = "apps/#{app_id}/environment/#{environment}/migrate"
+    url = "apps/#{app_id}/environments/#{environment}/migrate"
 
     case Client.post(url, nil) do
       {:ok, %Req.Response{status: 200, body: _data}} ->
@@ -159,7 +159,7 @@ defmodule Electric.Migrations.Sync do
 
   def upload_new_migration(app_id, environment, migration) do
     #    url = "app/#{app_id}/env/#{environment}/migrations/#{migration["name"]}"
-    url = "apps/#{app_id}/environment/#{environment}/migrations"
+    url = "apps/#{app_id}/environments/#{environment}/migrations"
     payload = Jason.encode!(%{"migration" => migration}) |> Jason.Formatter.pretty_print()
 
     case Client.post(url, payload) do
