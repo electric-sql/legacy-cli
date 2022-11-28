@@ -1051,6 +1051,7 @@ defmodule MigrationsFileTest do
               "something random"
             ],
             "sha256": "2a97d825e41ae70705381016921c55a3b086a813649e4da8fcba040710055747",
+            "status": "applied",
             "title": "init"
           },
           {
@@ -1060,6 +1061,7 @@ defmodule MigrationsFileTest do
               "other stuff"
             ],
             "sha256": "d0a52f739f137fc80fd67d9fd347cb4097bd6fb182e583f2c64d8de309393ad6",
+            "status": "applied",
             "title": "another"
           }
         ]
@@ -1099,7 +1101,24 @@ defmodule MigrationsFileTest do
         Electric.Migrations.list_migrations(%{:dir => migrations_path})
 
       assert listing ==
-               "\n------ Electric SQL Migrations ------\n\nfirst_migration_name\tdefault: \e[32msync\e[0m\nsecond_migration_name\tdefault: \e[32msync\e[0m\n"
+               "\n------ Electric SQL Migrations ------\n\nfirst_migration_name\tdefault: \e[32mapplied\e[0m\nsecond_migration_name\tdefault: \e[32mapplied\e[0m\n"
+    end
+
+    test "test list with status" do
+      temp = temp_folder()
+      migrations_path = Path.join([temp, "migrations"])
+
+      [first_migration, second_migration] = init_and_add_migration("test", temp)
+      first_migration_name = Path.dirname(first_migration) |> Path.basename()
+      second_migration_name = Path.dirname(second_migration) |> Path.basename()
+      change_migrations_name(migrations_path, first_migration_name, "first_migration_name")
+      change_migrations_name(migrations_path, second_migration_name, "second_migration_name")
+
+      {:ok, listing, _mismatched} =
+        Electric.Migrations.list_migrations(%{:dir => migrations_path})
+
+      assert listing ==
+               "\n------ Electric SQL Migrations ------\n\nfirst_migration_name\tdefault: \e[32mapplied\e[0m\nsecond_migration_name\tdefault: \e[32mapplied\e[0m\n"
     end
 
     test "test lists with error" do
@@ -1115,7 +1134,7 @@ defmodule MigrationsFileTest do
       {:ok, listing, mismatched} = Electric.Migrations.list_migrations(%{:dir => migrations_path})
 
       assert listing ==
-               "\n------ Electric SQL Migrations ------\n\nfirst_migration_name\tdefault: \e[32msync\e[0m\nsecond_migration_name\tdefault: \e[31mdifferent\e[0m\n"
+               "\n------ Electric SQL Migrations ------\n\nfirst_migration_name\tdefault: \e[32mapplied\e[0m\nsecond_migration_name\tdefault: \e[31mdifferent\e[0m\n"
 
       assert mismatched == [{"second_migration_name", "default"}]
     end

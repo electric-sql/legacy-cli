@@ -127,6 +127,7 @@ defmodule Electric.Migrations do
          {:ok, updated_manifest, _warnings} = update_manifest(src_folder, template),
          {:ok, all_environment_manifests} <-
            Electric.Migrations.Sync.get_all_migrations_from_server(app_id) do
+      #          IO.inspect(all_environment_manifests)
       {_listing, mismatched} = format_listing(updated_manifest, all_environment_manifests)
 
       if Enum.member?(mismatched, {migration_name, environment}) do
@@ -191,8 +192,8 @@ defmodule Electric.Migrations do
                 nil ->
                   {"-", []}
 
-                %{"sha256" => ^sha256} ->
-                  {IO.ANSI.green() <> "sync" <> IO.ANSI.reset(), []}
+                %{"sha256" => ^sha256, "status" => status} ->
+                  {IO.ANSI.green() <> status <> IO.ANSI.reset(), []}
 
                 _ ->
                   {IO.ANSI.red() <> "different" <> IO.ANSI.reset(),

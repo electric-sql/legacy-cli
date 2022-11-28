@@ -24,7 +24,7 @@ defmodule Electric.Migrations.Sync do
 
     case Client.get(url) do
       {:ok, %Req.Response{status: 200, body: data}} ->
-        {:ok, Jason.decode!(data)}
+        {:ok, data}
 
       {:ok, _stuff} ->
         {:error, "invalid credentials"}
@@ -39,7 +39,7 @@ defmodule Electric.Migrations.Sync do
 
     case Client.get(url) do
       {:ok, %Req.Response{status: 200, body: data}} ->
-        {:ok, Jason.decode!(data)}
+        {:ok, data}
 
       {:ok, _} ->
         {:error, "invalid credentials"}
@@ -83,7 +83,7 @@ defmodule Electric.Migrations.Sync do
 
     case Client.get(url) do
       {:ok, %Req.Response{status: 200, body: data}} ->
-        as_json = Jason.decode!(data)
+        as_json = data
 
         names =
           for database <- as_json["databases"] do

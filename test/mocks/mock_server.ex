@@ -15,13 +15,15 @@ defmodule Electric.MockServer do
       %{
         "name" => "1666612306_test_migration",
         "sha256" => "211b1e2b203d1fcac6ccb526d2775ec1f5575d4018ab1a33272948ce0ae76775",
-        "title" => "test migration"
+        "title" => "test migration",
+        "status" => "applied"
       }
     ],
     "test" => [
       %{
         "encoding" => "escaped",
         "name" => "first_migration_name",
+        "status" => "applied",
         "satellite_body" => [
           "something random"
         ],
@@ -31,6 +33,7 @@ defmodule Electric.MockServer do
       %{
         "encoding" => "escaped",
         "name" => "second_migration_name",
+        "status" => "applied",
         "satellite_body" => ["other stuff"],
         "sha256" => "d0a52f739f137fc80fd67d9fd347cb4097bd6fb182e583f2c64d8de309393ad6",
         "title" => "another"
@@ -40,6 +43,7 @@ defmodule Electric.MockServer do
       %{
         "encoding" => "escaped",
         "name" => "first_migration_name",
+        "status" => "applied",
         "satellite_body" => [
           "something random"
         ],
@@ -49,6 +53,7 @@ defmodule Electric.MockServer do
       %{
         "encoding" => "escaped",
         "name" => "second_migration_name",
+        "status" => "applied",
         "satellite_body" => ["other stuff"],
         "sha256" => "d0a52f739f137fc80fd67d9fd347cb4097bd6fb182e583f2c64d8de309393ad7",
         "title" => "another"
@@ -60,6 +65,7 @@ defmodule Electric.MockServer do
     "second_migration_name" => %{
       "encoding" => "escaped",
       "name" => "second_migration_name",
+      "status" => "applied",
       "satellite_body" => ["-- reverted satellite code"],
       "postgres_body" => "-- something",
       "original_body" => """
@@ -102,6 +108,7 @@ defmodule Electric.MockServer do
     }
 
     Plug.Conn.resp(conn, 200, Jason.encode!(server_manifest))
+    |> Plug.Conn.put_resp_header("Content-Type", "application/json")
     |> Plug.Conn.send_resp()
   end
 
@@ -111,16 +118,19 @@ defmodule Electric.MockServer do
     }
 
     Plug.Conn.resp(conn, 200, Jason.encode!(server_manifest))
+    |> Plug.Conn.put_resp_header("Content-Type", "application/json")
     |> Plug.Conn.send_resp()
   end
 
   post "api/v1/apps/:app_id/environment/:environment/migrations" do
-    Plug.Conn.resp(conn, 201, "ok")
+    Plug.Conn.resp(conn, 201, "\"ok\"")
+    |> Plug.Conn.put_resp_header("Content-Type", "application/json")
     |> Plug.Conn.send_resp()
   end
 
   post "api/v1/apps/:app_id/environment/:environment/migrate" do
-    Plug.Conn.resp(conn, 200, "ok")
+    Plug.Conn.resp(conn, 200, "\"ok\"")
+    |> Plug.Conn.put_resp_header("Content-Type", "application/json")
     |> Plug.Conn.send_resp()
   end
 
@@ -137,6 +147,7 @@ defmodule Electric.MockServer do
     }
 
     Plug.Conn.resp(conn, 200, Jason.encode!(app_info))
+    |> Plug.Conn.put_resp_header("Content-Type", "application/json")
     |> Plug.Conn.send_resp()
   end
 end

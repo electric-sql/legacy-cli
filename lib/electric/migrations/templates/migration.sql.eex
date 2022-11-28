@@ -1,7 +1,7 @@
 /*
 Electric SQL Migration
 name: <%= name %>
-title": <%= title %>
+title: <%= title %>
 
 When you build or sync these migrations we will add some triggers and metadata
 so that Electric Satellite can sync your data.
