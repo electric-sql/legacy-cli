@@ -9,7 +9,7 @@ defmodule Electric.Migrations.Sync do
     with {:ok, server_manifest} <- get_migrations_from_server(app_id, environment),
          {:ok, new_migrations} <- compare_local_with_server(local_bundle, server_manifest),
          {:ok, msg} <- upload_new_migrations(app_id, environment, new_migrations),
-         {:ok, "ok"} <- apply_all_migrations(app_id, environment) do
+         {:ok, "ok"} <- apply_all_migrations(app_id, environment, new_migrations) do
       {:ok, msg}
     end
   end
@@ -49,11 +49,13 @@ defmodule Electric.Migrations.Sync do
     end
   end
 
-  def apply_all_migrations(app_id, environment) do
+  def apply_all_migrations(app_id, environment, new_migrations) do
+    last_migration = List.last(new_migrations["migrations"])
+
     url = "apps/#{app_id}/environments/#{environment}/migrate"
 
-    case Client.post(url, nil) do
-      {:ok, %Req.Response{status: 200, body: _data}} ->
+    case Client.post(url, %{"migration_name" => last_migration["name"]}) do
+      {:ok, %Req.Response{status: 200, body: body}} ->
         {:ok, "ok"}
 
       {:ok, _} ->
@@ -158,11 +160,9 @@ defmodule Electric.Migrations.Sync do
   end
 
   def upload_new_migration(app_id, environment, migration) do
-    #    url = "app/#{app_id}/env/#{environment}/migrations/#{migration["name"]}"
     url = "apps/#{app_id}/environments/#{environment}/migrations"
-    payload = Jason.encode!(%{"migration" => migration}) |> Jason.Formatter.pretty_print()
 
-    case Client.post(url, payload) do
+    case Client.post(url, %{"migration" => migration}) do
       {:ok, %Req.Response{status: 201}} ->
         {:ok, "ok"}
 
