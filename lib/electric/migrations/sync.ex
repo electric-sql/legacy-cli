@@ -55,7 +55,7 @@ defmodule Electric.Migrations.Sync do
     url = "apps/#{app_id}/environments/#{environment}/migrate"
 
     case Client.post(url, %{"migration_name" => last_migration["name"]}) do
-      {:ok, %Req.Response{status: 200, body: body}} ->
+      {:ok, %Req.Response{status: 200, body: _body}} ->
         {:ok, "ok"}
 
       {:ok, _} ->
