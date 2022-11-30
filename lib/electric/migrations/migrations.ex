@@ -119,7 +119,7 @@ defmodule Electric.Migrations do
 
     with {:ok, src_folder} <- check_migrations_folder(options),
          {:ok, app_id} <- check_app_id(src_folder),
-         {:ok, updated_manifest, _warnings} = update_manifest(src_folder, template),
+         {:ok, updated_manifest, _warnings} <- update_manifest(src_folder, template),
          {:ok, all_environment_manifests} <-
            Electric.Migrations.Sync.get_all_migrations_from_server(app_id) do
       {listing, mismatched} = format_listing(updated_manifest, all_environment_manifests)
