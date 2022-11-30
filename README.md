@@ -80,7 +80,8 @@ See also https://github.com/bake-bake-bake/bakeware#static-compiling-openssl-int
 The `migrations` command lets you create new migrations, build electrified javascript distributions of the migrations 
 to use in your project, and sync your migrations to our cloud service.
 
-###`migrations init APP_ID [--dir MIGRATIONS_DIR]`
+### init
+`migrations init APP_ID [--dir MIGRATIONS_DIR]`
 
 Creates a new folder for migrations in your current directory called 'migrations' and adds a new migration 
 folder to it with a name automatically derived from the current time in UTC and the title `init` e.g. `20221116162204816_init`
@@ -94,16 +95,16 @@ The optional `MIGRATIONS_DIR` allows you to create the migration folder somewher
 
 `MIGRATIONS_DIR` must end with the folder name `migrations`
 
-
-###`migrations app APP_ID [--dir MIGRATIONS_DIR]`
+### app
+`migrations app APP_ID [--dir MIGRATIONS_DIR]`
 
 Changes the stored `APP_ID` that is used by all the other CLI migrations commands.
 
 The optional `MIGRATIONS_DIR` allows you to specify which migration directory to use other than one in the 
 current working directory.
 
-
-###`migrations new [--help] [--dir MIGRATIONS_DIR] MIGRATION_TITLE`
+###new
+`migrations new [--help] [--dir MIGRATIONS_DIR] MIGRATION_TITLE`
 
 MIGRATION_TITLE should be a short human readable description of the new migration.
 
@@ -113,8 +114,8 @@ time in UTC and the given title.
 The optional `MIGRATIONS_DIR` allows you to specify which migration directory to use other than one in the 
 current working directory.
 
-
-###`migrations build [--help] [--postgres] [--satellite] [--dir MIGRATIONS_DIR]`
+###build
+`migrations build [--help] [--postgres] [--satellite] [--dir MIGRATIONS_DIR]`
 
 Builds a javascript file at `dist/index.js` that contains all your migrations with Electric DB's added 
 DDL and some metadata.  
@@ -131,10 +132,8 @@ The optional flag `--postgres` will also build a `postgres.sql` file in each mig
 
 The optional flag `--satellite` will also build a `satellite.sql` file in each migrations' folder.
 
-
-
-
-###`migrations sync [--env ENVIRONMENT_NAME] [--dir MIGRATIONS_DIR]`
+###sync
+`migrations sync [--env ENVIRONMENT_NAME] [--dir MIGRATIONS_DIR]`
 
 Synchronises changes you have made to migration SQL files in your local `migrations` folder up to the Electric SQl servers, 
 and builds a new javascript file at `dist/index.js` that matches the newly synchronised set of migrations.
@@ -156,16 +155,16 @@ Also if a migration has a name that is lower in sort order than one already appl
 The optional `MIGRATIONS_DIR` allows you to specify which migration directory to use other than one in the 
 current working directory.
 
-
-###`migrations list [--help] [--dir MIGRATIONS_DIR]`
+###list
+`migrations list [--help] [--dir MIGRATIONS_DIR]`
 
 Will show a list of all the migrations and their status in every env in the app.
 
 The optional `MIGRATIONS_DIR` allows you to specify which migration directory to use other than one in the 
 current working directory.
 
-
-### `migration migrations revert [--help] [--dir MIGRATIONS_DIR] [--env ENVIRONMENT_NAME] MIGRATION_NAME`
+### revert
+`migrations revert [--help] [--dir MIGRATIONS_DIR] [--env ENVIRONMENT_NAME] MIGRATION_NAME`
 
 This will copy the named migration from the Electric SQL server to replace the local one. 
 
