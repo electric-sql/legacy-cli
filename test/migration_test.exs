@@ -510,7 +510,7 @@ defmodule MigrationsTest do
 
       fixed = Electric.Migrations.slugify_title(title, dt)
 
-      assert fixed == "19641205093007345_paul_s_birthday_yay"
+      assert fixed == "19641205_093007_345_paul_s_birthday_yay"
     end
 
     test "tests trigger has all columns" do

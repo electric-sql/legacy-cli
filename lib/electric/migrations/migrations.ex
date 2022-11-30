@@ -213,7 +213,7 @@ defmodule Electric.Migrations do
         {lines <> line <> "\n", mismatched ++ mismatches}
       end)
 
-    {"\n------ Electric SQL Migrations ------\n\n" <> lines, mismatched}
+    {IO.ANSI.reset() <> "\n------ Electric SQL Migrations ------\n\n" <> lines, mismatched}
   end
 
   defp optionally_write(_func, _folder, _manifest, flag) when flag !== true do
@@ -305,9 +305,9 @@ defmodule Electric.Migrations do
     ts =
       DateTime.truncate(datetime, :millisecond)
       |> DateTime.to_iso8601(:basic)
-      |> String.replace("T", "")
+      |> String.replace("T", "_")
       |> String.replace("Z", "")
-      |> String.replace(".", "")
+      |> String.replace(".", "_")
 
     "#{ts}_#{slug}" |> String.slice(0..64)
   end
