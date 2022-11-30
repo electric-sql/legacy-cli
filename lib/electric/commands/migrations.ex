@@ -176,6 +176,14 @@ defmodule Electric.Commands.Migrations do
           options: @dir ++ @env,
           flags: default_flags()
         ],
+        #        apply: [
+        #          name: "apply",
+        #          about: """
+        #          Applies all migrations
+        #          """,
+        #          options: @dir,
+        #          flags: default_flags()
+        #        ],
         list: [
           name: "list",
           about: """
@@ -246,6 +254,23 @@ defmodule Electric.Commands.Migrations do
       end
     end)
   end
+
+  #  def apply(%{options: options, unknown: _unknown}) do
+  #    environment = Map.get(options, :env, "default")
+  #
+  #    Progress.run("Applying satellite migrations", fn ->
+  #      case Electric.Migrations.apply_migrations(environment, options) do
+  #        {:ok, nil} ->
+  #          {:success, "Migrations applied successfully"}
+  #        {:ok, warnings} ->
+  #          #        IO.inspect(warnings)
+  #          {:success, format_messages("warnings", warnings)}
+  #
+  #        {:error, errors} ->
+  #          {:error, format_messages("errors", errors)}
+  #      end
+  #    end)
+  #  end
 
   def sync(%{args: _args, flags: _flags, options: options, unknown: _unknown}) do
     environment = Map.get(options, :env, "default")

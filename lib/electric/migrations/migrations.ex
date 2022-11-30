@@ -114,6 +114,13 @@ defmodule Electric.Migrations do
     end
   end
 
+  def apply_migrations(environment, options) do
+    with {:ok, src_folder} <- check_migrations_folder(options),
+         {:ok, app_id} <- check_app_id(src_folder) do
+      Electric.Migrations.Sync.apply_all_migrations(app_id, environment)
+    end
+  end
+
   def list_migrations(options) do
     template = Map.get(options, :template, @satellite_template)
 
