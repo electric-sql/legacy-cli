@@ -698,7 +698,11 @@ defmodule MigrationsFileTest do
 
       File.write!(my_new_migration, new_content, [:append])
 
-      {:ok, _msg} = Electric.Migrations.build_migrations(%{:dir => migrations_path})
+      {:ok, _msg} =
+        Electric.Migrations.build_migrations(%{:dir => migrations_path}, %{
+          satellite: false,
+          postgres: false
+        })
 
       init_migration_name = Path.basename(migration_folder)
 
@@ -758,7 +762,11 @@ defmodule MigrationsFileTest do
 
       File.write!(my_new_migration, new_content, [:append])
 
-      {:ok, _msg} = Electric.Migrations.build_migrations(%{:dir => migrations_path})
+      {:ok, _msg} =
+        Electric.Migrations.build_migrations(%{:dir => migrations_path}, %{
+          satellite: false,
+          postgres: false
+        })
 
       init_migration_name = Path.basename(migration_folder)
 
@@ -906,7 +914,11 @@ defmodule MigrationsFileTest do
       first_migration_name = Path.dirname(first_migration) |> Path.basename()
       second_migration_name = Path.dirname(second_migration) |> Path.basename()
 
-      {:ok, _msg} = Electric.Migrations.build_migrations(%{:dir => migrations_path})
+      {:ok, _msg} =
+        Electric.Migrations.build_migrations(%{:dir => migrations_path}, %{
+          satellite: false,
+          postgres: false
+        })
 
       manifest = Jason.decode!(File.read!(manifest_path))
       #      sha = List.first(manifest["migrations"])["sha256"]
@@ -978,7 +990,11 @@ defmodule MigrationsFileTest do
       migrations_path = Path.join([temp, "migrations"])
       init_and_add_migration("test", temp)
 
-      {:ok, _msg} = Electric.Migrations.build_migrations(%{:dir => migrations_path})
+      {:ok, _msg} =
+        Electric.Migrations.build_migrations(%{:dir => migrations_path}, %{
+          satellite: false,
+          postgres: false
+        })
 
       migration = most_recent_migration_file(migrations_path)
 
@@ -989,7 +1005,13 @@ defmodule MigrationsFileTest do
       """
 
       File.write!(migration, dogs_content, [:append])
-      {:error, msgs} = Electric.Migrations.build_migrations(%{:dir => migrations_path})
+
+      {:error, msgs} =
+        Electric.Migrations.build_migrations(%{:dir => migrations_path}, %{
+          satellite: false,
+          postgres: false
+        })
+
       [msg2, msg3] = msgs
 
       assert [msg2, msg3] == [
@@ -998,12 +1020,48 @@ defmodule MigrationsFileTest do
              ]
     end
 
+    test "test build writes satellite" do
+      temp = temp_folder()
+      migrations_path = Path.join([temp, "migrations"])
+      init_and_add_migration("test", temp)
+
+      {:ok, _msg} =
+        Electric.Migrations.build_migrations(%{:dir => migrations_path}, %{
+          satellite: true,
+          postgres: false
+        })
+
+      migration_dir = most_recent_migration_file(migrations_path) |> Path.dirname()
+      satellite_file_path = Path.join(migration_dir, "satellite.sql")
+      assert File.exists?(satellite_file_path)
+    end
+
+    test "test build writes postgres" do
+      temp = temp_folder()
+      migrations_path = Path.join([temp, "migrations"])
+      init_and_add_migration("test", temp)
+
+      {:ok, _msg} =
+        Electric.Migrations.build_migrations(%{:dir => migrations_path}, %{
+          satellite: false,
+          postgres: true
+        })
+
+      migration_dir = most_recent_migration_file(migrations_path) |> Path.dirname()
+      satellite_file_path = Path.join(migration_dir, "postgres.sql")
+      assert File.exists?(satellite_file_path)
+    end
+
     test "test build type warning" do
       temp = temp_folder()
       migrations_path = Path.join([temp, "migrations"])
       init_and_add_migration("test", temp)
 
-      {:ok, _msg} = Electric.Migrations.build_migrations(%{:dir => migrations_path})
+      {:ok, _msg} =
+        Electric.Migrations.build_migrations(%{:dir => migrations_path}, %{
+          satellite: false,
+          postgres: false
+        })
 
       migration = most_recent_migration_file(migrations_path)
 
@@ -1014,7 +1072,12 @@ defmodule MigrationsFileTest do
       """
 
       File.write!(migration, dogs_content, [:append])
-      {:error, msgs} = Electric.Migrations.build_migrations(%{:dir => migrations_path})
+
+      {:error, msgs} =
+        Electric.Migrations.build_migrations(%{:dir => migrations_path}, %{
+          satellite: false,
+          postgres: false
+        })
 
       assert msgs == [
                "The type INT for column value in table dogs is not allowed. Please use one of INTEGER, REAL, TEXT, BLOB"

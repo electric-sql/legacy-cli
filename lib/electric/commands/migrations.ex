@@ -70,6 +70,24 @@ defmodule Electric.Commands.Migrations do
     ]
   ]
 
+  @postgres [
+    postgres: [
+      long: "--postgres",
+      short: "-p",
+      help: "Also generate PostgresSQL when building",
+      required: false
+    ]
+  ]
+
+  @satellite [
+    satellite: [
+      long: "--satellite",
+      short: "-s",
+      help: "Also generate satellite SQL when building",
+      required: false
+    ]
+  ]
+
   def spec do
     [
       name: "migrations",
@@ -131,7 +149,7 @@ defmodule Electric.Commands.Migrations do
           Add this file to your mobile or web project to configure your SQLite database.
           """,
           options: @dir,
-          flags: default_flags()
+          flags: default_flags() |> Keyword.merge(@postgres) |> Keyword.merge(@satellite)
         ],
         sync: [
           name: "sync",
@@ -213,9 +231,9 @@ defmodule Electric.Commands.Migrations do
     end)
   end
 
-  def build(%{options: options, unknown: _unknown}) do
+  def build(%{options: options, flags: flags, unknown: _unknown}) do
     Progress.run("Building satellite migrations", fn ->
-      case Electric.Migrations.build_migrations(options) do
+      case Electric.Migrations.build_migrations(options, flags) do
         {:ok, nil} ->
           {:success, "Migrations built successfully"}
 
