@@ -103,7 +103,7 @@ The optional `MIGRATIONS_DIR` allows you to specify which migration directory to
 current working directory.
 
 
-###`migrations new MIGRATION_TITLE [--dir MIGRATIONS_DIR]`
+###`migrations new [--help] [--dir MIGRATIONS_DIR] MIGRATION_TITLE`
 
 MIGRATION_TITLE should be a short human readable description of the new migration.
 
@@ -114,7 +114,7 @@ The optional `MIGRATIONS_DIR` allows you to specify which migration directory to
 current working directory.
 
 
-###`migrations build [--dir MIGRATIONS_DIR]`
+###`migrations build [--help] [--postgres] [--satellite] [--dir MIGRATIONS_DIR]`
 
 Builds a javascript file at `dist/index.js` that contains all your migrations with Electric DB's added 
 DDL and some metadata.  
@@ -126,6 +126,12 @@ Add this file to your mobile or web project to configure your SQLite database.
 
 The optional `MIGRATIONS_DIR` allows you to specify which migration directory to use other than one in the 
 current working directory.
+
+The optional flag `--postgres` will also build a `postgres.sql` file in each migrations' folder with the PostgreSQL
+
+The optional flag `--satellite` will also build a `satellite.sql` file in each migrations' folder.
+
+
 
 
 ###`migrations sync [--env ENVIRONMENT_NAME] [--dir MIGRATIONS_DIR]`
@@ -151,7 +157,7 @@ The optional `MIGRATIONS_DIR` allows you to specify which migration directory to
 current working directory.
 
 
-###`migrations list [--dir MIGRATIONS_DIR]`
+###`migrations list [--help] [--dir MIGRATIONS_DIR]`
 
 Will show a list of all the migrations and their status in every env in the app.
 
@@ -159,7 +165,7 @@ The optional `MIGRATIONS_DIR` allows you to specify which migration directory to
 current working directory.
 
 
-### `migration revert MIGRATION_NAME [--env ENVIRONMENT_NAME] [--dir MIGRATIONS_DIR]`
+### `migration migrations revert [--help] [--dir MIGRATIONS_DIR] [--env ENVIRONMENT_NAME] MIGRATION_NAME`
 
 This will copy the named migration from the Electric SQL server to replace the local one. 
 

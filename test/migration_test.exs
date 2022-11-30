@@ -1164,7 +1164,7 @@ defmodule MigrationsFileTest do
         Electric.Migrations.list_migrations(%{:dir => migrations_path})
 
       assert listing ==
-               "\n------ Electric SQL Migrations ------\n\nfirst_migration_name\tdefault: \e[32mapplied\e[0m\nsecond_migration_name\tdefault: \e[32mapplied\e[0m\n"
+               "\e[0m\n------ Electric SQL Migrations ------\n\nfirst_migration_name\tdefault: \e[32mapplied\e[0m\nsecond_migration_name\tdefault: \e[32mapplied\e[0m\n"
     end
 
     test "test list with status" do
@@ -1181,7 +1181,7 @@ defmodule MigrationsFileTest do
         Electric.Migrations.list_migrations(%{:dir => migrations_path})
 
       assert listing ==
-               "\n------ Electric SQL Migrations ------\n\nfirst_migration_name\tdefault: \e[32mapplied\e[0m\nsecond_migration_name\tdefault: \e[32mapplied\e[0m\n"
+               "\e[0m\n------ Electric SQL Migrations ------\n\nfirst_migration_name\tdefault: \e[32mapplied\e[0m\nsecond_migration_name\tdefault: \e[32mapplied\e[0m\n"
     end
 
     test "test lists with error" do
@@ -1197,7 +1197,7 @@ defmodule MigrationsFileTest do
       {:ok, listing, mismatched} = Electric.Migrations.list_migrations(%{:dir => migrations_path})
 
       assert listing ==
-               "\n------ Electric SQL Migrations ------\n\nfirst_migration_name\tdefault: \e[32mapplied\e[0m\nsecond_migration_name\tdefault: \e[31mdifferent\e[0m\n"
+               "\e[0m\n------ Electric SQL Migrations ------\n\nfirst_migration_name\tdefault: \e[32mapplied\e[0m\nsecond_migration_name\tdefault: \e[31mdifferent\e[0m\n"
 
       assert mismatched == [{"second_migration_name", "default"}]
     end
