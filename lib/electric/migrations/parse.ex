@@ -149,7 +149,13 @@ defmodule Electric.Migrations.Parse do
         "The type #{info.type} for column #{info.name} in table #{name} is not allowed. Please use one of INTEGER, REAL, TEXT, BLOB"
       end
 
-    validation_fails = validation_fails ++ type_errors
+    not_null_errors =
+      for {_cid, info} <- column_infos,
+          info.pk == 1 && info.notnull == 0 do
+        "The primary key #{info.name} in table #{name} isn't NOT NULL. Please add NOT NULL to this column."
+      end
+
+    validation_fails = validation_fails ++ type_errors ++ not_null_errors
 
     # private keys columns
     private_key_column_names =
@@ -211,15 +217,15 @@ defmodule Electric.Migrations.Parse do
     errors = []
     lower = String.downcase(sql)
 
-    errors =
-      if not String.contains?(lower, "strict") do
-        [
-          "The table #{table_name} is not STRICT."
-          | errors
-        ]
-      else
-        errors
-      end
+    #    errors =
+    #      if not String.contains?(lower, "strict") do
+    #        [
+    #          "The table #{table_name} is not STRICT."
+    #          | errors
+    #        ]
+    #      else
+    #        errors
+    #      end
 
     if not String.contains?(lower, "without rowid") do
       [

@@ -44,7 +44,11 @@ defmodule MigrationsParseTest do
           %{name: "test1", original_body: sql_in}
         ])
 
-      expected = ["The table fish is not WITHOUT ROWID.", "The table fish is not STRICT."]
+      expected = [
+        "The table fish is not WITHOUT ROWID.",
+        "The primary key value in table fish isn't NOT NULL. Please add NOT NULL to this column."
+      ]
+
       assert message == expected
     end
 
