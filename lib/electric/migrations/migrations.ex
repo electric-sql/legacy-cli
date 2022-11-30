@@ -276,6 +276,7 @@ defmodule Electric.Migrations do
         {:error, "Please set the app name"}
 
       app_id ->
+        IO.puts("app_id: #{app_id} ")
         {:ok, app_id}
     end
   end
