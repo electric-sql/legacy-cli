@@ -41,7 +41,7 @@ defmodule Electric.Commands.Migrations do
 
   @app [
     app: [
-      value_name: "APP_SLUG",
+      value_name: "APP_ID",
       help: "Globally unique slug generated when you create an application",
       required: true,
       parser: :string
@@ -103,7 +103,7 @@ defmodule Electric.Commands.Migrations do
 
           Inside this folder will be a file called `migration.sql`. You should write your initial SQLite DDL SQL into this file.
 
-          The APP_SLUG you give should be the slug of the app previous created in the web console.
+          The APP_ID you give should be the slug of the app previous created in the web console.
           You give it once here and the CLI stores it in the 'migrations/manifest.json' so you don't have to keep re-typing it.
           """,
           args: @app,
@@ -115,7 +115,7 @@ defmodule Electric.Commands.Migrations do
           about: """
           Updates the app used.
 
-          Changes the stored APP_SLUG that is used by all the other CLI migrations commands.
+          Changes the stored APP_ID that is used by all the other CLI migrations commands.
           """,
           args: @app,
           options: @dir,

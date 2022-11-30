@@ -80,14 +80,14 @@ See also https://github.com/bake-bake-bake/bakeware#static-compiling-openssl-int
 The `migrations` command lets you create new migrations, build electrified javascript distributions of the migrations 
 to use in your project, and sync your migrations to our cloud service.
 
-###`migrations init APP_SLUG [--dir MIGRATIONS_DIR]`
+###`migrations init APP_ID [--dir MIGRATIONS_DIR]`
 
 Creates a new folder for migrations in your current directory called 'migrations' and adds a new migration 
 folder to it with a name automatically derived from the current time in UTC and the title `init` e.g. `20221116162204816_init`
 
 Inside this folder will be a file called `migration.sql`. You should write your initial SQLite DDL SQL into this file.
 
-The APP_SLUG you give should be the slug of the app previous created in the web console. 
+The APP_ID you give should be the slug of the app previous created in the web console. 
 You give it once here and the CLI stores it in the `migrations/manifest.json` so you don't have to keep re-typing it.
 
 The optional `MIGRATIONS_DIR` allows you to create the migration folder somewhere other than the current working directory.
@@ -95,9 +95,9 @@ The optional `MIGRATIONS_DIR` allows you to create the migration folder somewher
 `MIGRATIONS_DIR` must end with the folder name `migrations`
 
 
-###`migrations app APP_SLUG [--dir MIGRATIONS_DIR]`
+###`migrations app APP_ID [--dir MIGRATIONS_DIR]`
 
-Changes the stored `APP_SLUG` that is used by all the other CLI migrations commands.
+Changes the stored `APP_ID` that is used by all the other CLI migrations commands.
 
 The optional `MIGRATIONS_DIR` allows you to specify which migration directory to use other than one in the 
 current working directory.
