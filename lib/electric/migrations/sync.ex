@@ -31,6 +31,9 @@ defmodule Electric.Migrations.Sync do
           {:ok, %Req.Response{body: %{"errors" => %{"detail" => msg}}}} ->
             {:error, msg}
 
+          {:ok, %Req.Response{body: %{"error" => %{"message" => msg}}}} ->
+            {:error, msg}
+
           {:error, _exception} ->
             {:error, "failed to connect"}
         end
@@ -55,6 +58,9 @@ defmodule Electric.Migrations.Sync do
       {:ok, %Req.Response{body: %{"errors" => %{"detail" => [msg]}}}} ->
         {:error, msg}
 
+      {:ok, %Req.Response{body: %{"error" => %{"message" => msg}}}} ->
+        {:error, msg}
+
       {:error, _exception} ->
         {:error, "failed to connect"}
     end
@@ -68,6 +74,9 @@ defmodule Electric.Migrations.Sync do
         {:ok, data}
 
       {:ok, %Req.Response{body: %{"errors" => %{"detail" => [msg]}}}} ->
+        {:error, msg}
+
+      {:ok, %Req.Response{body: %{"error" => %{"message" => msg}}}} ->
         {:error, msg}
 
       {:error, _exception} ->
@@ -104,6 +113,9 @@ defmodule Electric.Migrations.Sync do
         {:ok, names}
 
       {:ok, %Req.Response{body: %{"errors" => %{"detail" => [msg]}}}} ->
+        {:error, msg}
+
+      {:ok, %Req.Response{body: %{"error" => %{"message" => msg}}}} ->
         {:error, msg}
 
       {:error, _exception} ->
@@ -176,6 +188,9 @@ defmodule Electric.Migrations.Sync do
         {:ok, "ok"}
 
       {:ok, %Req.Response{body: %{"errors" => %{"detail" => [msg]}}}} ->
+        {:error, msg}
+
+      {:ok, %Req.Response{body: %{"error" => %{"message" => msg}}}} ->
         {:error, msg}
 
       {:error, _exception} ->
