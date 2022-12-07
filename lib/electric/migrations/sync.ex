@@ -9,8 +9,37 @@ defmodule Electric.Migrations.Sync do
     with {:ok, server_manifest} <- get_migrations_from_server(app_id, environment),
          {:ok, new_migrations} <- compare_local_with_server(local_bundle, server_manifest),
          {:ok, msg} <- upload_new_migrations(app_id, environment, new_migrations),
-         {:ok, "ok"} <- apply_all_migrations(app_id, environment, new_migrations) do
+         {:ok, _} <- apply_all_migrations(app_id, environment) do
       {:ok, msg}
+    end
+  end
+
+  def apply_all_migrations(app_id, environment) do
+    with {:ok, manifest} <- get_migrations_from_server(app_id, environment) do
+      last_migration = List.last(manifest["migrations"])
+
+      if last_migration["status"] == "not_applied" do
+        url = "apps/#{app_id}/environments/#{environment}/migrate"
+
+        case Client.post(url, %{"migration_name" => last_migration["name"]}) do
+          {:ok, %Req.Response{status: 200, body: _body}} ->
+            {:ok, nil}
+
+          {:ok, %Req.Response{body: %{"errors" => %{"detail" => [msg]}}}} ->
+            {:error, msg}
+
+          {:ok, %Req.Response{body: %{"errors" => %{"detail" => msg}}}} ->
+            {:error, msg}
+
+          {:ok, %Req.Response{body: %{"error" => %{"message" => msg}}}} ->
+            {:error, msg}
+
+          {:error, _exception} ->
+            {:error, "failed to connect"}
+        end
+      else
+        {:ok, nil}
+      end
     end
   end
 
@@ -26,8 +55,11 @@ defmodule Electric.Migrations.Sync do
       {:ok, %Req.Response{status: 200, body: data}} ->
         {:ok, data}
 
-      {:ok, _stuff} ->
-        {:error, "invalid credentials"}
+      {:ok, %Req.Response{body: %{"errors" => %{"detail" => [msg]}}}} ->
+        {:error, msg}
+
+      {:ok, %Req.Response{body: %{"error" => %{"message" => msg}}}} ->
+        {:error, msg}
 
       {:error, _exception} ->
         {:error, "failed to connect"}
@@ -41,25 +73,11 @@ defmodule Electric.Migrations.Sync do
       {:ok, %Req.Response{status: 200, body: data}} ->
         {:ok, data}
 
-      {:ok, _} ->
-        {:error, "invalid credentials"}
+      {:ok, %Req.Response{body: %{"errors" => %{"detail" => [msg]}}}} ->
+        {:error, msg}
 
-      {:error, _exception} ->
-        {:error, "failed to connect"}
-    end
-  end
-
-  def apply_all_migrations(app_id, environment, new_migrations) do
-    last_migration = List.last(new_migrations["migrations"])
-
-    url = "apps/#{app_id}/environments/#{environment}/migrate"
-
-    case Client.post(url, %{"migration_name" => last_migration["name"]}) do
-      {:ok, %Req.Response{status: 200, body: _body}} ->
-        {:ok, "ok"}
-
-      {:ok, _} ->
-        {:error, "invalid credentials"}
+      {:ok, %Req.Response{body: %{"error" => %{"message" => msg}}}} ->
+        {:error, msg}
 
       {:error, _exception} ->
         {:error, "failed to connect"}
@@ -88,14 +106,17 @@ defmodule Electric.Migrations.Sync do
         as_json = data
 
         names =
-          for database <- as_json["databases"] do
+          for database <- as_json["data"]["databases"] do
             database["slug"]
           end
 
         {:ok, names}
 
-      {:ok, _} ->
-        {:error, "invalid credentials"}
+      {:ok, %Req.Response{body: %{"errors" => %{"detail" => [msg]}}}} ->
+        {:error, msg}
+
+      {:ok, %Req.Response{body: %{"error" => %{"message" => msg}}}} ->
+        {:error, msg}
 
       {:error, _exception} ->
         {:error, "failed to connect"}
@@ -166,11 +187,11 @@ defmodule Electric.Migrations.Sync do
       {:ok, %Req.Response{status: 201}} ->
         {:ok, "ok"}
 
-      {:ok, %Req.Response{status: 422}} ->
-        {:error, "malformed request"}
+      {:ok, %Req.Response{body: %{"errors" => %{"detail" => [msg]}}}} ->
+        {:error, msg}
 
-      {:ok, _rsp} ->
-        {:error, "invalid credentials"}
+      {:ok, %Req.Response{body: %{"error" => %{"message" => msg}}}} ->
+        {:error, msg}
 
       {:error, _exception} ->
         {:error, "failed to connect"}

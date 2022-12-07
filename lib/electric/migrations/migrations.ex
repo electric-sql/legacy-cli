@@ -6,6 +6,8 @@ defmodule Electric.Migrations do
 
   @migration_file_name "migration.sql"
   @manifest_file_name "manifest.json"
+  @postgres_file_name "postgres.sql"
+  @satellite_file_name "satellite.sql"
   @js_bundle_file_name "index.js"
   @dist_folder_name "dist"
   @migration_template EEx.compile_file("lib/electric/migrations/templates/migration.sql.eex")
@@ -68,13 +70,19 @@ defmodule Electric.Migrations do
   - :manifest will also create a file called manifest.json in the migrations folder listing all migrations
   - :bundle will also create a index.js file in the migrations folder which exports a js object containing all the migrations
   """
-  def build_migrations(options) do
+  def build_migrations(options, flags) do
     template = Map.get(options, :template, @satellite_template)
 
     with {:ok, src_folder} <- check_migrations_folder(options),
          {:ok, app_id} <- check_app_id(src_folder),
-         {:ok, updated_manifest, warnings} <- update_manifest(src_folder, template) do
-      write_js_bundle(src_folder, updated_manifest, app_id, "local")
+         {:ok, triggered_manifest, warnings} <-
+           update_manifest(src_folder, template, flags[:satellite]),
+         :ok <-
+           optionally_write(&write_satellite/2, src_folder, triggered_manifest, flags[:satellite]),
+         {:ok, postgres_manifest, _} = add_postgres_bodies(triggered_manifest, flags[:postgres]),
+         :ok <-
+           optionally_write(&write_postgres/2, src_folder, postgres_manifest, flags[:postgres]) do
+      write_js_bundle(src_folder, triggered_manifest, app_id, "local")
 
       if length(warnings) > 0 do
         {:ok, warnings}
@@ -106,12 +114,19 @@ defmodule Electric.Migrations do
     end
   end
 
+  def apply_migrations(environment, options) do
+    with {:ok, src_folder} <- check_migrations_folder(options),
+         {:ok, app_id} <- check_app_id(src_folder) do
+      Electric.Migrations.Sync.apply_all_migrations(app_id, environment)
+    end
+  end
+
   def list_migrations(options) do
     template = Map.get(options, :template, @satellite_template)
 
     with {:ok, src_folder} <- check_migrations_folder(options),
          {:ok, app_id} <- check_app_id(src_folder),
-         {:ok, updated_manifest, _warnings} = update_manifest(src_folder, template),
+         {:ok, updated_manifest, _warnings} <- update_manifest(src_folder, template),
          {:ok, all_environment_manifests} <-
            Electric.Migrations.Sync.get_all_migrations_from_server(app_id) do
       {listing, mismatched} = format_listing(updated_manifest, all_environment_manifests)
@@ -127,7 +142,6 @@ defmodule Electric.Migrations do
          {:ok, updated_manifest, _warnings} = update_manifest(src_folder, template),
          {:ok, all_environment_manifests} <-
            Electric.Migrations.Sync.get_all_migrations_from_server(app_id) do
-      #          IO.inspect(all_environment_manifests)
       {_listing, mismatched} = format_listing(updated_manifest, all_environment_manifests)
 
       if Enum.member?(mismatched, {migration_name, environment}) do
@@ -206,15 +220,44 @@ defmodule Electric.Migrations do
         {lines <> line <> "\n", mismatched ++ mismatches}
       end)
 
-    {"\n------ Electric SQL Migrations ------\n\n" <> lines, mismatched}
+    {IO.ANSI.reset() <> "\n------ Electric SQL Migrations ------\n\n" <> lines, mismatched}
   end
 
-  defp update_manifest(src_folder, template) do
+  defp optionally_write(_func, _folder, _manifest, flag) when flag !== true do
+    :ok
+  end
+
+  defp optionally_write(func, folder, manifest, _flag) do
+    func.(folder, manifest)
+  end
+
+  def write_postgres(src_folder, manifest) do
+    for migration <- manifest["migrations"] do
+      file_path = Path.join([src_folder, migration["name"], @postgres_file_name])
+      File.write!(file_path, migration["postgres_body"])
+    end
+
+    :ok
+  end
+
+  def write_satellite(src_folder, manifest) do
+    #    IO.inspect(manifest)
+    for migration <- manifest["migrations"] do
+      file_path = Path.join([src_folder, migration["name"], @satellite_file_name])
+      File.write!(file_path, migration["satellite_raw"])
+    end
+
+    :ok
+  end
+
+  defp update_manifest(src_folder, template, add_raw_satellite \\ false) do
     with {:ok, updated_manifest, warnings} <-
            src_folder
            |> read_manifest()
-           |> add_triggers_to_manifest(src_folder, template) do
+           |> add_triggers_to_manifest(src_folder, template, add_raw_satellite) do
       write_manifest(src_folder, updated_manifest)
+      #      IO.puts("***************************")
+      #      IO.inspect(updated_manifest)
       {:ok, updated_manifest, warnings}
     else
       {:error, errors} ->
@@ -240,6 +283,7 @@ defmodule Electric.Migrations do
         {:error, "Please set the app name"}
 
       app_id ->
+        IO.puts("app_id: #{app_id} ")
         {:ok, app_id}
     end
   end
@@ -269,9 +313,9 @@ defmodule Electric.Migrations do
     ts =
       DateTime.truncate(datetime, :millisecond)
       |> DateTime.to_iso8601(:basic)
-      |> String.replace("T", "")
+      |> String.replace("T", "_")
       |> String.replace("Z", "")
-      |> String.replace(".", "")
+      |> String.replace(".", "_")
 
     "#{ts}_#{slug}" |> String.slice(0..64)
   end
@@ -360,8 +404,48 @@ defmodule Electric.Migrations do
   def manifest_json(manifest) do
     manifest
     |> remove_original_bodies()
+    |> remove_satellite_raw()
     |> Jason.encode!()
     |> Jason.Formatter.pretty_print()
+  end
+
+  defp add_postgres_bodies(manifest, flag) when flag !== true do
+    {:ok, manifest, nil}
+  end
+
+  defp add_postgres_bodies(manifest, _flag) do
+    migrations = manifest["migrations"]
+
+    {status, migrations, messages} =
+      1..length(migrations)
+      |> Enum.map(&Enum.take(migrations, &1))
+      |> Enum.reduce_while({:ok, [], []}, fn subset,
+                                             {_status, migrations_with_postgres, messages} ->
+        case add_postgres_to_migrations(subset) do
+          {:ok, migration, nil} ->
+            {:cont, {:ok, migrations_with_postgres ++ [migration], messages}}
+
+          {:ok, migration, warnings} ->
+            {:cont, {:ok, migrations_with_postgres ++ [migration], messages ++ warnings}}
+
+          {:error, errors} ->
+            {:halt, {:error, [], errors}}
+        end
+      end)
+
+    {status, Map.merge(manifest, %{"migrations" => migrations}), messages}
+  end
+
+  def add_postgres_to_migrations(migrations) do
+    migration = List.last(migrations)
+
+    case Electric.Databases.Postgres.Generation.postgres_for_migrations_w_strings(migrations) do
+      {:ok, postgres_body, warnings} ->
+        {:ok, Map.merge(migration, %{"postgres_body" => postgres_body}), warnings}
+
+      {:error, reasons} ->
+        {:error, reasons}
+    end
   end
 
   defp write_js_bundle(src_folder, manifest, app_id, environment) do
@@ -408,7 +492,16 @@ defmodule Electric.Migrations do
     Map.merge(manifest, %{"migrations" => migrations})
   end
 
-  defp add_triggers_to_manifest(manifest, src_folder, template) do
+  defp remove_satellite_raw(manifest) do
+    migrations =
+      for migration <- manifest["migrations"] do
+        Map.delete(migration, "satellite_raw")
+      end
+
+    Map.merge(manifest, %{"migrations" => migrations})
+  end
+
+  defp add_triggers_to_manifest(manifest, src_folder, template, add_raw_satellite) do
     manifest_with_original = add_original_bodies(manifest, src_folder)
     migrations_with_original = manifest_with_original["migrations"]
 
@@ -417,7 +510,7 @@ defmodule Electric.Migrations do
       |> Enum.map(&Enum.take(migrations_with_original, &1))
       |> Enum.reduce_while({:ok, [], []}, fn subset,
                                              {_status, migrations_with_triggers, messages} ->
-        case add_triggers_to_migration(subset, template) do
+        case add_triggers_to_migration(subset, template, add_raw_satellite) do
           {:ok, migration, nil} ->
             {:cont, {:ok, migrations_with_triggers ++ [migration], messages}}
 
@@ -437,11 +530,11 @@ defmodule Electric.Migrations do
   end
 
   @doc false
-  def add_triggers_to_migration(migration_set, template) do
+  def add_triggers_to_migration(migration_set, template, add_raw_satellite \\ false) do
     migration = List.last(migration_set)
     hash = strip_comments(migration["original_body"]) |> calc_hash()
 
-    if hash == migration["sha256"] do
+    if hash == migration["sha256"] && add_raw_satellite === false do
       {:ok, migration, []}
     else
       case Electric.Migrations.Triggers.add_triggers_to_last_migration(migration_set, template) do
@@ -451,8 +544,17 @@ defmodule Electric.Migrations do
         {satellite_sql, warnings} ->
           satellite_body = Electric.Migrations.Lexer.get_statements(satellite_sql)
 
-          {:ok, Map.merge(migration, %{"satellite_body" => satellite_body, "sha256" => hash}),
-           warnings}
+          if add_raw_satellite do
+            {:ok,
+             Map.merge(migration, %{
+               "satellite_body" => satellite_body,
+               "satellite_raw" => satellite_sql,
+               "sha256" => hash
+             }), warnings}
+          else
+            {:ok, Map.merge(migration, %{"satellite_body" => satellite_body, "sha256" => hash}),
+             warnings}
+          end
       end
     end
   end

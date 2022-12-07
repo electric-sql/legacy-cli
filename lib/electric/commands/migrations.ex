@@ -41,7 +41,7 @@ defmodule Electric.Commands.Migrations do
 
   @app [
     app: [
-      value_name: "APP_SLUG",
+      value_name: "APP_ID",
       help: "Globally unique slug generated when you create an application",
       required: true,
       parser: :string
@@ -70,6 +70,24 @@ defmodule Electric.Commands.Migrations do
     ]
   ]
 
+  @postgres [
+    postgres: [
+      long: "--postgres",
+      short: "-p",
+      help: "Also generate PostgresSQL when building",
+      required: false
+    ]
+  ]
+
+  @satellite [
+    satellite: [
+      long: "--satellite",
+      short: "-s",
+      help: "Also generate satellite SQL when building",
+      required: false
+    ]
+  ]
+
   def spec do
     [
       name: "migrations",
@@ -85,7 +103,7 @@ defmodule Electric.Commands.Migrations do
 
           Inside this folder will be a file called `migration.sql`. You should write your initial SQLite DDL SQL into this file.
 
-          The APP_SLUG you give should be the slug of the app previous created in the web console.
+          The APP_ID you give should be the slug of the app previous created in the web console.
           You give it once here and the CLI stores it in the 'migrations/manifest.json' so you don't have to keep re-typing it.
           """,
           args: @app,
@@ -97,7 +115,7 @@ defmodule Electric.Commands.Migrations do
           about: """
           Updates the app used.
 
-          Changes the stored APP_SLUG that is used by all the other CLI migrations commands.
+          Changes the stored APP_ID that is used by all the other CLI migrations commands.
           """,
           args: @app,
           options: @dir,
@@ -131,7 +149,7 @@ defmodule Electric.Commands.Migrations do
           Add this file to your mobile or web project to configure your SQLite database.
           """,
           options: @dir,
-          flags: default_flags()
+          flags: default_flags() |> Keyword.merge(@postgres) |> Keyword.merge(@satellite)
         ],
         sync: [
           name: "sync",
@@ -158,6 +176,14 @@ defmodule Electric.Commands.Migrations do
           options: @dir ++ @env,
           flags: default_flags()
         ],
+        #        apply: [
+        #          name: "apply",
+        #          about: """
+        #          Applies all migrations
+        #          """,
+        #          options: @dir,
+        #          flags: default_flags()
+        #        ],
         list: [
           name: "list",
           about: """
@@ -213,9 +239,9 @@ defmodule Electric.Commands.Migrations do
     end)
   end
 
-  def build(%{options: options, unknown: _unknown}) do
+  def build(%{options: options, flags: flags, unknown: _unknown}) do
     Progress.run("Building satellite migrations", fn ->
-      case Electric.Migrations.build_migrations(options) do
+      case Electric.Migrations.build_migrations(options, flags) do
         {:ok, nil} ->
           {:success, "Migrations built successfully"}
 
@@ -228,6 +254,23 @@ defmodule Electric.Commands.Migrations do
       end
     end)
   end
+
+  #  def apply(%{options: options, unknown: _unknown}) do
+  #    environment = Map.get(options, :env, "default")
+  #
+  #    Progress.run("Applying satellite migrations", fn ->
+  #      case Electric.Migrations.apply_migrations(environment, options) do
+  #        {:ok, nil} ->
+  #          {:success, "Migrations applied successfully"}
+  #        {:ok, warnings} ->
+  #          #        IO.inspect(warnings)
+  #          {:success, format_messages("warnings", warnings)}
+  #
+  #        {:error, errors} ->
+  #          {:error, format_messages("errors", errors)}
+  #      end
+  #    end)
+  #  end
 
   def sync(%{args: _args, flags: _flags, options: options, unknown: _unknown}) do
     environment = Map.get(options, :env, "default")

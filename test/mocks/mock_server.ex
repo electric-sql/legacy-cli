@@ -136,14 +136,16 @@ defmodule Electric.MockServer do
 
   get "api/v1/apps/:app_id" do
     app_info = %{
-      "databases" => [
-        %{
-          "slug" => "default"
-        }
-      ],
-      "id" => "tame-cut-4121",
-      "name" => "Example App",
-      "slug" => "example-app"
+      "data" => %{
+        "databases" => [
+          %{
+            "slug" => "default"
+          }
+        ],
+        "id" => "tame-cut-4121",
+        "name" => "Example App",
+        "slug" => "example-app"
+      }
     }
 
     Plug.Conn.resp(conn, 200, Jason.encode!(app_info))

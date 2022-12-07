@@ -214,7 +214,8 @@ defmodule CommandMigrationsTest do
           unknown: nil
         })
 
-      assert msg == "\n------ Electric SQL Migrations ------\n\n#{migration_name}\tdefault: -\n"
+      assert msg ==
+               "\e[0m\n------ Electric SQL Migrations ------\n\n#{migration_name}\tdefault: -\n"
     end
 
     test "revert migrations" do

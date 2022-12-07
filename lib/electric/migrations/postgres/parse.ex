@@ -1,19 +1,24 @@
-defmodule Electric.Migrations.Parse do
+defmodule Electric.Databases.Postgres.Parse do
   @moduledoc """
   Creates an AST from SQL migrations
   """
 
   @allowed_sql_types ["integer", "real", "text", "blob"]
-  @default_namespace "main"
+  @default_namespace "public"
 
   @doc """
-  Given a set of Maps and returns an ugly map of maps containing info about the DB structure.
+  Given a set of Electric.Migration and returns an ugly map of maps containing info about the DB structure.
   Also validates the SQL and returns error messages if validation fails
   """
+
+  def sql_ast_from_migrations([]) do
+    {:ok, nil, []}
+  end
+
   def sql_ast_from_migrations(migrations) do
     case ast_from_ordered_migrations(migrations) do
       {ast, [], []} ->
-        {:ok, ast, nil}
+        {:ok, ast, []}
 
       {ast, [], warnings} ->
         {:ok, ast, warnings}
@@ -23,34 +28,13 @@ defmodule Electric.Migrations.Parse do
     end
   end
 
-  defp check_for_namespaces(migrations) do
-    namespaced =
-      for migration <- migrations do
-        namespaced_table_names(migration.original_body)
-      end
+  @doc false
+  def ast_from_ordered_migrations(migrations) do
+    namespace = @default_namespace
 
-    case List.flatten(namespaced) do
-      [] ->
-        :ok
+    # get all the table names
+    {:ok, conn} = Exqlite.Sqlite3.open(":memory:")
 
-      namespaced ->
-        errors =
-          for name <- namespaced do
-            "The table #{name} has a database name. Please leave this out and only give the table name."
-          end
-
-        {:error, errors, []}
-    end
-  end
-
-  def namespaced_table_names(sql) do
-    for [_match, capture] <-
-          Regex.scan(~r/create table[^(]*\ ([\w]+\.[\w]+)\W*\(/, String.downcase(sql)) do
-      capture
-    end
-  end
-
-  def apply_migrations(conn, migrations) do
     sql_errors =
       Enum.flat_map(migrations, fn migration ->
         case Exqlite.Sqlite3.execute(conn, migration.original_body) do
@@ -59,23 +43,9 @@ defmodule Electric.Migrations.Parse do
         end
       end)
 
-    case List.flatten(sql_errors) do
-      [] ->
-        :ok
-
-      errors ->
-        {:error, errors, []}
-    end
-  end
-
-  @doc false
-  def ast_from_ordered_migrations(migrations) do
-    namespace = @default_namespace
-    # get all the table names
-    {:ok, conn} = Exqlite.Sqlite3.open(":memory:")
-
-    with :ok <- check_for_namespaces(migrations),
-         :ok <- apply_migrations(conn, migrations) do
+    if length(sql_errors) > 0 do
+      {:error, sql_errors, []}
+    else
       index_info = all_index_info_from_connection(conn)
 
       {:ok, statement} =
@@ -115,23 +85,25 @@ defmodule Electric.Migrations.Parse do
   defp generate_table_ast(table_info, namespace, index_info, conn) do
     [type, name, tbl_name, rootpage, sql] = table_info
 
+    table_info = %Electric.Databases.Postgres.Structure.TableInfo{
+      type: type,
+      name: name,
+      tbl_name: tbl_name,
+      rootpage: rootpage,
+      sql: sql
+    }
+
     validation_fails = check_sql(tbl_name, sql)
     warning_messages = check_sql_warnings(tbl_name, sql)
 
     # column names
     {:ok, info_statement} = Exqlite.Sqlite3.prepare(conn, "PRAGMA table_info(#{tbl_name});")
-
     columns = Enum.reverse(get_rows_while(conn, info_statement, []))
-
-    column_names =
-      for [_cid, name, _type, _notnull, _dflt_value, _pk] <- columns do
-        name
-      end
 
     column_infos =
       for [cid, name, type, notnull, dflt_value, pk] <- columns, into: %{} do
         {cid,
-         %{
+         %Electric.Databases.Postgres.Structure.ColumnInfo{
            cid: cid,
            name: name,
            type: type,
@@ -146,22 +118,10 @@ defmodule Electric.Migrations.Parse do
     type_errors =
       for {_cid, info} <- column_infos,
           not Enum.member?(@allowed_sql_types, String.downcase(info.type)) do
-        "The type #{info.type} for column #{info.name} in table #{name} is not allowed. Please use one of INTEGER, REAL, TEXT, BLOB"
+        "The type given for column #{info.name} in table #{name} is not allowed. Please use one of INTEGER, REAL, TEXT, BLOB"
       end
 
-    not_null_errors =
-      for {_cid, info} <- column_infos,
-          info.pk == 1 && info.notnull == 0 do
-        "The primary key #{info.name} in table #{name} isn't NOT NULL. Please add NOT NULL to this column."
-      end
-
-    validation_fails = validation_fails ++ type_errors ++ not_null_errors
-
-    # private keys columns
-    private_key_column_names =
-      for [_cid, name, _type, _notnull, _dflt_value, pk] when pk == 1 <- columns do
-        name
-      end
+    validation_fails = validation_fails ++ type_errors
 
     # foreign keys
     {:ok, foreign_statement} =
@@ -169,19 +129,9 @@ defmodule Electric.Migrations.Parse do
 
     foreign_keys_rows = get_rows_while(conn, foreign_statement, [])
 
-    foreign_keys =
-      for [_id, _seq, table, from, to, _on_update, _on_delete, _match] <-
-            foreign_keys_rows do
-        %{
-          child_key: from,
-          parent_key: to,
-          table: "#{namespace}.#{table}"
-        }
-      end
-
     foreign_keys_info =
       for [id, seq, table, from, to, on_update, on_delete, match] <- foreign_keys_rows do
-        %{
+        %Electric.Databases.Postgres.Structure.ForeignKeyInfo{
           id: id,
           seq: seq,
           table: table,
@@ -193,19 +143,10 @@ defmodule Electric.Migrations.Parse do
         }
       end
 
-    %{
+    %Electric.Databases.Postgres.Structure.FullTableInfo{
       table_name: tbl_name,
-      table_info: %{
-        type: type,
-        name: name,
-        tbl_name: tbl_name,
-        rootpage: rootpage,
-        sql: sql
-      },
-      columns: column_names,
+      table_info: table_info,
       namespace: namespace,
-      primary: private_key_column_names,
-      foreign_keys: foreign_keys,
       column_infos: column_infos,
       foreign_keys_info: foreign_keys_info,
       validation_fails: validation_fails,
@@ -217,15 +158,15 @@ defmodule Electric.Migrations.Parse do
     errors = []
     lower = String.downcase(sql)
 
-    #    errors =
-    #      if not String.contains?(lower, "strict") do
-    #        [
-    #          "The table #{table_name} is not STRICT."
-    #          | errors
-    #        ]
-    #      else
-    #        errors
-    #      end
+    errors =
+      if not String.contains?(lower, "strict") do
+        [
+          "The table #{table_name} is not STRICT."
+          | errors
+        ]
+      else
+        errors
+      end
 
     if not String.contains?(lower, "without rowid") do
       [
@@ -267,7 +208,6 @@ defmodule Electric.Migrations.Parse do
     for [_type, _name, tbl_name, _rootpage, _sql] <- info, into: %{} do
       # column names
       {:ok, info_statement} = Exqlite.Sqlite3.prepare(conn, "PRAGMA index_list(#{tbl_name});")
-
       indexes = Enum.reverse(get_rows_while(conn, info_statement, []))
 
       index_infos =
@@ -329,11 +269,7 @@ defmodule Electric.Migrations.Parse do
     Enum.any?(matching_unique_indexes)
   end
 
-  defp is_primary_desc(_column_name, nil) do
-    false
-  end
-
-  defp is_primary_desc(column_name, indexes) do
+  defp is_primary_desc(column_name, indexes) when indexes != nil do
     matching_desc_indexes =
       for {_, info} <- indexes,
           info.origin == "pk",
@@ -344,77 +280,7 @@ defmodule Electric.Migrations.Parse do
     Enum.any?(matching_desc_indexes)
   end
 
-  @doc false
-  def ast_from_ordered_migrations2(migrations) do
-    bodies =
-      for migration <- migrations do
-        migration.original_body
-      end
-
-    {simple_tables_info(bodies), [], []}
-  end
-
-  @doc false
-  def simple_tables_info(all_migrations) do
-    namespace = "main"
-    # get all the table names
-    {:ok, conn} = Exqlite.Sqlite3.open(":memory:")
-
-    for migration <- all_migrations do
-      :ok = Exqlite.Sqlite3.execute(conn, migration)
-    end
-
-    {:ok, statement} =
-      Exqlite.Sqlite3.prepare(
-        conn,
-        "SELECT name, sql FROM sqlite_master WHERE type='table' AND name!='_electric_oplog';"
-      )
-
-    info = get_rows_while(conn, statement, [])
-    :ok = Exqlite.Sqlite3.release(conn, statement)
-
-    # for each table
-    infos =
-      for [table_name, _sql] <- info do
-        # column names
-        {:ok, info_statement} = Exqlite.Sqlite3.prepare(conn, "PRAGMA table_info(#{table_name});")
-        columns = Enum.reverse(get_rows_while(conn, info_statement, []))
-
-        column_names =
-          for [_cid, name, _type, _notnull, _dflt_value, _pk] <- columns do
-            name
-          end
-
-        # private keys columns
-        private_key_column_names =
-          for [_cid, name, _type, _notnull, _dflt_value, pk] when pk == 1 <- columns do
-            name
-          end
-
-        # foreign keys
-        {:ok, foreign_statement} =
-          Exqlite.Sqlite3.prepare(conn, "PRAGMA foreign_key_list(#{table_name});")
-
-        foreign_keys = get_rows_while(conn, foreign_statement, [])
-
-        foreign_keys =
-          for [_a, _b, parent_table, child_key, parent_key, _c, _d, _e] <- foreign_keys do
-            %{
-              :child_key => child_key,
-              :parent_key => parent_key,
-              :table => "#{namespace}.#{parent_table}"
-            }
-          end
-
-        %{
-          :table_name => table_name,
-          :columns => column_names,
-          :namespace => namespace,
-          :primary => private_key_column_names,
-          :foreign_keys => foreign_keys
-        }
-      end
-
-    Enum.into(infos, %{}, fn info -> {"#{namespace}.#{info.table_name}", info} end)
+  defp is_primary_desc(_column_name, indexes) when indexes == nil do
+    false
   end
 end
