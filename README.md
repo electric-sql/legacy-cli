@@ -168,3 +168,11 @@ By default this will use the `default` environment, if you want to use a differe
 
 The optional `MIGRATIONS_DIR` allows you to specify which migration directory to use other than one in the 
 current working directory.
+
+## Contributing
+
+See the [Community Guidelines](https://github.com/electric-sql/meta) including the [Guide to Contributing](https://github.com/electric-sql/meta/blob/main/CONTRIBUTING.md) and [Contributor License Agreement](https://github.com/electric-sql/meta/blob/main/CLA.md).
+
+## Support
+
+We have an [open community Discord](https://discord.gg/B7kHGwDcbj). If you’re interested in the project, please come and say hello and let us know if you have any questions or need any help or support getting things running.
