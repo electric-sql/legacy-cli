@@ -155,7 +155,13 @@ defmodule Electric.Migrations.Parse do
         "The primary key #{info.name} in table #{name} isn't NOT NULL. Please add NOT NULL to this column."
       end
 
-    validation_fails = validation_fails ++ type_errors ++ not_null_errors
+    case_errors =
+      for {_cid, info} <- column_infos,
+          String.downcase(info.name) != info.name do
+        "The name of column #{info.name} in table #{name} is not allowed. Please only use lowercase for column names."
+      end
+
+    validation_fails = validation_fails ++ type_errors ++ not_null_errors ++ case_errors
 
     # private keys columns
     private_key_column_names =
