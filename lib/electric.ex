@@ -26,7 +26,7 @@ defmodule Electric do
       |> Enum.map(fn {k, v} -> {k, v.spec()} end)
 
     Optimus.new!(
-      name: "#{@project[:app]}",
+      name: "electric",
       description: "Electric SQL CLI",
       version: @project[:version],
       about: "...",
