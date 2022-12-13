@@ -1,17 +1,16 @@
 import Config
-import System
 
-base_url =
-  if System.get_env("BASE_URL") != nil do
-    System.get_env("BASE_URL")
-  else
-    "http://localhost:4000/api/v1/"
+default_base_url =
+  case config_env() do
+    :prod -> "https://console.electric-sql.com/api/v1/"
+    :test -> "http://localhost:4003/api/v1/"
+    :dev -> "http://localhost:4000/api/v1/"
   end
 
-if config_env() == :dev do
-  config :electric_sql_cli,
-    base_url: base_url
+config :electric_sql_cli,
+  default_base_url: default_base_url
 
+if config_env() == :dev do
   # Git hooks for analysis and formatting.
   config :git_hooks,
     auto_install: true,
@@ -28,9 +27,4 @@ if config_env() == :dev do
         ]
       ]
     ]
-end
-
-if config_env() == :test do
-  config :electric_sql_cli,
-    base_url: "http://localhost:4003/api/v1/"
 end

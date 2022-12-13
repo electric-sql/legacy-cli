@@ -8,10 +8,10 @@ defmodule Electric.Client do
 
   alias Electric.Util
 
-  @default_base_url "https://console.electric-sql.com/api/v1/"
+  @default_base_url Application.compile_env!(:electric_sql_cli, [:default_base_url])
 
   def base_url do
-    Application.get_env(:electric_sql_cli, :base_url, @default_base_url)
+    System.get_env("ELECTRIC_BASE_URL", @default_base_url)
   end
 
   def base_req do
