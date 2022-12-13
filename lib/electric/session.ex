@@ -6,24 +6,52 @@ defmodule Electric.Session do
 
   # Credentials are stored in a `.session-creds` file inside a
   # `.electric-sql` config folder in the user's home directory.
-  @dirname ".electric-sql"
-  @filename ".session-creds"
+  @dirname "electric"
+  @filename "credentials.json"
 
   defp file_path do
-    folder_path()
+    state_path()
     |> Path.join(@filename)
   end
 
-  defp folder_path do
-    dir =
-      System.user_home()
-      |> Path.join(@dirname)
+  @doc """
+  Gives the base directory for the session state.
 
-    unless File.dir?(dir) do
-      File.mkdir_p!(dir)
+  If set will use the environment variable `ELECTRIC_STATE_HOME`. Otherwise uses
+  `$XDG_STATE_HOME/electric` which defaults to `$HOME/.local/state/electric`.
+  """
+  def state_path do
+    {source, path} =
+      case System.get_env("ELECTRIC_STATE_HOME", "") do
+        "" ->
+          case System.fetch_env("XDG_STATE_HOME") do
+            {:ok, path} ->
+              {"XDG_STATE_HOME", Path.join(path, @dirname)}
+
+            :error ->
+              home = System.get_env("HOME", System.user_home!())
+              {nil, Path.join([home, ".local/state", @dirname])}
+          end
+
+        path ->
+          {"ELECTRIC_STATE_HOME", path}
+      end
+
+    if File.exists?(path) do
+      unless File.dir?(path) do
+        message =
+          IO.iodata_to_binary([
+            "State path '#{path}' is not a directory",
+            if(source, do: " (set from $#{source})", else: "")
+          ])
+
+        raise RuntimeError, message: message
+      end
+    else
+      File.mkdir_p!(path)
     end
 
-    dir
+    path
   end
 
   defmodule Credentials do
