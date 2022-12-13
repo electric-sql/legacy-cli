@@ -10,10 +10,19 @@ defmodule Electric.Client do
 
   import Electric.Util, only: [verbose: 1]
 
-  @default_base_url Application.compile_env!(:electric_sql_cli, [:default_base_url])
+  @default_console_url Application.compile_env!(:electric_sql_cli, [:default_console_url])
+
+  def console_url do
+    System.get_env("ELECTRIC_CONSOLE_URL", @default_console_url)
+  end
 
   def base_url do
-    System.get_env("ELECTRIC_BASE_URL", @default_base_url)
+    with {:ok, uri} <- URI.new(console_url()) do
+      URI.to_string(%{uri | path: "/api/v1/"})
+    else
+      {:error, _reason} ->
+        raise "Invalid ELECTRIC_CONSOLE_URL: #{console_url()}"
+    end
   end
 
   def base_req do
