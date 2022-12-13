@@ -190,6 +190,9 @@ defmodule Electric.Migrations.Sync do
       {:ok, %Req.Response{body: %{"errors" => %{"detail" => [msg]}}}} ->
         {:error, msg}
 
+      {:ok, %Req.Response{body: %{"errors" => %{"original_body" => [_ | _] = msgs}}}} ->
+        {:error, msgs}
+
       {:ok, %Req.Response{body: %{"error" => %{"message" => msg}}}} ->
         {:error, msg}
 
