@@ -99,6 +99,8 @@ defmodule Electric.Session do
 
     case File.write(path, contents) do
       :ok ->
+        # make credential file only readable by current user
+        File.chmod!(path, 0o600)
         Memoize.invalidate(__MODULE__, :get)
 
         :ok
