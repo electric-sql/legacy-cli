@@ -8,6 +8,8 @@ defmodule Electric.Client do
 
   alias Electric.Util
 
+  import Electric.Util, only: [verbose: 1]
+
   @default_base_url Application.compile_env!(:electric_sql_cli, [:default_base_url])
 
   def base_url do
@@ -65,9 +67,7 @@ defmodule Electric.Client do
           options
       end
 
-    response =
-      req
-      |> Req.request(options)
+    response = do_request(req, options)
 
     # Intercept the response and handle the case where
     # we provided a bearer token but got an unauthenticated
@@ -91,7 +91,7 @@ defmodule Electric.Client do
       data: refresh_token
     }
 
-    case Req.request(base_req(), method: :post, url: path, json: payload) do
+    case do_request(base_req(), method: :post, url: path, json: payload) do
       {:ok, %{status: 200, body: %{"data" => data}}} ->
         set_credentials(data)
 
@@ -106,5 +106,17 @@ defmodule Electric.Client do
     data
     |> Util.rename_map_key("refreshToken", "refresh_token")
     |> Session.set()
+  end
+
+  defp do_request(req, options) do
+    message = [
+      (options[:method] || req.method) |> to_string() |> String.upcase(),
+      " ",
+      URI.merge(req.options.base_url, URI.new!(options[:url] || "/")) |> URI.to_string()
+    ]
+
+    verbose(message)
+
+    Req.request(req, options)
   end
 end

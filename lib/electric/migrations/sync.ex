@@ -141,21 +141,23 @@ defmodule Electric.Migrations.Sync do
   end
 
   defp has_all_server_migrations_locally(local_migration_lookup, server_migration_lookup) do
-    Enum.reduce_while(server_migration_lookup, {:ok, "all here"}, fn {migration_name,
-                                                                      server_migration},
-                                                                     status ->
-      case local_migration_lookup[migration_name] do
-        nil ->
-          {:halt, {:error, "The migration #{migration_name} is missing locally"}}
+    Enum.reduce_while(
+      server_migration_lookup,
+      {:ok, "all here"},
+      fn {migration_name, server_migration}, status ->
+        case local_migration_lookup[migration_name] do
+          nil ->
+            {:halt, {:error, "The migration #{migration_name} is missing locally"}}
 
-        migration ->
-          if migration["sha256"] == server_migration["sha256"] do
-            {:cont, status}
-          else
-            {:halt, {:error, "The migration #{migration_name} has been changed locally"}}
-          end
+          migration ->
+            if migration["sha256"] == server_migration["sha256"] do
+              {:cont, status}
+            else
+              {:halt, {:error, "The migration #{migration_name} has been changed locally"}}
+            end
+        end
       end
-    end)
+    )
   end
 
   defp migration_lookup(bundle) do
