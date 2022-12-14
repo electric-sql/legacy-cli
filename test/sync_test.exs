@@ -43,6 +43,29 @@ defmodule MigrationsSyncTest do
     assert msg == "Synchronized 2 new migrations successfully"
   end
 
+  test "handles 422 error responses for invalid migrations" do
+    migrations = %{
+      "migrations" => [
+        %{
+          "name" => "migration_name",
+          "sha256" => "211b1e2b203d1fcac6ccb526d2775ec1f5575d4018ab1a33272948ce0ae76775",
+          "encoding" => "escaped",
+          "original_body" =>
+            "CREATE TABLE IF NOT EXISTS items (\n  value TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;",
+          "satellite_body" => [
+            "CREATE TABLE IF NOT EXISTS items (\n  value TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;",
+            "--ADD A TRIGGER FOR main.items;"
+          ],
+          "title" => "migration name"
+        }
+      ]
+    }
+
+    # Using app_id = "status-422" triggers hard-coded error response
+    {:error, ["The table items is not STRICT."]} =
+      Electric.Migrations.Sync.upload_new_migrations("status-422", "production", migrations)
+  end
+
   test "compare local to server bundles" do
     local_bundle = %{
       "migrations" => [

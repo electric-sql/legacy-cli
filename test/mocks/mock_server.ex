@@ -122,6 +122,16 @@ defmodule Electric.MockServer do
     |> Plug.Conn.send_resp()
   end
 
+  post "api/v1/apps/status-422/environments/:environment/migrations" do
+    Plug.Conn.resp(
+      conn,
+      422,
+      Jason.encode!(%{errors: %{original_body: ["The table items is not STRICT."]}})
+    )
+    |> Plug.Conn.put_resp_header("Content-Type", "application/json")
+    |> Plug.Conn.send_resp()
+  end
+
   post "api/v1/apps/:app_id/environments/:environment/migrations" do
     Plug.Conn.resp(conn, 201, "\"ok\"")
     |> Plug.Conn.put_resp_header("Content-Type", "application/json")
