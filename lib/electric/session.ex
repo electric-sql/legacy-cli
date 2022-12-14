@@ -4,6 +4,8 @@ defmodule Electric.Session do
   """
   use Memoize
 
+  import Electric.Util, only: [verbose: 1]
+
   # Credentials are stored in a `.session-creds` file inside a
   # `.electric-sql` config folder in the user's home directory.
   @dirname "electric"
@@ -75,6 +77,8 @@ defmodule Electric.Session do
   defmemo get do
     path = file_path()
 
+    verbose("Reading credentials from #{path}")
+
     case File.read(path) do
       {:ok, contents} ->
         contents
@@ -115,6 +119,8 @@ defmodule Electric.Session do
   """
   def clear do
     path = file_path()
+
+    verbose("Deleting credential file #{path}")
 
     case File.rm(path) do
       :ok ->

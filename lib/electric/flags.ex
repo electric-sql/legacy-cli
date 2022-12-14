@@ -8,6 +8,12 @@ defmodule Electric.Flags do
       long: "--help",
       help: "Print usage docs",
       required: false
+    ],
+    verbose: [
+      long: "--verbose",
+      short: "-v",
+      help: "Output more information about the client's actions",
+      required: false
     ]
   ]
 

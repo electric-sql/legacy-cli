@@ -1,8 +1,8 @@
 #!/bin/sh
 
-export MIX_ENV=dev
+export MIX_ENV=prod
 
-mix deps.get
+mix deps.get --only=prod
 mix release
 
-cp _build/dev/rel/bakeware/electric .
+cp _build/${MIX_ENV}/rel/bakeware/electric .

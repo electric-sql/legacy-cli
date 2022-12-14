@@ -26,7 +26,7 @@ defmodule Electric do
       |> Enum.map(fn {k, v} -> {k, v.spec()} end)
 
     Optimus.new!(
-      name: "#{@project[:app]}",
+      name: "electric",
       description: "Electric SQL CLI",
       version: @project[:version],
       about: "...",
@@ -44,6 +44,7 @@ defmodule Electric do
   def run(argv \\ []) do
     argv
     |> parse()
+    |> set_verbosity()
     |> route()
 
     0
@@ -74,6 +75,16 @@ defmodule Electric do
   defp route(_) do
     spec()
     |> Optimus.parse!(["--help"], &halt/1)
+  end
+
+  defp set_verbosity({_route, %{flags: flags}} = options) do
+    Electric.Util.enable_verbose(Map.get(flags, :verbose, false))
+
+    options
+  end
+
+  defp set_verbosity(options) do
+    options
   end
 
   defp handle_command({:result, data}) when is_binary(data) do

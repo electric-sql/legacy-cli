@@ -21,4 +21,19 @@ defmodule Electric.Util do
     [:green, :bright, message, :reset]
     |> IO.ANSI.format()
   end
+
+  def enable_verbose(verbose?) do
+    Application.put_env(:electric_sql_cli, :verbose, verbose?)
+    verbose("Enabling verbose output")
+  end
+
+  def verbose? do
+    Application.get_env(:electric_sql_cli, :verbose, false)
+  end
+
+  def verbose(message) do
+    if verbose?() do
+      IO.puts(IO.ANSI.format([:blue, "∷ ", message]))
+    end
+  end
 end

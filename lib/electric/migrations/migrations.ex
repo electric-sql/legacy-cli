@@ -4,6 +4,8 @@ defmodule Electric.Migrations do
   Munges sql migrations and uploads them to the server
   """
 
+  import Electric.Util, only: [verbose: 1]
+
   @migration_file_name "migration.sql"
   @manifest_file_name "manifest.json"
   @postgres_file_name "postgres.sql"
@@ -34,10 +36,14 @@ defmodule Electric.Migrations do
             Path.join(root_directory, "migrations")
           end
       end
+      |> Path.expand()
+
+    verbose("Using migrations directory #{migrations_folder}")
 
     if File.exists?(migrations_folder) do
-      {:error, ["Migrations folder at #{migrations_folder} already exists."]}
+      {:error, ["Migrations folder at '#{migrations_folder}' already exists."]}
     else
+      verbose("Creating '#{migrations_folder}'")
       File.mkdir_p!(migrations_folder)
       add_migration(migrations_folder, "init", app_id)
     end
@@ -234,6 +240,7 @@ defmodule Electric.Migrations do
   def write_postgres(src_folder, manifest) do
     for migration <- manifest["migrations"] do
       file_path = Path.join([src_folder, migration["name"], @postgres_file_name])
+      verbose("Writing PostgreSQL migration '#{file_path}'")
       File.write!(file_path, migration["postgres_body"])
     end
 
@@ -244,6 +251,7 @@ defmodule Electric.Migrations do
     #    IO.inspect(manifest)
     for migration <- manifest["migrations"] do
       file_path = Path.join([src_folder, migration["name"], @satellite_file_name])
+      verbose("Writing Satellite migration '#{file_path}'")
       File.write!(file_path, migration["satellite_raw"])
     end
 
@@ -283,17 +291,21 @@ defmodule Electric.Migrations do
         {:error, "Please set the app name"}
 
       app_id ->
-        IO.puts("app_id: #{app_id} ")
+        verbose(["Using app id ", :yellow, "#{app_id}"])
         {:ok, app_id}
     end
   end
 
   defp check_migrations_folder(options) do
-    migrations_folder = Map.get(options, :dir, "migrations")
+    migrations_folder = Map.get(options, :dir, "migrations") |> Path.expand()
+
+    verbose("Checking for migrations directory '#{migrations_folder}'")
 
     if not File.exists?(migrations_folder) do
       {:error, ["Couldn't find the migrations folder at #{migrations_folder}"]}
     else
+      verbose("Migrations directory '#{migrations_folder}' exists")
+
       if Path.basename(migrations_folder) == "migrations" do
         {:ok, migrations_folder}
       else
@@ -333,6 +345,7 @@ defmodule Electric.Migrations do
       )
 
     migration_file_path = Path.join([migration_folder, @migration_file_name])
+    verbose("Writing migration file '#{migration_file_path}'")
     File.write!(migration_file_path, body)
     add_migration_to_manifest(migrations_folder, migration_name, migration_title, body, app_id)
 
@@ -388,6 +401,7 @@ defmodule Electric.Migrations do
       File.rm(manifest_path)
     end
 
+    verbose("Writing manifest '#{manifest_path}'")
     File.write!(manifest_path, manifest_json(manifest))
   end
 
@@ -397,6 +411,8 @@ defmodule Electric.Migrations do
     if File.exists?(migration_path) do
       File.rm(migration_path)
     end
+
+    verbose("Writing migration '#{migration_path}'")
 
     File.write!(migration_path, original_body)
   end
@@ -438,6 +454,8 @@ defmodule Electric.Migrations do
 
   def add_postgres_to_migrations(migrations) do
     migration = List.last(migrations)
+
+    verbose("Generating PostgreSQL migration #{migration["name"]}")
 
     case Electric.Databases.Postgres.Generation.postgres_for_migrations_w_strings(migrations) do
       {:ok, postgres_body, warnings} ->
