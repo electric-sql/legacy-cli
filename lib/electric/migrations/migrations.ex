@@ -25,27 +25,46 @@ defmodule Electric.Migrations do
   """
   def init_migrations(app_id, options) do
     migrations_folder =
-      case root_directory = Map.get(options, :dir) do
+      case Map.get(options, :migrations_dir) do
         nil ->
           "migrations"
 
-        _ ->
-          if Path.basename(root_directory) == "migrations" do
-            root_directory
-          else
-            Path.join(root_directory, "migrations")
-          end
+        path ->
+          path
       end
       |> Path.expand()
 
     verbose("Using migrations directory #{migrations_folder}")
 
-    if File.exists?(migrations_folder) do
-      {:error, ["Migrations folder at '#{migrations_folder}' already exists."]}
-    else
+    unless File.exists?(migrations_folder) do
       verbose("Creating '#{migrations_folder}'")
       File.mkdir_p!(migrations_folder)
-      add_migration(migrations_folder, "init", app_id)
+    end
+
+    case init_migration_exists?(app_id, migrations_folder) do
+      {:ok, false} ->
+        add_migration(migrations_folder, "init", app_id)
+
+      {:ok, true} ->
+        {:ok, true}
+
+      {:error, _reason} = error ->
+        error
+    end
+  end
+
+  defp init_migration_exists?(app_id, migrations_folder) do
+    if File.exists?(Path.join(migrations_folder, @manifest_file_name)) do
+      manifest = read_manifest(migrations_folder)
+
+      if manifest["app_id"] == app_id do
+        {:ok, Enum.any?(manifest["migrations"], fn m -> m["title"] == "init" end)}
+      else
+        {:error,
+         "App ID of existing migrations ('#{manifest["app_id"]}') does not match new value: '#{app_id}'"}
+      end
+    else
+      {:ok, false}
     end
   end
 
@@ -297,7 +316,7 @@ defmodule Electric.Migrations do
   end
 
   defp check_migrations_folder(options) do
-    migrations_folder = Map.get(options, :dir, "migrations") |> Path.expand()
+    migrations_folder = Map.get(options, :migrations_dir, "migrations") |> Path.expand()
 
     verbose("Checking for migrations directory '#{migrations_folder}'")
 
@@ -421,8 +440,7 @@ defmodule Electric.Migrations do
     manifest
     |> remove_original_bodies()
     |> remove_satellite_raw()
-    |> Jason.encode!()
-    |> Jason.Formatter.pretty_print()
+    |> Jason.encode!(pretty: true)
   end
 
   defp add_postgres_bodies(manifest, flag) when flag !== true do

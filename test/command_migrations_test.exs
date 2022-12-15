@@ -1,5 +1,7 @@
-defmodule CommandMigrationsTest do
+defmodule Electric.Command.MigrationsTest do
   use ExUnit.Case
+
+  alias Electric.Config
 
   setup_all do
     tmp_dir = "tmp"
@@ -12,40 +14,27 @@ defmodule CommandMigrationsTest do
   end
 
   describe "run commands" do
-    test "init migrations" do
+    setup do
       temp = temp_folder()
       migrations_path = Path.join([temp, "migrations"])
 
-      {:success, msg} =
-        Electric.Commands.Migrations.init(%{
-          args: %{app: "app-name"},
-          flags: nil,
-          options: %{:dir => temp},
-          unknown: nil
-        })
+      config =
+        Config.new(
+          root: temp,
+          migrations_dir: migrations_path,
+          app_id: "app-name",
+          env: "default"
+        )
 
-      assert File.exists?(migrations_path)
-      assert msg == "Migrations initialised"
+      # create migrations dir
+      {:ok, _path} = Config.init(config)
+
+      {:ok, config: config}
     end
 
-    test "build migrations" do
-      temp = temp_folder()
-      migrations_path = Path.join([temp, "migrations"])
-
-      {:success, msg} =
-        Electric.Commands.Migrations.init(%{
-          args: %{app: "app-name"},
-          flags: [],
-          options: %{:dir => temp},
-          unknown: nil
-        })
-
-      assert File.exists?(migrations_path)
-      assert msg == "Migrations initialised"
-
-      sql_file_paths = Path.join([migrations_path, "*", "migration.sql"]) |> Path.wildcard()
+    test "build migrations", %{config: config} do
+      sql_file_paths = Path.join([config.migrations_dir, "*", "migration.sql"]) |> Path.wildcard()
       my_new_migration = List.first(sql_file_paths)
-      #      migration_folder = Path.dirname(my_new_migration)
 
       new_content = """
       CREATE TABLE IF NOT EXISTS items (
@@ -59,67 +48,15 @@ defmodule CommandMigrationsTest do
         Electric.Commands.Migrations.build(%{
           args: [],
           flags: [],
-          options: %{:dir => migrations_path},
+          options: %{root: config.root},
           unknown: nil
         })
 
-      assert File.exists?(Path.join([migrations_path, "manifest.json"]))
+      assert File.exists?(Path.join([config.migrations_dir, "manifest.json"]))
     end
 
-    test "build migrations errors" do
-      temp = temp_folder()
-      migrations_path = Path.join([temp, "migrations"])
-
-      {:success, msg} =
-        Electric.Commands.Migrations.init(%{
-          args: %{app: "app-name"},
-          flags: [],
-          options: %{:dir => temp},
-          unknown: nil
-        })
-
-      assert File.exists?(migrations_path)
-      assert msg == "Migrations initialised"
-
-      sql_file_paths = Path.join([migrations_path, "*", "migration.sql"]) |> Path.wildcard()
-      my_new_migration = List.first(sql_file_paths)
-      #      migration_folder = Path.dirname(my_new_migration)
-
-      new_content = """
-      CREATE TABLE IF NOT EXISTS items (
-        value TEXT PRIMARY KEY
-      ) STRICT, WITHOUT ROWID;
-      """
-
-      File.write!(my_new_migration, new_content, [:append])
-
-      {:error, msg} =
-        Electric.Commands.Migrations.build(%{
-          args: [],
-          flags: [],
-          options: %{:dir => temp},
-          unknown: nil
-        })
-
-      assert msg == "There were 1 errors:\nThe migrations folder must be called \"migrations\""
-    end
-
-    test "sync migrations" do
-      temp = temp_folder()
-      migrations_path = Path.join([temp, "migrations"])
-
-      {:success, msg} =
-        Electric.Commands.Migrations.init(%{
-          args: %{app: "app-name"},
-          flags: [],
-          options: %{:dir => temp},
-          unknown: nil
-        })
-
-      assert File.exists?(migrations_path)
-      assert msg == "Migrations initialised"
-
-      sql_file_paths = Path.join([migrations_path, "*", "migration.sql"]) |> Path.wildcard()
+    test "sync migrations", %{config: config} do
+      sql_file_paths = Path.join([config.migrations_dir, "*", "migration.sql"]) |> Path.wildcard()
       my_new_migration = List.first(sql_file_paths)
       _migration_folder = Path.dirname(my_new_migration)
 
@@ -135,29 +72,15 @@ defmodule CommandMigrationsTest do
         Electric.Commands.Migrations.sync(%{
           args: %{},
           flags: [],
-          options: %{:dir => migrations_path, :env => "production"},
+          options: %{root: config.root, env: "production"},
           unknown: nil
         })
 
       assert msg == "Migrations synchronized with server successfully"
     end
 
-    test "new migrations" do
-      temp = temp_folder()
-      migrations_path = Path.join([temp, "migrations"])
-
-      {:success, msg} =
-        Electric.Commands.Migrations.init(%{
-          args: %{app: "app-name"},
-          flags: [],
-          options: %{:dir => temp},
-          unknown: nil
-        })
-
-      assert File.exists?(migrations_path)
-      assert msg == "Migrations initialised"
-
-      sql_file_paths = Path.join([migrations_path, "*", "migration.sql"]) |> Path.wildcard()
+    test "new migrations", %{config: config} do
+      sql_file_paths = Path.join([config.migrations_dir, "*", "migration.sql"]) |> Path.wildcard()
       my_new_migration = List.first(sql_file_paths)
 
       new_content = """
@@ -172,29 +95,15 @@ defmodule CommandMigrationsTest do
         Electric.Commands.Migrations.new(%{
           args: %{migration_title: "Another migration"},
           flags: [],
-          options: %{:dir => migrations_path},
+          options: %{root: config.root},
           unknown: nil
         })
 
       assert msg == "New migration created"
     end
 
-    test "list migrations" do
-      temp = temp_folder()
-      migrations_path = Path.join([temp, "migrations"])
-
-      {:success, msg} =
-        Electric.Commands.Migrations.init(%{
-          args: %{app: "app-name"},
-          flags: [],
-          options: %{:dir => temp},
-          unknown: nil
-        })
-
-      assert File.exists?(migrations_path)
-      assert msg == "Migrations initialised"
-
-      sql_file_paths = Path.join([migrations_path, "*", "migration.sql"]) |> Path.wildcard()
+    test "list migrations", %{config: config} do
+      sql_file_paths = Path.join([config.migrations_dir, "*", "migration.sql"]) |> Path.wildcard()
       my_new_migration = List.first(sql_file_paths)
       migration_name = Path.dirname(my_new_migration) |> Path.basename()
 
@@ -210,7 +119,7 @@ defmodule CommandMigrationsTest do
         Electric.Commands.Migrations.list(%{
           args: %{},
           flags: [],
-          options: %{:dir => migrations_path},
+          options: %{root: config.root},
           unknown: nil
         })
 
@@ -218,22 +127,8 @@ defmodule CommandMigrationsTest do
                "\e[0m\n------ Electric SQL Migrations ------\n\n#{migration_name}\tdefault: -\n"
     end
 
-    test "revert migrations" do
-      temp = temp_folder()
-      migrations_path = Path.join([temp, "migrations"])
-
-      {:success, msg} =
-        Electric.Commands.Migrations.init(%{
-          args: %{app: "app-name"},
-          flags: [],
-          options: %{:dir => temp},
-          unknown: nil
-        })
-
-      assert File.exists?(migrations_path)
-      assert msg == "Migrations initialised"
-
-      sql_file_paths = Path.join([migrations_path, "*", "migration.sql"]) |> Path.wildcard()
+    test "revert migrations", %{config: config} do
+      sql_file_paths = Path.join([config.migrations_dir, "*", "migration.sql"]) |> Path.wildcard()
       my_new_migration = List.first(sql_file_paths)
       migration_name = Path.dirname(my_new_migration) |> Path.basename()
 
@@ -249,7 +144,7 @@ defmodule CommandMigrationsTest do
         Electric.Commands.Migrations.revert(%{
           args: %{migration_name: migration_name},
           flags: [],
-          options: %{:dir => migrations_path, env: "default"},
+          options: %{root: config.root, env: "default"},
           unknown: nil
         })
 

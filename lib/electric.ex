@@ -9,12 +9,12 @@ defmodule Electric do
   alias Electric.Commands
   alias Electric.Util
 
-  @env Mix.env()
-
   @commands [
     accounts: Commands.Accounts,
     apps: Commands.Apps,
     auth: Commands.Auth,
+    init: Commands.Config.Init,
+    config: Commands.Config,
     migrations: Commands.Migrations
   ]
 
@@ -38,33 +38,49 @@ defmodule Electric do
 
   @impl Bakeware.Script
   def main(argv \\ []) do
-    run(argv)
+    case run(argv) do
+      :ok ->
+        :ok
+
+      {:ok, output} when is_binary(output) ->
+        IO.puts(output)
+
+      {:error, output} ->
+        IO.puts(output)
+        System.halt(1)
+
+      {:halt, status} ->
+        System.halt(status)
+    end
   end
 
+  # allows for running the command without handling the result and causing the system to exit
+  @doc false
   def run(argv \\ []) do
     argv
     |> parse()
     |> set_verbosity()
     |> route()
-
-    0
+    |> map_result()
   end
 
   def parse(argv \\ []) do
-    spec()
-    |> Optimus.parse!(argv, &halt/1)
+    Optimus.parse!(spec(), argv, &halt/1)
   end
 
-  defp route({[key, command], %{flags: %{help: true}}}) do
-    spec()
-    |> Optimus.parse!(["help", "#{key}", "#{command}"], &halt/1)
+  defp route({command_path, %{flags: %{help: true}}}) when is_list(command_path) do
+    Optimus.parse!(spec(), ["help" | Enum.map(command_path, &to_string/1)], &halt/1)
   end
 
   defp route({[key, command], options}) when is_atom(key) and is_atom(command) do
     @commands
     |> Keyword.get(key)
     |> apply(command, [options])
-    |> handle_command()
+  end
+
+  # not liking the constant impedence mismatch between the cli and optimus
+  defp route({[:init], options}) do
+    apply(Commands.Config, :init, [options])
   end
 
   defp route({[key], _}) do
@@ -77,6 +93,64 @@ defmodule Electric do
     |> Optimus.parse!(["--help"], &halt/1)
   end
 
+  defp map_result({:result, data}) when is_binary(data) do
+    {:ok, data}
+  end
+
+  defp map_result({:result, data}) do
+    {:ok, output} = Jason.encode(data, pretty: true)
+
+    {:ok, output}
+  end
+
+  defp map_result({:results, data}) do
+    {:ok, output} = Jason.encode(data, pretty: true)
+
+    {:ok, output}
+  end
+
+  defp map_result({:success, message}) do
+    output = Util.format_success(message)
+
+    {:ok, output}
+  end
+
+  defp map_result({:help, subcommand, message}) when is_binary(message) do
+    map_result({:help, subcommand, message, 1})
+  end
+
+  defp map_result({:help, subcommand, message, status}) when is_binary(message) do
+    spec()
+    |> Optimus.Errors.format(subcommand, [message])
+    |> Enum.join("\n")
+    |> String.trim_trailing()
+    |> IO.write()
+
+    spec()
+    |> Optimus.parse!(["help" | Enum.map(subcommand, &to_string/1)], fn _ -> halt(status) end)
+  end
+
+  defp map_result({:error, error}) when is_binary(error) do
+    map_result({:error, [error]})
+  end
+
+  defp map_result({:error, errors}) when is_list(errors) do
+    output =
+      spec()
+      |> Optimus.Errors.format(errors)
+      |> Enum.join("\n")
+
+    {:error, output}
+  end
+
+  defp map_result({:halt, 0}) do
+    {:halt, 0}
+  end
+
+  defp halt(status) do
+    {:halt, status}
+  end
+
   defp set_verbosity({_route, %{flags: flags}} = options) do
     Electric.Util.enable_verbose(Map.get(flags, :verbose, false))
 
@@ -85,56 +159,6 @@ defmodule Electric do
 
   defp set_verbosity(options) do
     options
-  end
-
-  defp handle_command({:result, data}) when is_binary(data) do
-    data
-    |> IO.puts()
-
-    {:result, data}
-  end
-
-  defp handle_command({:result, data}) do
-    data
-    |> Jason.encode_to_iodata!(pretty: true)
-    |> IO.puts()
-
-    {:result, data}
-  end
-
-  defp handle_command({:results, data}) do
-    data
-    |> Jason.encode_to_iodata!(pretty: true)
-    |> IO.puts()
-
-    {:results, data}
-  end
-
-  defp handle_command({:success, message}) when is_binary(message) do
-    message
-    |> Util.format_success()
-    |> IO.puts()
-
-    {:success, message}
-  end
-
-  defp handle_command({:error, error}) when is_binary(error) do
-    handle_command({:error, [error]})
-  end
-
-  defp handle_command({:error, errors}) when is_list(errors) do
-    spec()
-    |> Optimus.Errors.format(errors)
-    |> Enum.map(&IO.puts/1)
-
-    halt({:error, errors})
-  end
-
-  defp halt(val) do
-    case @env do
-      :test -> {:halt, val}
-      _ -> System.halt(0)
-    end
   end
 
   @doc """
