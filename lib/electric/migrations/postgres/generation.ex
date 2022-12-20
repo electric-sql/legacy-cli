@@ -43,7 +43,7 @@ defmodule Electric.Databases.Postgres.Generation do
   end
 
   defp get_sql_for_ast_changes(before_ast, after_ast) do
-    for change <- table_changes(before_ast, after_ast), into: "" do
+    for change <- table_changes(before_ast, after_ast) |> Enum.reverse(), into: "" do
       case change do
         {nil, table_after} ->
           build_sql_create_table(table_after)
@@ -74,7 +74,11 @@ defmodule Electric.Databases.Postgres.Generation do
 
     columns_and_keys = "\n  " <> Enum.join(column_definitions ++ foreign_key_clauses, ",\n  ")
 
-    "\nCREATE TABLE #{table_full_name(table_info)} (#{columns_and_keys});\n"
+    """
+
+    CREATE TABLE #{table_full_name(table_info)} (#{columns_and_keys});
+    ALTER TABLE #{table_full_name(table_info)} REPLICA IDENTITY FULL;
+    """
   end
 
   defp build_sql_drop_table(table_info) do
