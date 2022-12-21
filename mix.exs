@@ -6,7 +6,7 @@ defmodule Electric.MixProject do
   def project do
     [
       app: :electric_sql_cli,
-      version: "0.1.0",
+      version: git_version(),
       elixir: "~> 1.13",
       start_permanent: Mix.env() == :prod,
       build_embedded: Mix.env() == :prod,
@@ -80,4 +80,13 @@ defmodule Electric.MixProject do
 
   defp compression(:prod), do: 19
   defp compression(_), do: 1
+
+  defp git_version() do
+    {version, 0} =
+      System.cmd("git", ~w"describe --dirty --abbrev=7 --tags --always --first-parent")
+
+    version
+    |> String.trim()
+    |> String.replace_leading("v", "")
+  end
 end
