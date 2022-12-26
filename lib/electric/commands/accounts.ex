@@ -2,6 +2,7 @@ defmodule Electric.Commands.Accounts do
   @moduledoc """
   The `Accounts` command.
   """
+  alias Electric.Session
   use Electric, :command
 
   def spec do
@@ -23,20 +24,22 @@ defmodule Electric.Commands.Accounts do
   end
 
   def list(_cmd) do
-    result =
-      Progress.run("Listing accounts", false, fn ->
-        Client.get("accounts")
-      end)
+    with :ok <- Session.require_auth() do
+      result =
+        Progress.run("Listing accounts", false, fn ->
+          Client.get("accounts")
+        end)
 
-    case result do
-      {:ok, %Req.Response{status: 200, body: %{"data" => data}}} ->
-        {:results, data}
+      case result do
+        {:ok, %Req.Response{status: 200, body: %{"data" => data}}} ->
+          {:result, data |> Enum.map(& [IO.ANSI.green, "* ", IO.ANSI.reset, &1["name"]]) |> Enum.join("\n")}
 
-      {:ok, %Req.Response{}} ->
-        {:error, "invalid credentials"}
+        {:ok, %Req.Response{status: 403}} ->
+          {:error, "invalid credentials"}
 
-      {:error, _exception} ->
-        {:error, "failed to connect"}
+        {:error, _exception} ->
+          {:error, "couldn't connect to ElectricSQL servers"}
+      end
     end
   end
 end

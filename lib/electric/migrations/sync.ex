@@ -35,7 +35,7 @@ defmodule Electric.Migrations.Sync do
             {:error, msg}
 
           {:error, _exception} ->
-            {:error, "failed to connect"}
+            {:error, "couldn't connect to ElectricSQL servers"}
         end
       else
         {:ok, nil}
@@ -54,6 +54,8 @@ defmodule Electric.Migrations.Sync do
     case Client.get(url) do
       {:ok, %Req.Response{status: 200, body: data}} ->
         {:ok, data}
+      {:ok, %Req.Response{status: 404, body: data}} ->
+        {:error, "app '#{app_id}' with environment '#{environment}' not found. Was it deleted?", ["Check ", IO.ANSI.yellow, "electric apps list", IO.ANSI.reset, " for available apps."]}
 
       {:ok, %Req.Response{body: %{"errors" => %{"detail" => [msg]}}}} ->
         {:error, msg}
@@ -62,7 +64,7 @@ defmodule Electric.Migrations.Sync do
         {:error, msg}
 
       {:error, _exception} ->
-        {:error, "failed to connect"}
+        {:error, "couldn't connect to ElectricSQL servers"}
     end
   end
 
@@ -80,7 +82,7 @@ defmodule Electric.Migrations.Sync do
         {:error, msg}
 
       {:error, _exception} ->
-        {:error, "failed to connect"}
+        {:error, "couldn't connect to ElectricSQL servers"}
     end
   end
 
@@ -119,7 +121,7 @@ defmodule Electric.Migrations.Sync do
         {:error, msg}
 
       {:error, _exception} ->
-        {:error, "failed to connect"}
+        {:error, "couldn't connect to ElectricSQL servers"}
     end
   end
 
@@ -199,7 +201,7 @@ defmodule Electric.Migrations.Sync do
         {:error, msg}
 
       {:error, _exception} ->
-        {:error, "failed to connect"}
+        {:error, "couldn't connect to ElectricSQL servers"}
     end
   end
 end
