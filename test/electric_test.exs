@@ -4,7 +4,7 @@ defmodule ElectricTest do
   doctest Electric
 
   test "entrypoint runs without error" do
-    assert {0, output} = with_io(fn -> Electric.main() end)
+    assert {:ok, output} = with_io(fn -> Electric.main() end)
 
     assert output =~ "Electric SQL CLI"
   end

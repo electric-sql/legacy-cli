@@ -18,8 +18,9 @@ defmodule Electric.Util do
   end
 
   def format_success(message) do
-    [:green, :bright, message, :reset]
+    [:green, :bright, message]
     |> IO.ANSI.format()
+    |> IO.iodata_to_binary()
   end
 
   def enable_verbose(verbose?) do

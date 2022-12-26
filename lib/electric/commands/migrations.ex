@@ -21,6 +21,8 @@ defmodule Electric.Commands.Migrations do
   """
   use Electric, :command
 
+  alias Electric.Config
+
   @migration_title [
     migration_title: [
       value_name: "MIGRATION_TITLE",
@@ -36,37 +38,6 @@ defmodule Electric.Commands.Migrations do
       help: "The name of an existing migration",
       required: true,
       parser: :string
-    ]
-  ]
-
-  @app [
-    app: [
-      value_name: "APP_ID",
-      help: "Globally unique slug generated when you create an application",
-      required: true,
-      parser: :string
-    ]
-  ]
-
-  @dir [
-    dir: [
-      value_name: "MIGRATIONS_DIR",
-      short: "-d",
-      long: "--dir",
-      help: "Migrations directory where the migration files live.",
-      parser: :string,
-      default: "./migrations"
-    ]
-  ]
-
-  @env [
-    env: [
-      value_name: "ENVIRONMENT_NAME",
-      short: "-e",
-      long: "--env",
-      help: "The name of the app environment you want to use.",
-      parser: :string,
-      default: "default"
     ]
   ]
 
@@ -93,34 +64,6 @@ defmodule Electric.Commands.Migrations do
       name: "migrations",
       about: "Manage database schema migrations",
       subcommands: [
-        init: [
-          name: "init",
-          about: """
-          Initializes a 'migrations' folder for your app.
-
-          Creates a new folder for migrations in your current directory called 'migrations' and adds a new migration
-          folder to it with a name automatically derived from the current time in UTC and the title 'init' e.g. '20221116162204816_init'
-
-          Inside this folder will be a file called `migration.sql`. You should write your initial SQLite DDL SQL into this file.
-
-          The APP_ID you give should be the slug of the app previous created in the web console.
-          You give it once here and the CLI stores it in the 'migrations/manifest.json' so you don't have to keep re-typing it.
-          """,
-          args: @app,
-          options: @dir,
-          flags: default_flags()
-        ],
-        app: [
-          name: "app",
-          about: """
-          Updates the app used.
-
-          Changes the stored APP_ID that is used by all the other CLI migrations commands.
-          """,
-          args: @app,
-          options: @dir,
-          flags: default_flags()
-        ],
         new: [
           name: "new",
           about: """
@@ -133,7 +76,7 @@ defmodule Electric.Commands.Migrations do
 
           """,
           args: @migration_title,
-          options: @dir,
+          options: config_options() ++ migrations_options(),
           flags: default_flags()
         ],
         build: [
@@ -148,7 +91,7 @@ defmodule Electric.Commands.Migrations do
 
           Add this file to your mobile or web project to configure your SQLite database.
           """,
-          options: @dir,
+          options: config_options() ++ migrations_options(),
           flags: default_flags() |> Keyword.merge(@postgres) |> Keyword.merge(@satellite)
         ],
         sync: [
@@ -173,7 +116,7 @@ defmodule Electric.Commands.Migrations do
 
           Also if a migration has a name that is lower in sort order than one already applied on the server this sync will fail.
           """,
-          options: @dir ++ @env,
+          options: config_options() ++ migrations_options() ++ env_options(),
           flags: default_flags()
         ],
         #        apply: [
@@ -181,7 +124,7 @@ defmodule Electric.Commands.Migrations do
         #          about: """
         #          Applies all migrations
         #          """,
-        #          options: @dir,
+        #          options: config_options() ++ migrations_options(),
         #          flags: default_flags()
         #        ],
         list: [
@@ -191,7 +134,7 @@ defmodule Electric.Commands.Migrations do
 
           Shows a list of all the migrations and their status in every env in the app.
           """,
-          options: @dir,
+          options: config_options() ++ migrations_options(),
           flags: default_flags()
         ],
         revert: [
@@ -200,7 +143,7 @@ defmodule Electric.Commands.Migrations do
           Copies the named migration from the server to replace the local one.
           """,
           args: @migration_name,
-          options: @dir ++ @env,
+          options: config_options() ++ migrations_options() ++ env_options(),
           flags: default_flags()
         ]
       ]
@@ -215,44 +158,44 @@ defmodule Electric.Commands.Migrations do
     "There was 1 #{type_of_message}:\n" <> messages
   end
 
-  def init(%{args: %{app: app_id}, flags: _flags, options: options, unknown: _unknown}) do
-    Progress.run("Initializing", fn ->
-      case Electric.Migrations.init_migrations(app_id, options) do
-        {:ok, nil} ->
-          {:success, "Migrations initialised"}
-
-        {:error, errors} ->
-          {:error, format_messages("errors", errors)}
-      end
-    end)
+  def init(_cmd) do
+    {:error, "Please run `electric init` to initialize your application"}
   end
 
   def new(%{args: args, flags: _flags, options: options, unknown: _unknown}) do
-    Progress.run("Creating new migration", fn ->
-      case Electric.Migrations.new_migration(args.migration_title, options) do
-        {:ok, nil} ->
-          {:success, "New migration created"}
+    with {:ok, config} <- Config.load(options.root) do
+      options = Config.merge(config, options)
 
-        {:error, errors} ->
-          {:error, format_messages("errors", errors)}
-      end
-    end)
+      Electric.Progress.run("Creating new migration", fn ->
+        case Electric.Migrations.new_migration(args.migration_title, options) do
+          {:ok, nil} ->
+            {:success, "New migration created"}
+
+          {:error, errors} ->
+            {:error, format_messages("errors", errors)}
+        end
+      end)
+    end
   end
 
   def build(%{options: options, flags: flags, unknown: _unknown}) do
-    Progress.run("Building satellite migrations", fn ->
-      case Electric.Migrations.build_migrations(options, flags) do
-        {:ok, nil} ->
-          {:success, "Migrations built successfully"}
+    with {:ok, config} <- Config.load(options.root) do
+      options = Config.merge(config, options)
 
-        {:ok, warnings} ->
-          #        IO.inspect(warnings)
-          {:success, format_messages("warnings", warnings)}
+      Progress.run("Building satellite migrations", fn ->
+        case Electric.Migrations.build_migrations(options, flags) do
+          {:ok, nil} ->
+            {:success, "Migrations built successfully"}
 
-        {:error, errors} ->
-          {:error, format_messages("errors", errors)}
-      end
-    end)
+          {:ok, warnings} ->
+            #        IO.inspect(warnings)
+            {:success, format_messages("warnings", warnings)}
+
+          {:error, errors} ->
+            {:error, format_messages("errors", errors)}
+        end
+      end)
+    end
   end
 
   #  def apply(%{options: options, unknown: _unknown}) do
@@ -273,58 +216,72 @@ defmodule Electric.Commands.Migrations do
   #  end
 
   def sync(%{args: _args, flags: _flags, options: options, unknown: _unknown}) do
-    environment = Map.get(options, :env, "default")
+    with {:ok, config} <- Config.load(options.root),
+         :ok <- Session.require_auth() do
+      options = Config.merge(config, options)
 
-    Progress.run("Synchronizing migrations", fn ->
-      case Electric.Migrations.sync_migrations(environment, options) do
-        {:ok, nil} ->
-          {:success, "Migrations synchronized with server successfully"}
+      Progress.run("Synchronizing migrations", false, fn ->
+        case Electric.Migrations.sync_migrations(options.env, options) do
+          {:ok, nil} ->
+            {:success, "Migrations synchronized with server successfully"}
 
-        {:ok, warnings} ->
-          #        IO.inspect(warnings)
-          {:success, format_messages("warnings", warnings)}
+          {:ok, warnings} ->
+            #        IO.inspect(warnings)
+            {:success, format_messages("warnings", warnings)}
 
-        {:error, errors} ->
-          {:error, format_messages("errors", errors)}
-      end
-    end)
+          {:error, errors} ->
+            {:error, format_messages("errors", errors)}
+
+          error ->
+            error
+        end
+      end)
+    end
   end
 
   def list(%{options: options}) do
-    case Electric.Migrations.list_migrations(options) do
-      {:ok, listing, _mismatched} ->
-        {:success, listing}
+    with {:ok, config} <- Config.load(options.root) do
+      options = Config.merge(config, options)
 
-      {:error, errors} ->
-        {:error, format_messages("errors", errors)}
-    end
-  end
-
-  def app(%{args: %{app: app_id}, options: options}) do
-    case Electric.Migrations.update_app_id(app_id, options) do
-      {:ok, _} ->
-        {:success, "Changed to using app #{app_id}"}
-
-      {:error, errors} ->
-        {:error, format_messages("errors", errors)}
-    end
-  end
-
-  def revert(%{args: %{migration_name: migration_name}, options: options}) do
-    environment = Map.get(options, :env, "default")
-
-    Progress.run("Reverting migration", fn ->
-      case Electric.Migrations.revert_migration(environment, migration_name, options) do
-        {:ok, nil} ->
-          {:success, "Migration reverted successfully"}
-
-        {:ok, warnings} ->
-          #        IO.inspect(warnings)
-          {:success, format_messages("warnings", warnings)}
+      case Electric.Migrations.list_migrations(options) do
+        {:ok, listing, _mismatched} ->
+          {:success, listing}
 
         {:error, errors} ->
           {:error, format_messages("errors", errors)}
       end
-    end)
+    end
+  end
+
+  def app(%{args: %{app: _app_id}, options: _options}) do
+    # TODO: implement config app command
+    {:error, "Use `electric config app` to set the app id"}
+    # case Electric.Migrations.update_app_id(app_id, options) do
+    #   {:ok, _} ->
+    #     {:success, "Changed to using app #{app_id}"}
+
+    #   {:error, errors} ->
+    #     {:error, format_messages("errors", errors)}
+    # end
+  end
+
+  def revert(%{args: %{migration_name: migration_name}, options: options}) do
+    with {:ok, config} <- Config.load(options.root) do
+      options = Config.merge(config, options)
+
+      Progress.run("Reverting migration", fn ->
+        case Electric.Migrations.revert_migration(options.env, migration_name, options) do
+          {:ok, nil} ->
+            {:success, "Migration reverted successfully"}
+
+          {:ok, warnings} ->
+            #        IO.inspect(warnings)
+            {:success, format_messages("warnings", warnings)}
+
+          {:error, errors} ->
+            {:error, format_messages("errors", errors)}
+        end
+      end)
+    end
   end
 end

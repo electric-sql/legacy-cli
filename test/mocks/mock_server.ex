@@ -102,6 +102,55 @@ defmodule Electric.MockServer do
     @migration_fixtures[migration_name]
   end
 
+  get "api/v1/apps" do
+    default_env = %{
+      name: "Default",
+      slug: "default",
+      status: "provisioned",
+      type: "postgres"
+    }
+
+    app_list = %{
+      data: [
+        %{id: "test", name: "test", slug: "test", databases: [default_env]},
+        %{id: "test2", name: "test2", slug: "test2", databases: [default_env]},
+        %{id: "app-name-2", name: "app-name-2", slug: "app-name-2", databases: [default_env]},
+        %{
+          id: "cranberry-soup-1337",
+          name: "app-name-2",
+          slug: "app-name-2",
+          databases: [default_env]
+        }
+      ]
+    }
+
+    Plug.Conn.resp(conn, 200, Jason.encode!(app_list))
+    |> Plug.Conn.put_resp_header("Content-Type", "application/json")
+  end
+
+  post "api/v1/auth/login" do
+    case conn.body_params do
+      %{"data" => %{"email" => "test@electric-sql.com", "password" => "password"}} ->
+        data = %{
+          email: "test@electric-sql.com",
+          id: "00000000-0000-0000-0000-000000000000",
+          token: "test_JWT_token",
+          refreshToken: "test_refresh_JWT_token"
+        }
+
+        conn
+        |> Plug.Conn.resp(200, Jason.encode!(%{data: data}))
+        |> Plug.Conn.put_resp_header("Content-Type", "application/json")
+        |> Plug.Conn.send_resp()
+
+      _ ->
+        conn
+        |> Plug.Conn.resp(401, Jason.encode!(%{error: %{details: "no account with this email"}}))
+        |> Plug.Conn.put_resp_header("Content-Type", "application/json")
+        |> Plug.Conn.send_resp()
+    end
+  end
+
   get "api/v1/apps/:app_id/environments/:environment/migrations" do
     server_manifest = %{
       "migrations" => get_some_migrations(app_id)

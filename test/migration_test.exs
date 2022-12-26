@@ -644,23 +644,29 @@ defmodule MigrationsFileTest do
   describe "api tests" do
     test "tests can init" do
       temp = temp_folder()
-      migrations_path = Path.join([temp, "migrations"])
-      {:ok, _msg} = Electric.Migrations.init_migrations("test_app", %{:dir => temp})
-      assert File.exists?(migrations_path)
+      migrations_dir = Path.join([temp, "migrations"])
+
+      {:ok, _msg} =
+        Electric.Migrations.init_migrations("test_app", %{migrations_dir: migrations_dir})
+
+      assert File.exists?(migrations_dir)
     end
 
     test "tests init adds migration to manifest" do
       temp = temp_folder()
-      migrations_folder = Path.join([temp, "migrations"])
-      {:ok, _msg} = Electric.Migrations.init_migrations("test_app", %{:dir => temp})
-      assert File.exists?(migrations_folder)
+      migrations_dir = Path.join([temp, "migrations"])
+
+      {:ok, _msg} =
+        Electric.Migrations.init_migrations("test_app", %{migrations_dir: migrations_dir})
+
+      assert File.exists?(migrations_dir)
 
       init_migration_name =
-        most_recent_migration_file(migrations_folder)
+        most_recent_migration_file(migrations_dir)
         |> Path.dirname()
         |> Path.basename()
 
-      manifest_path = Path.join([migrations_folder, "manifest.json"])
+      manifest_path = Path.join([migrations_dir, "manifest.json"])
       assert File.exists?(manifest_path)
       manifest = Jason.decode!(File.read!(manifest_path))
 
@@ -682,11 +688,14 @@ defmodule MigrationsFileTest do
 
     test "init and then modify and then build updates manifest" do
       temp = temp_folder()
-      migrations_path = Path.join([temp, "migrations"])
-      {:ok, _msg} = Electric.Migrations.init_migrations("test_app", %{:dir => temp})
-      assert File.exists?(migrations_path)
+      migrations_dir = Path.join([temp, "migrations"])
 
-      sql_file_paths = Path.join([migrations_path, "*", "migration.sql"]) |> Path.wildcard()
+      {:ok, _msg} =
+        Electric.Migrations.init_migrations("test_app", %{migrations_dir: migrations_dir})
+
+      assert File.exists?(migrations_dir)
+
+      sql_file_paths = Path.join([migrations_dir, "*", "migration.sql"]) |> Path.wildcard()
       my_new_migration = List.first(sql_file_paths)
       migration_folder = Path.dirname(my_new_migration)
 
@@ -699,14 +708,14 @@ defmodule MigrationsFileTest do
       File.write!(my_new_migration, new_content, [:append])
 
       {:ok, _msg} =
-        Electric.Migrations.build_migrations(%{:dir => migrations_path}, %{
+        Electric.Migrations.build_migrations(%{migrations_dir: migrations_dir}, %{
           satellite: false,
           postgres: false
         })
 
       init_migration_name = Path.basename(migration_folder)
 
-      manifest_path = Path.join([migrations_path, "manifest.json"])
+      manifest_path = Path.join([migrations_dir, "manifest.json"])
       assert File.exists?(manifest_path)
       manifest = Jason.decode!(File.read!(manifest_path))
       sha = List.first(manifest["migrations"])["sha256"]
@@ -746,11 +755,14 @@ defmodule MigrationsFileTest do
 
     test "init and then modify and then build creates index.js" do
       temp = temp_folder()
-      migrations_path = Path.join([temp, "migrations"])
-      {:ok, _msg} = Electric.Migrations.init_migrations("test_app", %{:dir => temp})
-      assert File.exists?(migrations_path)
+      migrations_dir = Path.join([temp, "migrations"])
 
-      sql_file_paths = Path.join([migrations_path, "*", "migration.sql"]) |> Path.wildcard()
+      {:ok, _msg} =
+        Electric.Migrations.init_migrations("test_app", %{migrations_dir: migrations_dir})
+
+      assert File.exists?(migrations_dir)
+
+      sql_file_paths = Path.join([migrations_dir, "*", "migration.sql"]) |> Path.wildcard()
       my_new_migration = List.first(sql_file_paths)
       migration_folder = Path.dirname(my_new_migration)
 
@@ -763,14 +775,14 @@ defmodule MigrationsFileTest do
       File.write!(my_new_migration, new_content, [:append])
 
       {:ok, _msg} =
-        Electric.Migrations.build_migrations(%{:dir => migrations_path}, %{
+        Electric.Migrations.build_migrations(%{migrations_dir: migrations_dir}, %{
           satellite: false,
           postgres: false
         })
 
       init_migration_name = Path.basename(migration_folder)
 
-      js_path = Path.join([migrations_path, "dist", "index.js"])
+      js_path = Path.join([migrations_dir, "dist", "index.js"])
       assert File.exists?(js_path)
 
       local_js = File.read!(js_path)
@@ -813,18 +825,20 @@ defmodule MigrationsFileTest do
 
     test "init and then change app slug" do
       temp = temp_folder()
-      migrations_folder = Path.join([temp, "migrations"])
-      {:ok, _msg} = Electric.Migrations.init_migrations("test_app", %{:dir => temp})
+      migrations_dir = Path.join([temp, "migrations"])
 
       {:ok, _msg} =
-        Electric.Migrations.update_app_id("test_app_changed", %{:dir => migrations_folder})
+        Electric.Migrations.init_migrations("test_app", %{migrations_dir: migrations_dir})
+
+      {:ok, _msg} =
+        Electric.Migrations.update_app_id("test_app_changed", %{migrations_dir: migrations_dir})
 
       init_migration_name =
-        most_recent_migration_file(migrations_folder)
+        most_recent_migration_file(migrations_dir)
         |> Path.dirname()
         |> Path.basename()
 
-      manifest_path = Path.join([migrations_folder, "manifest.json"])
+      manifest_path = Path.join([migrations_dir, "manifest.json"])
       assert File.exists?(manifest_path)
       manifest = Jason.decode!(File.read!(manifest_path))
 
@@ -869,10 +883,10 @@ defmodule MigrationsFileTest do
     end
 
     def init_and_add_migration(app_id, temp) do
-      migrations_path = Path.join([temp, "migrations"])
-      {:ok, _msg} = Electric.Migrations.init_migrations(app_id, %{:dir => temp})
+      migrations_dir = Path.join([temp, "migrations"])
+      {:ok, _msg} = Electric.Migrations.init_migrations(app_id, %{migrations_dir: migrations_dir})
 
-      my_new_migration = most_recent_migration_file(migrations_path)
+      my_new_migration = most_recent_migration_file(migrations_dir)
 
       new_content = """
       CREATE TABLE IF NOT EXISTS items (
@@ -883,7 +897,8 @@ defmodule MigrationsFileTest do
       File.write!(my_new_migration, new_content, [:append])
       Process.sleep(1000)
 
-      {:ok, _msg} = Electric.Migrations.new_migration("another", %{:dir => migrations_path})
+      {:ok, _msg} =
+        Electric.Migrations.new_migration("another", %{migrations_dir: migrations_dir})
 
       cats_content = """
       CREATE TABLE IF NOT EXISTS cats (
@@ -891,23 +906,23 @@ defmodule MigrationsFileTest do
       ) STRICT, WITHOUT ROWID;
       """
 
-      second_migration = most_recent_migration_file(migrations_path)
+      second_migration = most_recent_migration_file(migrations_dir)
       File.write!(second_migration, cats_content, [:append])
 
       [my_new_migration, second_migration]
     end
 
-    def most_recent_migration_file(migrations_path) do
-      Path.join([migrations_path, "*", "migration.sql"]) |> Path.wildcard() |> List.last()
+    def most_recent_migration_file(migrations_dir) do
+      Path.join([migrations_dir, "*", "migration.sql"]) |> Path.wildcard() |> List.last()
     end
 
     test "init and then modify and then add and then build" do
       temp = temp_folder()
-      migrations_path = Path.join([temp, "migrations"])
+      migrations_dir = Path.join([temp, "migrations"])
 
       [first_migration, second_migration] = init_and_add_migration("test", temp)
 
-      manifest_path = Path.join([migrations_path, "manifest.json"])
+      manifest_path = Path.join([migrations_dir, "manifest.json"])
       assert File.exists?(manifest_path)
       #      manifest = Jason.decode!(File.read!(manifest_path))
 
@@ -915,7 +930,7 @@ defmodule MigrationsFileTest do
       second_migration_name = Path.dirname(second_migration) |> Path.basename()
 
       {:ok, _msg} =
-        Electric.Migrations.build_migrations(%{:dir => migrations_path}, %{
+        Electric.Migrations.build_migrations(%{migrations_dir: migrations_dir}, %{
           satellite: false,
           postgres: false
         })
@@ -987,16 +1002,16 @@ defmodule MigrationsFileTest do
 
     test "test build warning" do
       temp = temp_folder()
-      migrations_path = Path.join([temp, "migrations"])
+      migrations_dir = Path.join([temp, "migrations"])
       init_and_add_migration("test", temp)
 
       {:ok, _msg} =
-        Electric.Migrations.build_migrations(%{:dir => migrations_path}, %{
+        Electric.Migrations.build_migrations(%{migrations_dir: migrations_dir}, %{
           satellite: false,
           postgres: false
         })
 
-      migration = most_recent_migration_file(migrations_path)
+      migration = most_recent_migration_file(migrations_dir)
 
       dogs_content = """
       CREATE TABLE IF NOT EXISTS dogs (
@@ -1007,7 +1022,7 @@ defmodule MigrationsFileTest do
       File.write!(migration, dogs_content, [:append])
 
       {:error, msgs} =
-        Electric.Migrations.build_migrations(%{:dir => migrations_path}, %{
+        Electric.Migrations.build_migrations(%{migrations_dir: migrations_dir}, %{
           satellite: false,
           postgres: false
         })
@@ -1022,48 +1037,48 @@ defmodule MigrationsFileTest do
 
     test "test build writes satellite" do
       temp = temp_folder()
-      migrations_path = Path.join([temp, "migrations"])
+      migrations_dir = Path.join([temp, "migrations"])
       init_and_add_migration("test", temp)
 
       {:ok, _msg} =
-        Electric.Migrations.build_migrations(%{:dir => migrations_path}, %{
+        Electric.Migrations.build_migrations(%{migrations_dir: migrations_dir}, %{
           satellite: true,
           postgres: false
         })
 
-      migration_dir = most_recent_migration_file(migrations_path) |> Path.dirname()
+      migration_dir = most_recent_migration_file(migrations_dir) |> Path.dirname()
       satellite_file_path = Path.join(migration_dir, "satellite.sql")
       assert File.exists?(satellite_file_path)
     end
 
     test "test build writes postgres" do
       temp = temp_folder()
-      migrations_path = Path.join([temp, "migrations"])
+      migrations_dir = Path.join([temp, "migrations"])
       init_and_add_migration("test", temp)
 
       {:ok, _msg} =
-        Electric.Migrations.build_migrations(%{:dir => migrations_path}, %{
+        Electric.Migrations.build_migrations(%{migrations_dir: migrations_dir}, %{
           satellite: false,
           postgres: true
         })
 
-      migration_dir = most_recent_migration_file(migrations_path) |> Path.dirname()
+      migration_dir = most_recent_migration_file(migrations_dir) |> Path.dirname()
       satellite_file_path = Path.join(migration_dir, "postgres.sql")
       assert File.exists?(satellite_file_path)
     end
 
     test "test build type warning" do
       temp = temp_folder()
-      migrations_path = Path.join([temp, "migrations"])
+      migrations_dir = Path.join([temp, "migrations"])
       init_and_add_migration("test", temp)
 
       {:ok, _msg} =
-        Electric.Migrations.build_migrations(%{:dir => migrations_path}, %{
+        Electric.Migrations.build_migrations(%{migrations_dir: migrations_dir}, %{
           satellite: false,
           postgres: false
         })
 
-      migration = most_recent_migration_file(migrations_path)
+      migration = most_recent_migration_file(migrations_dir)
 
       dogs_content = """
       CREATE TABLE IF NOT EXISTS dogs (
@@ -1074,7 +1089,7 @@ defmodule MigrationsFileTest do
       File.write!(migration, dogs_content, [:append])
 
       {:error, msgs} =
-        Electric.Migrations.build_migrations(%{:dir => migrations_path}, %{
+        Electric.Migrations.build_migrations(%{migrations_dir: migrations_dir}, %{
           satellite: false,
           postgres: false
         })
@@ -1086,18 +1101,19 @@ defmodule MigrationsFileTest do
 
     test "test can sync" do
       temp = temp_folder()
-      migrations_path = Path.join([temp, "migrations"])
+      migrations_dir = Path.join([temp, "migrations"])
 
       [first_migration, second_migration] = init_and_add_migration("test", temp)
 
       first_migration_name = Path.dirname(first_migration) |> Path.basename()
       second_migration_name = Path.dirname(second_migration) |> Path.basename()
-      change_migrations_name(migrations_path, first_migration_name, "first_migration_name")
-      change_migrations_name(migrations_path, second_migration_name, "second_migration_name")
+      change_migrations_name(migrations_dir, first_migration_name, "first_migration_name")
+      change_migrations_name(migrations_dir, second_migration_name, "second_migration_name")
 
-      {:ok, _msg} = Electric.Migrations.sync_migrations("default", %{:dir => migrations_path})
+      {:ok, _msg} =
+        Electric.Migrations.sync_migrations("default", %{migrations_dir: migrations_dir})
 
-      js_path = Path.join([migrations_path, "dist", "index.js"])
+      js_path = Path.join([migrations_dir, "dist", "index.js"])
       assert File.exists?(js_path)
 
       default_js = File.read!(js_path)
@@ -1136,32 +1152,33 @@ defmodule MigrationsFileTest do
 
     test "test sync fails if different sha" do
       temp = temp_folder()
-      migrations_path = Path.join([temp, "migrations"])
+      migrations_dir = Path.join([temp, "migrations"])
 
       [first_migration, second_migration] = init_and_add_migration("test2", temp)
 
       first_migration_name = Path.dirname(first_migration) |> Path.basename()
       second_migration_name = Path.dirname(second_migration) |> Path.basename()
-      change_migrations_name(migrations_path, first_migration_name, "first_migration_name")
-      change_migrations_name(migrations_path, second_migration_name, "second_migration_name")
+      change_migrations_name(migrations_dir, first_migration_name, "first_migration_name")
+      change_migrations_name(migrations_dir, second_migration_name, "second_migration_name")
 
-      {:error, msg} = Electric.Migrations.sync_migrations("default", %{:dir => migrations_path})
+      {:error, msg} =
+        Electric.Migrations.sync_migrations("default", %{migrations_dir: migrations_dir})
 
       assert msg == "The migration second_migration_name has been changed locally"
     end
 
     test "test list" do
       temp = temp_folder()
-      migrations_path = Path.join([temp, "migrations"])
+      migrations_dir = Path.join([temp, "migrations"])
 
       [first_migration, second_migration] = init_and_add_migration("test", temp)
       first_migration_name = Path.dirname(first_migration) |> Path.basename()
       second_migration_name = Path.dirname(second_migration) |> Path.basename()
-      change_migrations_name(migrations_path, first_migration_name, "first_migration_name")
-      change_migrations_name(migrations_path, second_migration_name, "second_migration_name")
+      change_migrations_name(migrations_dir, first_migration_name, "first_migration_name")
+      change_migrations_name(migrations_dir, second_migration_name, "second_migration_name")
 
       {:ok, listing, _mismatched} =
-        Electric.Migrations.list_migrations(%{:dir => migrations_path})
+        Electric.Migrations.list_migrations(%{migrations_dir: migrations_dir})
 
       assert listing ==
                "\e[0m\n------ Electric SQL Migrations ------\n\nfirst_migration_name\tdefault: \e[32mapplied\e[0m\nsecond_migration_name\tdefault: \e[32mapplied\e[0m\n"
@@ -1169,16 +1186,16 @@ defmodule MigrationsFileTest do
 
     test "test list with status" do
       temp = temp_folder()
-      migrations_path = Path.join([temp, "migrations"])
+      migrations_dir = Path.join([temp, "migrations"])
 
       [first_migration, second_migration] = init_and_add_migration("test", temp)
       first_migration_name = Path.dirname(first_migration) |> Path.basename()
       second_migration_name = Path.dirname(second_migration) |> Path.basename()
-      change_migrations_name(migrations_path, first_migration_name, "first_migration_name")
-      change_migrations_name(migrations_path, second_migration_name, "second_migration_name")
+      change_migrations_name(migrations_dir, first_migration_name, "first_migration_name")
+      change_migrations_name(migrations_dir, second_migration_name, "second_migration_name")
 
       {:ok, listing, _mismatched} =
-        Electric.Migrations.list_migrations(%{:dir => migrations_path})
+        Electric.Migrations.list_migrations(%{migrations_dir: migrations_dir})
 
       assert listing ==
                "\e[0m\n------ Electric SQL Migrations ------\n\nfirst_migration_name\tdefault: \e[32mapplied\e[0m\nsecond_migration_name\tdefault: \e[32mapplied\e[0m\n"
@@ -1186,15 +1203,16 @@ defmodule MigrationsFileTest do
 
     test "test lists with error" do
       temp = temp_folder()
-      migrations_path = Path.join([temp, "migrations"])
+      migrations_dir = Path.join([temp, "migrations"])
 
       [first_migration, second_migration] = init_and_add_migration("test2", temp)
       first_migration_name = Path.dirname(first_migration) |> Path.basename()
       second_migration_name = Path.dirname(second_migration) |> Path.basename()
-      change_migrations_name(migrations_path, first_migration_name, "first_migration_name")
-      change_migrations_name(migrations_path, second_migration_name, "second_migration_name")
+      change_migrations_name(migrations_dir, first_migration_name, "first_migration_name")
+      change_migrations_name(migrations_dir, second_migration_name, "second_migration_name")
 
-      {:ok, listing, mismatched} = Electric.Migrations.list_migrations(%{:dir => migrations_path})
+      {:ok, listing, mismatched} =
+        Electric.Migrations.list_migrations(%{migrations_dir: migrations_dir})
 
       assert listing ==
                "\e[0m\n------ Electric SQL Migrations ------\n\nfirst_migration_name\tdefault: \e[32mapplied\e[0m\nsecond_migration_name\tdefault: \e[31mdifferent\e[0m\n"
@@ -1204,17 +1222,17 @@ defmodule MigrationsFileTest do
 
     test "test revert unchanged" do
       temp = temp_folder()
-      migrations_path = Path.join([temp, "migrations"])
+      migrations_dir = Path.join([temp, "migrations"])
 
       [first_migration, second_migration] = init_and_add_migration("test", temp)
       first_migration_name = Path.dirname(first_migration) |> Path.basename()
       second_migration_name = Path.dirname(second_migration) |> Path.basename()
-      change_migrations_name(migrations_path, first_migration_name, "first_migration_name")
-      change_migrations_name(migrations_path, second_migration_name, "second_migration_name")
+      change_migrations_name(migrations_dir, first_migration_name, "first_migration_name")
+      change_migrations_name(migrations_dir, second_migration_name, "second_migration_name")
 
       {status, _msg} =
         Electric.Migrations.revert_migration("default", "second_migration_name", %{
-          :dir => migrations_path
+          migrations_dir: migrations_dir
         })
 
       assert status == :error
@@ -1222,21 +1240,21 @@ defmodule MigrationsFileTest do
 
     test "test revert" do
       temp = temp_folder()
-      migrations_path = Path.join([temp, "migrations"])
+      migrations_dir = Path.join([temp, "migrations"])
 
       [first_migration, second_migration] = init_and_add_migration("test2", temp)
       first_migration_name = Path.dirname(first_migration) |> Path.basename()
       second_migration_name = Path.dirname(second_migration) |> Path.basename()
-      change_migrations_name(migrations_path, first_migration_name, "first_migration_name")
-      change_migrations_name(migrations_path, second_migration_name, "second_migration_name")
+      change_migrations_name(migrations_dir, first_migration_name, "first_migration_name")
+      change_migrations_name(migrations_dir, second_migration_name, "second_migration_name")
 
       {status, nil} =
         Electric.Migrations.revert_migration("default", "second_migration_name", %{
-          :dir => migrations_path
+          migrations_dir: migrations_dir
         })
 
       assert status == :ok
-      manifest_path = Path.join([migrations_path, "manifest.json"])
+      manifest_path = Path.join([migrations_dir, "manifest.json"])
       manifest = Jason.decode!(File.read!(manifest_path))
 
       expected = %{
@@ -1279,7 +1297,7 @@ defmodule MigrationsFileTest do
       assert manifest == expected
 
       reverted_migration_path =
-        Path.join([migrations_path, "second_migration_name", "migration.sql"])
+        Path.join([migrations_dir, "second_migration_name", "migration.sql"])
 
       reverted_body = File.read!(reverted_migration_path)
 

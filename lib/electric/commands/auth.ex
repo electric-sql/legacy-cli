@@ -100,7 +100,7 @@ defmodule Electric.Commands.Auth do
         {:error, "invalid credentials"}
 
       {:error, _exception} ->
-        {:error, "failed to connect"}
+        {:error, "couldn't connect to ElectricSQL servers"}
     end
   end
 

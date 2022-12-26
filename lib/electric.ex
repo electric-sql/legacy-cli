@@ -9,18 +9,19 @@ defmodule Electric do
   alias Electric.Commands
   alias Electric.Util
 
-  @env Mix.env()
-
   @commands [
     accounts: Commands.Accounts,
     apps: Commands.Apps,
     auth: Commands.Auth,
+    init: Commands.Config.Init,
+    config: Commands.Config,
     migrations: Commands.Migrations
   ]
 
   @project Mix.Project.config()
 
-  defp spec do
+  @spec spec :: any()
+  def spec do
     subspecs =
       @commands
       |> Enum.map(fn {k, v} -> {k, v.spec()} end)
@@ -32,49 +33,151 @@ defmodule Electric do
       about: "...",
       allow_unknown_args: false,
       parse_double_dash: true,
+      flags: [
+        verbose: [
+          long: "--verbose",
+          short: "-v",
+          help: "Output more information about the CLI actions",
+          required: false,
+          global: true
+        ]
+      ],
       subcommands: subspecs
     )
   end
 
   @impl Bakeware.Script
   def main(argv \\ []) do
-    run(argv)
+    case run(argv) do
+      :ok ->
+        :ok
+
+      {:ok, output} when is_binary(output) ->
+        IO.puts(output)
+
+      {:error, output} ->
+        IO.puts(output)
+        System.halt(1)
+
+      {:halt, status} ->
+        System.halt(status)
+    end
   end
 
+  # allows for running the command without handling the result and causing the system to exit
+  @doc false
   def run(argv \\ []) do
     argv
+    |> prepend_help_flag()
     |> parse()
-    |> set_verbosity()
-    |> route()
+    |> case do
+      :version ->
+        spec() |> Optimus.Title.title() |> join_lines()
 
-    0
+      :help ->
+        spec() |> Optimus.Help.help([], columns()) |> join_lines()
+
+      {:help, subcommand} ->
+        spec() |> Optimus.Help.help(subcommand, columns()) |> join_lines()
+
+      {:error, errors} ->
+        {:error, Electric.Cli.Formatting.format_errors(spec(), errors) |> Enum.join("\n")}
+
+      {:error, subcommand, errors} ->
+        {:error,
+         Electric.Cli.Formatting.format_errors(spec(), subcommand, errors) |> Enum.join("\n")}
+
+      ok_tuple ->
+        request = get_subcommand_and_result(ok_tuple)
+
+        request
+        |> set_verbosity()
+        |> execute()
+        |> map_result()
+    end
   end
+
+  defp prepend_help_flag(["--help"] = args), do: args
+
+  defp prepend_help_flag(args) do
+    case Enum.group_by(args, &(&1 == "--help")) do
+      %{true: _, false: ["help" | _] = other_args} -> other_args
+      %{true: _} = map -> ["help" | Map.get(map, false, [])]
+      _ -> args
+    end
+  end
+
+  defp get_subcommand_and_result({:ok, subcommand, result}), do: {subcommand, result}
+  defp get_subcommand_and_result({:ok, result}), do: {[], result}
 
   def parse(argv \\ []) do
-    spec()
-    |> Optimus.parse!(argv, &halt/1)
+    Optimus.parse(spec(), argv)
   end
 
-  defp route({[key, command], %{flags: %{help: true}}}) do
-    spec()
-    |> Optimus.parse!(["help", "#{key}", "#{command}"], &halt/1)
+  defp execute({[], _}), do: Optimus.parse!(spec(), ["--help"], &halt/1)
+  defp execute({[:init], options}), do: apply(Commands.Config, :init, [options])
+  defp execute({[key], _}), do: Optimus.parse!(spec(), ["help", "#{key}"], &halt/1)
+  defp execute({[key, command], options}), do: apply(@commands[key], command, [options])
+
+  defp map_result({:result, data}) when is_binary(data) do
+    {:ok, data}
   end
 
-  defp route({[key, command], options}) when is_atom(key) and is_atom(command) do
-    @commands
-    |> Keyword.get(key)
-    |> apply(command, [options])
-    |> handle_command()
+  defp map_result({:result, data}) do
+    {:ok, output} = Jason.encode(data, pretty: true)
+
+    {:ok, output}
   end
 
-  defp route({[key], _}) do
-    spec()
-    |> Optimus.parse!(["help", "#{key}"], &halt/1)
+  defp map_result({:results, data, headers}) do
+    {:ok,
+     TableRex.Table.new(data, headers)
+     |> TableRex.Table.render!(horizontal_style: :header, vertical_style: :off)}
   end
 
-  defp route(_) do
+  defp map_result({:results, data}) do
+    {:ok, output} = Jason.encode(data, pretty: true)
+
+    {:ok, output}
+  end
+
+  defp map_result({:success, message}) do
+    output = Util.format_success(message)
+
+    {:ok, output}
+  end
+
+  defp map_result({:help, subcommand, message}) when is_binary(message) do
+    map_result({:help, subcommand, message, 1})
+  end
+
+  defp map_result({:help, subcommand, message, status}) when is_binary(message) do
     spec()
-    |> Optimus.parse!(["--help"], &halt/1)
+    |> Electric.Cli.Formatting.format_errors(subcommand, [message])
+    |> Enum.join("\n")
+    |> String.trim_trailing()
+    |> IO.puts()
+
+    halt(status)
+  end
+
+  defp map_result({:error, errors}),
+    do: {:error, Electric.Cli.Formatting.colorize_errors(List.wrap(errors)) |> Enum.join("\n")}
+
+  defp map_result({:error, errors, hint}) do
+    output =
+      Electric.Cli.Formatting.colorize_errors(List.wrap(errors)) ++
+        ["", hint]
+
+    {:error, output |> Enum.join("\n")}
+  end
+
+  defp map_result({:halt, status}) do
+    {:halt, status}
+  end
+
+  defp halt(status) do
+    {:halt, status}
   end
 
   defp set_verbosity({_route, %{flags: flags}} = options) do
@@ -87,53 +190,14 @@ defmodule Electric do
     options
   end
 
-  defp handle_command({:result, data}) when is_binary(data) do
-    data
-    |> IO.puts()
-
-    {:result, data}
+  defp join_lines(list) do
+    {:ok, Enum.join(list, "\n")}
   end
 
-  defp handle_command({:result, data}) do
-    data
-    |> Jason.encode_to_iodata!(pretty: true)
-    |> IO.puts()
-
-    {:result, data}
-  end
-
-  defp handle_command({:results, data}) do
-    data
-    |> Jason.encode_to_iodata!(pretty: true)
-    |> IO.puts()
-
-    {:results, data}
-  end
-
-  defp handle_command({:success, message}) when is_binary(message) do
-    message
-    |> Util.format_success()
-    |> IO.puts()
-
-    {:success, message}
-  end
-
-  defp handle_command({:error, error}) when is_binary(error) do
-    handle_command({:error, [error]})
-  end
-
-  defp handle_command({:error, errors}) when is_list(errors) do
-    spec()
-    |> Optimus.Errors.format(errors)
-    |> Enum.map(&IO.puts/1)
-
-    halt({:error, errors})
-  end
-
-  defp halt(val) do
-    case @env do
-      :test -> {:halt, val}
-      _ -> System.halt(0)
+  defp columns do
+    case Optimus.Term.width() do
+      {:ok, width} -> width
+      _ -> 80
     end
   end
 

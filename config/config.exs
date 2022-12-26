@@ -28,3 +28,7 @@ if config_env() == :dev do
       ]
     ]
 end
+
+if config_env() == :prod do
+  config :logger, level: :emergency
+end

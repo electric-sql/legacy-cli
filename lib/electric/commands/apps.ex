@@ -18,26 +18,26 @@ defmodule Electric.Commands.Apps do
       name: "apps",
       about: "Manage applications",
       subcommands: [
-        create: [
-          name: "create",
-          about: """
-          Create a new application.
+        # create: [
+        #   name: "create",
+        #   about: """
+        #   Create a new application.
 
-          Create a new application and provision the associated
-          database infrastructure and replication systems.
-          """,
-          flags: default_flags()
-        ],
-        destroy: [
-          name: "destroy",
-          about: """
-          Permanently destroy an application.
+        #   Create a new application and provision the associated
+        #   database infrastructure and replication systems.
+        #   """,
+        #   flags: default_flags()
+        # ],
+        # destroy: [
+        #   name: "destroy",
+        #   about: """
+        #   Permanently destroy an application.
 
-          Delete an application and permanently destroy the associated
-          data, database infrastructure and replication systems.
-          """,
-          flags: default_flags()
-        ],
+        #   Delete an application and permanently destroy the associated
+        #   data, database infrastructure and replication systems.
+        #   """,
+        #   flags: default_flags()
+        # ],
         list: [
           name: "list",
           about: """
@@ -84,22 +84,47 @@ defmodule Electric.Commands.Apps do
   end
 
   def list(_cmd) do
-    result =
-      Progress.run("Listing apps", false, fn ->
-        Client.get("apps")
-      end)
+    with :ok <- Session.require_auth() do
+      result =
+        Progress.run("Listing apps", false, fn ->
+          Client.get("apps")
+        end)
 
-    case result do
-      {:ok, %Req.Response{status: 200, body: %{"data" => data}}} ->
-        {:results, data}
+      case result do
+        {:ok, %Req.Response{status: 200, body: %{"data" => data}}} ->
+          rows =
+            Enum.flat_map(
+              data,
+              &Enum.map(&1["databases"], fn db ->
+                [
+                  &1["id"],
+                  &1["name"],
+                  db["slug"],
+                  colorize_status(db["status"]) |> IO.iodata_to_binary()
+                ]
+              end)
+            )
 
-      {:ok, %Req.Response{}} ->
-        {:error, "invalid credentials"}
+          {:results, rows, ["ID", "Name", "Environment", "Status"]}
 
-      {:error, _exception} ->
-        {:error, "failed to connect"}
+        {:ok, %Req.Response{}} ->
+          {:error, "invalid credentials"}
+
+        {:error, _exception} ->
+          {:error, "couldn't connect to ElectricSQL servers"}
+      end
     end
   end
+
+  defp colorize_status("provisioned" = text), do: [IO.ANSI.green(), text, IO.ANSI.reset()]
+
+  defp colorize_status("provisioning" = text),
+    do: [IO.ANSI.yellow(), IO.ANSI.blink_slow(), text, IO.ANSI.reset()]
+
+  defp colorize_status("migrating" = text),
+    do: [IO.ANSI.yellow(), IO.ANSI.blink_slow(), text, IO.ANSI.reset()]
+
+  defp colorize_status("failed" = text), do: [IO.ANSI.red(), text, IO.ANSI.reset()]
 
   # # flags: %{}, options: %{}, unknown: []}
   # def open(_cmd) do
@@ -107,22 +132,24 @@ defmodule Electric.Commands.Apps do
   # end
 
   def show(%{args: %{app_id: app_id}}) do
-    path = "apps/#{app_id}"
+    with :ok <- Session.require_auth() do
+      path = "apps/#{app_id}"
 
-    result =
-      Progress.run("Getting app", false, fn ->
-        Client.get(path)
-      end)
+      result =
+        Progress.run("Getting app", false, fn ->
+          Client.get(path)
+        end)
 
-    case result do
-      {:ok, %Req.Response{status: 200, body: %{"data" => data}}} ->
-        {:result, data}
+      case result do
+        {:ok, %Req.Response{status: 200, body: %{"data" => data}}} ->
+          {:result, data}
 
-      {:ok, %Req.Response{}} ->
-        {:error, "invalid credentials"}
+        {:ok, %Req.Response{}} ->
+          {:error, "invalid credentials"}
 
-      {:error, _exception} ->
-        {:error, "failed to connect"}
+        {:error, _exception} ->
+          {:error, "couldn't connect to ElectricSQL servers"}
+      end
     end
   end
 end
