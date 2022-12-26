@@ -2,7 +2,7 @@
 /*---------------------------------------------
 Below are templated triggers added by Satellite
 ---------------------------------------------*/
-<%= if is_init do %>
+<%= if is_init && false do %>
 -- The ops log table
 CREATE TABLE IF NOT EXISTS _electric_oplog (
   rowid INTEGER PRIMARY KEY AUTOINCREMENT,
