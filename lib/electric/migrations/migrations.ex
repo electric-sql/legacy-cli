@@ -6,6 +6,10 @@ defmodule Electric.Migrations do
 
   import Electric.Util, only: [verbose: 1]
 
+  for template <- Path.wildcard("lib/electric/migrations/templates/*.eex") do
+    @external_resource template
+  end
+
   @migration_file_name "migration.sql"
   @manifest_file_name "manifest.json"
   @postgres_file_name "postgres.sql"
