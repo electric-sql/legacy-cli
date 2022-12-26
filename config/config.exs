@@ -1,5 +1,7 @@
 import Config
 
+config :logger, level: :emergency
+
 default_console_url =
   case config_env() do
     :prod -> "https://console.electric-sql.com"

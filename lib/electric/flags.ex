@@ -3,19 +3,7 @@ defmodule Electric.Flags do
   Share default flags.
   """
 
-  @default_flags [
-    help: [
-      long: "--help",
-      help: "Print usage docs",
-      required: false
-    ],
-    verbose: [
-      long: "--verbose",
-      short: "-v",
-      help: "Output more information about the client's actions",
-      required: false
-    ]
-  ]
+  @default_flags []
 
   def merge_flags(command_specific \\ []) do
     @default_flags
