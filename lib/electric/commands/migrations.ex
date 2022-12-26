@@ -64,23 +64,6 @@ defmodule Electric.Commands.Migrations do
       name: "migrations",
       about: "Manage database schema migrations",
       subcommands: [
-        init: [
-          name: "init",
-          about: """
-          Please run `electric init` to initialize your application's configuration and migration folder.
-          """
-        ],
-        app: [
-          name: "app",
-          about: """
-          Updates the app used.
-
-          Changes the stored APP_ID that is used by all the other CLI migrations commands.
-          """,
-          args: app_flags(),
-          options: config_options() ++ migrations_options(),
-          flags: default_flags()
-        ],
         new: [
           name: "new",
           about: """
@@ -233,10 +216,11 @@ defmodule Electric.Commands.Migrations do
   #  end
 
   def sync(%{args: _args, flags: _flags, options: options, unknown: _unknown}) do
-    with {:ok, config} <- Config.load(options.root) do
+    with {:ok, config} <- Config.load(options.root),
+         :ok <- Session.require_auth() do
       options = Config.merge(config, options)
 
-      Progress.run("Synchronizing migrations", fn ->
+      Progress.run("Synchronizing migrations", false, fn ->
         case Electric.Migrations.sync_migrations(options.env, options) do
           {:ok, nil} ->
             {:success, "Migrations synchronized with server successfully"}
@@ -247,6 +231,9 @@ defmodule Electric.Commands.Migrations do
 
           {:error, errors} ->
             {:error, format_messages("errors", errors)}
+
+          error ->
+            error
         end
       end)
     end

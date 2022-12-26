@@ -134,4 +134,19 @@ defmodule Electric.Session do
         err
     end
   end
+
+  def require_auth() do
+    if File.exists?(file_path()) do
+      :ok
+    else
+      {:error, "couldn't find ElectricSQL credentials in #{file_path()}",
+       [
+         "Did you run ",
+         IO.ANSI.yellow(),
+         "electric auth login <email>",
+         IO.ANSI.reset(),
+         " on this machine?"
+       ]}
+    end
+  end
 end
