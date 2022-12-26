@@ -32,7 +32,6 @@ defmodule Electric.Migrations do
         path ->
           path
       end
-      |> Path.expand()
 
     verbose("Using migrations directory #{migrations_folder}")
 
@@ -316,7 +315,7 @@ defmodule Electric.Migrations do
   end
 
   defp check_migrations_folder(options) do
-    migrations_folder = Map.get(options, :migrations_dir, "migrations") |> Path.expand()
+    migrations_folder = Map.get(options, :migrations_dir, "migrations")
 
     verbose("Checking for migrations directory '#{migrations_folder}'")
 

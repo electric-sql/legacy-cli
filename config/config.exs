@@ -1,7 +1,5 @@
 import Config
 
-config :logger, level: :emergency
-
 default_console_url =
   case config_env() do
     :prod -> "https://console.electric-sql.com"
@@ -29,4 +27,8 @@ if config_env() == :dev do
         ]
       ]
     ]
+end
+
+if config_env() == :prod do
+  config :logger, level: :emergency
 end

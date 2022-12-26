@@ -26,7 +26,9 @@ defmodule Electric.Config do
         }
 
   def new(args) do
-    __struct__(args)
+    config = struct(__MODULE__, args)
+
+    Map.update!(config, :migrations_dir, &Path.expand(&1, config.root))
   end
 
   def keys do
@@ -45,7 +47,7 @@ defmodule Electric.Config do
     with {:exists, true} <- {:exists, File.exists?(path)},
          {:ok, json} <- File.read(path),
          {:ok, map} <- Jason.decode(json, keys: :atoms!) do
-      {:ok, new(Map.put(map, :root, path))}
+      {:ok, new(Map.put(map, :root, dir))}
     else
       {:exists, false} ->
         {:error, ".electricrc file is missing in this directory",
@@ -79,7 +81,13 @@ defmodule Electric.Config do
   def init(config, no_verify \\ false)
 
   def init(%__MODULE__{} = config, true) do
-    with {:ok, json} <- Jason.encode(Map.drop(config, [:__struct__, :root]), pretty: true),
+    file_contents =
+      config
+      |> Map.from_struct()
+      |> Map.drop([:root])
+      |> Map.update!(:migrations_dir, &Path.relative_to(&1, config.root))
+
+    with {:ok, json} <- Jason.encode(file_contents, pretty: true),
          {:ok, _} <- Migrations.init_migrations(config.app_id, config),
          path = path(config.root),
          :ok <- File.write(path, json <> "\n") do
