@@ -41,13 +41,14 @@ defmodule Electric.Config do
     Path.join(dir, @rc_filename)
   end
 
-  def load(dir \\ cwd()) do
-    path = path(dir || cwd())
+  def load(dir) do
+    current_dir = dir || cwd()
+    path = path(current_dir)
 
     with {:exists, true} <- {:exists, File.exists?(path)},
          {:ok, json} <- File.read(path),
          {:ok, map} <- Jason.decode(json, keys: :atoms!) do
-      {:ok, new(Map.put(map, :root, dir))}
+      {:ok, new(Map.put(map, :root, current_dir))}
     else
       {:exists, false} ->
         {:error, ".electricrc file is missing in this directory",
