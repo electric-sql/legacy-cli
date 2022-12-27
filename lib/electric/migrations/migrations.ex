@@ -128,7 +128,7 @@ defmodule Electric.Migrations do
 
     with {:ok, src_folder} <- check_migrations_folder(options),
          {:ok, app_id} <- check_app_id(src_folder),
-         {:ok, updated_manifest, warnings} = update_manifest(src_folder, template),
+         {:ok, updated_manifest, warnings} <- update_manifest(src_folder, template),
          {:ok, _msg} <-
            Electric.Migrations.Sync.sync_migrations(app_id, environment, updated_manifest),
          {:ok, server_manifest} <-
