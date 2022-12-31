@@ -168,8 +168,8 @@ defmodule Electric.Commands.Migrations do
 
       Electric.Progress.run("Creating new migration", fn ->
         case Electric.Migrations.new_migration(args.migration_title, options) do
-          {:ok, nil} ->
-            {:success, "New migration created"}
+          {:ok, migration_file_path} ->
+            {:success, "New migration created at:\n#{migration_file_path}"}
 
           {:error, errors} ->
             {:error, format_messages("errors", errors)}

@@ -371,7 +371,7 @@ defmodule Electric.Migrations do
     File.write!(migration_file_path, body)
     add_migration_to_manifest(migrations_folder, migration_name, migration_title, body, app_id)
 
-    {:ok, nil}
+    {:ok, migration_file_path}
   end
 
   def get_template() do

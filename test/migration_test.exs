@@ -1319,5 +1319,18 @@ defmodule MigrationsFileTest do
 
       assert reverted_body == expected
     end
+
+    test "new migration returns `{:ok, migration_file_path}`" do
+      temp = temp_folder()
+      migrations_dir = Path.join([temp, "migrations"])
+      opts = %{migrations_dir: migrations_dir}
+
+      {:ok, _msg} = Electric.Migrations.init_migrations("test_app", opts)
+      assert {:ok, file_path} = Electric.Migrations.new_migration("another", opts)
+
+      assert is_binary(file_path)
+      assert String.starts_with?(file_path, migrations_dir)
+      assert String.ends_with?(file_path, "migration.sql")
+    end
   end
 end
