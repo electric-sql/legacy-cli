@@ -12,7 +12,7 @@ defmodule Electric.Config do
     :env
   ]
 
-  @rc_filename ".electricrc"
+  @rc_filename "electric.json"
 
   @enforce_keys @keys
 
@@ -51,7 +51,7 @@ defmodule Electric.Config do
       {:ok, new(Map.put(map, :root, current_dir))}
     else
       {:exists, false} ->
-        {:error, ".electricrc file is missing in this directory",
+        {:error, "electric.json file is missing in this directory",
          [
            "Did you run ",
            IO.ANSI.yellow(),
@@ -73,7 +73,7 @@ defmodule Electric.Config do
   end
 
   @doc """
-  Initialize the `.electricrc` config file according to the provided settings
+  Initialize the `electric.json` config file according to the provided settings
 
   `no_verify` argument, if true, disables connection to the Console that makes sure
   that the app exist to prevent typos. This is an escape hatch for E2E tests to minimize

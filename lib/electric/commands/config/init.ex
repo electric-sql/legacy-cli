@@ -7,7 +7,7 @@ defmodule Electric.Commands.Config.Init do
     """
     Initializes a new Electric application configuration.
 
-    Creates a new file `.electricrc` in either your current working directory or the directory
+    Creates a new file `electric.json` in either your current working directory or the directory
     specified by the `--dir` argument, that contains the application id of the current project
     along with a default environment and location of the (default) migrations folder.
 
