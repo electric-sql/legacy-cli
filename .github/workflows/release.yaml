@@ -29,6 +29,8 @@ jobs:
           Add-Content -Path $env:GITHUB_ENV -Value "CC=gcc"
       - name: Setup elixir on mac
         if: ${{ startsWith(matrix.os, 'macos')}}
+        env:
+          HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: "true"
         run: |
           brew update --preinstall
           brew install erlang@25
