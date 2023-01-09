@@ -16,7 +16,8 @@ jobs:
     env:
       MIX_ENV: prod
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
+      - run: git fetch --tags
       - uses: erlef/setup-beam@v1
         if: ${{ !startsWith(matrix.os, 'macos')}}
         with:
