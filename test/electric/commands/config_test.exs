@@ -23,7 +23,7 @@ defmodule Electric.Commands.ConfigTest do
   end
 
   defp assert_config(root, expected) do
-    rc_file = Path.join(root, ".electricrc")
+    rc_file = Path.join(root, "electric.json")
     migrations_dir = Path.expand(expected.migrations_dir, root)
     assert File.exists?(rc_file)
 
@@ -64,7 +64,7 @@ defmodule Electric.Commands.ConfigTest do
       test "shows help text if --help passed", cxt do
         args = argv(cxt, ["--help"])
         assert {:ok, output} = Electric.run(args)
-        assert output =~ ~r/.electricrc/
+        assert output =~ ~r/electric.json/
       end
 
       test "returns error and shows usage if app id not specified", cxt do
@@ -81,7 +81,7 @@ defmodule Electric.Commands.ConfigTest do
 
       @tag :cd
       @tag :logged_in
-      test "creates a .electricrc file in the pwd", cxt do
+      test "creates an electric.json file in the pwd", cxt do
         args = argv(cxt, ["cranberry-soup-1337"])
 
         capture_io(fn ->
