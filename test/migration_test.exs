@@ -5,6 +5,13 @@ defmodule MigrationsTest do
                       "<%= original_sql %><%= for {table_full_name, _table} <- tables do %>--ADD A TRIGGER FOR <%= table_full_name %>;<% end %>\n"
                     )
 
+  defp electric_conn do
+    with {:ok, conn} <- Exqlite.Sqlite3.open(":memory:"),
+         :ok <- Electric.Migrations.__initialise_schema__(conn) do
+      {:ok, conn}
+    end
+  end
+
   describe "adds_triggers to sql" do
     test "add a trigger" do
       sql = """
@@ -91,35 +98,6 @@ defmodule MigrationsTest do
       /*---------------------------------------------
       Below are templated triggers added by Satellite
       ---------------------------------------------*/
-
-      -- The ops log table
-      CREATE TABLE IF NOT EXISTS _electric_oplog (
-        rowid INTEGER PRIMARY KEY AUTOINCREMENT,
-        namespace String NOT NULL,
-        tablename String NOT NULL,
-        optype String NOT NULL,
-        primaryKey String NOT NULL,
-        newRow String,
-        oldRow String,
-        timestamp TEXT
-      );
-
-      -- Somewhere to keep our metadata
-      CREATE TABLE IF NOT EXISTS _electric_meta (
-        key TEXT PRIMARY KEY,
-        value BLOB
-      );
-
-      -- Somewhere to track migrations
-      CREATE TABLE IF NOT EXISTS _electric_migrations (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL UNIQUE,
-        sha256 TEXT NOT NULL,
-        applied_at TEXT NOT NULL
-      );
-
-      -- Initialisation of the metadata table
-      INSERT INTO _electric_meta (key, value) VALUES ('compensations', 0), ('lastAckdRowId','0'), ('lastSentRowId', '0'), ('lsn', 'MA=='), ('clientId', '');
 
 
       -- These are toggles for turning the triggers on and off
@@ -247,6 +225,8 @@ defmodule MigrationsTest do
     end
 
     test "tests op table created" do
+      {:ok, conn} = electric_conn()
+
       sql = """
       CREATE TABLE IF NOT EXISTS fish (
       value TEXT PRIMARY KEY
@@ -259,9 +239,6 @@ defmodule MigrationsTest do
           Electric.Migrations.get_template()
         )
 
-      #        IO.inspect(sql)
-
-      {:ok, conn} = Exqlite.Sqlite3.open(":memory:")
       :ok = Exqlite.Sqlite3.execute(conn, sql)
 
       {:ok, statement} =
@@ -281,24 +258,27 @@ defmodule MigrationsTest do
     end
 
     test "tests using namespaces" do
+      {:ok, conn} = Exqlite.Sqlite3.open(":memory:")
+
       sql = """
       CREATE TABLE IF NOT EXISTS main.fish (
       value TEXT PRIMARY KEY
       ) STRICT, WITHOUT ROWID;
       """
 
-      {:ok, conn} = Exqlite.Sqlite3.open(":memory:")
       :ok = Exqlite.Sqlite3.execute(conn, sql)
 
       {:ok, statement} =
         Exqlite.Sqlite3.prepare(conn, "SELECT name FROM sqlite_master WHERE type='table';")
 
       names = get_while(conn, statement, [])
-      #        IO.inspect(names)
+
       assert MapSet.new(names) == MapSet.new(["fish"])
     end
 
     test "tests triggers create op log entries" do
+      {:ok, conn} = electric_conn()
+
       sql = """
       CREATE TABLE IF NOT EXISTS fish (
       value TEXT PRIMARY KEY
@@ -311,7 +291,6 @@ defmodule MigrationsTest do
           Electric.Migrations.get_template()
         )
 
-      {:ok, conn} = Exqlite.Sqlite3.open(":memory:")
       :ok = Exqlite.Sqlite3.execute(conn, sql)
 
       ## adding a fish
@@ -331,6 +310,8 @@ defmodule MigrationsTest do
     end
 
     test "tests triggers work as statements" do
+      {:ok, conn} = electric_conn()
+
       sql = """
       CREATE TABLE IF NOT EXISTS fish (
       value TEXT PRIMARY KEY,
@@ -344,14 +325,9 @@ defmodule MigrationsTest do
           Electric.Migrations.get_template()
         )
 
-      #      IO.puts(sql)
-
       commands = Electric.Migrations.Lexer.get_statements(sql)
 
-      {:ok, conn} = Exqlite.Sqlite3.open(":memory:")
-
       for command <- commands do
-        #        IO.puts(command)
         :ok = Exqlite.Sqlite3.execute(conn, command)
       end
 
@@ -514,6 +490,8 @@ defmodule MigrationsTest do
     end
 
     test "tests trigger has all columns" do
+      {:ok, conn} = electric_conn()
+
       sql = """
       CREATE TABLE IF NOT EXISTS fish (
       value TEXT PRIMARY KEY,
@@ -527,7 +505,6 @@ defmodule MigrationsTest do
           Electric.Migrations.get_template()
         )
 
-      {:ok, conn} = Exqlite.Sqlite3.open(":memory:")
       :ok = Exqlite.Sqlite3.execute(conn, sql)
 
       ## adding a red fish
@@ -551,6 +528,8 @@ defmodule MigrationsTest do
     end
 
     test "tests trigger has all columns for multiple migrations" do
+      {:ok, conn} = electric_conn()
+
       sql1 = """
       CREATE TABLE IF NOT EXISTS fish (
       value TEXT PRIMARY KEY
@@ -577,7 +556,6 @@ defmodule MigrationsTest do
           Electric.Migrations.get_template()
         )
 
-      {:ok, conn} = Exqlite.Sqlite3.open(":memory:")
       :ok = Exqlite.Sqlite3.execute(conn, sql_out1)
       :ok = Exqlite.Sqlite3.execute(conn, sql_out2)
 
@@ -728,10 +706,6 @@ defmodule MigrationsFileTest do
             "name" => init_migration_name,
             "satellite_body" => [
               "CREATE TABLE IF NOT EXISTS items (\n  value TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;",
-              "CREATE TABLE IF NOT EXISTS _electric_oplog (\n  rowid INTEGER PRIMARY KEY AUTOINCREMENT,\n  namespace String NOT NULL,\n  tablename String NOT NULL,\n  optype String NOT NULL,\n  primaryKey String NOT NULL,\n  newRow String,\n  oldRow String,\n  timestamp TEXT\n);",
-              "CREATE TABLE IF NOT EXISTS _electric_meta (\n  key TEXT PRIMARY KEY,\n  value BLOB\n);",
-              "CREATE TABLE IF NOT EXISTS _electric_migrations (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  name TEXT NOT NULL UNIQUE,\n  sha256 TEXT NOT NULL,\n  applied_at TEXT NOT NULL\n);",
-              "INSERT INTO _electric_meta (key, value) VALUES ('compensations', 0), ('lastAckdRowId','0'), ('lastSentRowId', '0'), ('lsn', 'MA=='), ('clientId', '');",
               "DROP TABLE IF EXISTS _electric_trigger_settings;",
               "CREATE TABLE _electric_trigger_settings(tablename STRING PRIMARY KEY, flag INTEGER);",
               "INSERT INTO _electric_trigger_settings(tablename,flag) VALUES ('main.items', 1);",
@@ -797,10 +771,6 @@ defmodule MigrationsFileTest do
             "name": "#{init_migration_name}",
             "satellite_body": [
               "CREATE TABLE IF NOT EXISTS items (\\n  value TEXT PRIMARY KEY\\n) STRICT, WITHOUT ROWID;",
-              "CREATE TABLE IF NOT EXISTS _electric_oplog (\\n  rowid INTEGER PRIMARY KEY AUTOINCREMENT,\\n  namespace String NOT NULL,\\n  tablename String NOT NULL,\\n  optype String NOT NULL,\\n  primaryKey String NOT NULL,\\n  newRow String,\\n  oldRow String,\\n  timestamp TEXT\\n);",
-              "CREATE TABLE IF NOT EXISTS _electric_meta (\\n  key TEXT PRIMARY KEY,\\n  value BLOB\\n);",
-              "CREATE TABLE IF NOT EXISTS _electric_migrations (\\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\\n  name TEXT NOT NULL UNIQUE,\\n  sha256 TEXT NOT NULL,\\n  applied_at TEXT NOT NULL\\n);",
-              "INSERT INTO _electric_meta (key, value) VALUES ('compensations', 0), ('lastAckdRowId','0'), ('lastSentRowId', '0'), ('lsn', 'MA=='), ('clientId', '');",
               "DROP TABLE IF EXISTS _electric_trigger_settings;",
               "CREATE TABLE _electric_trigger_settings(tablename STRING PRIMARY KEY, flag INTEGER);",
               "INSERT INTO _electric_trigger_settings(tablename,flag) VALUES ('main.items', 1);",
@@ -946,10 +916,6 @@ defmodule MigrationsFileTest do
             "name" => first_migration_name,
             "satellite_body" => [
               "CREATE TABLE IF NOT EXISTS items (\n  value TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;",
-              "CREATE TABLE IF NOT EXISTS _electric_oplog (\n  rowid INTEGER PRIMARY KEY AUTOINCREMENT,\n  namespace String NOT NULL,\n  tablename String NOT NULL,\n  optype String NOT NULL,\n  primaryKey String NOT NULL,\n  newRow String,\n  oldRow String,\n  timestamp TEXT\n);",
-              "CREATE TABLE IF NOT EXISTS _electric_meta (\n  key TEXT PRIMARY KEY,\n  value BLOB\n);",
-              "CREATE TABLE IF NOT EXISTS _electric_migrations (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  name TEXT NOT NULL UNIQUE,\n  sha256 TEXT NOT NULL,\n  applied_at TEXT NOT NULL\n);",
-              "INSERT INTO _electric_meta (key, value) VALUES ('compensations', 0), ('lastAckdRowId','0'), ('lastSentRowId', '0'), ('lsn', 'MA=='), ('clientId', '');",
               "DROP TABLE IF EXISTS _electric_trigger_settings;",
               "CREATE TABLE _electric_trigger_settings(tablename STRING PRIMARY KEY, flag INTEGER);",
               "INSERT INTO _electric_trigger_settings(tablename,flag) VALUES ('main.items', 1);",
@@ -1265,10 +1231,6 @@ defmodule MigrationsFileTest do
             "name" => "first_migration_name",
             "satellite_body" => [
               "CREATE TABLE IF NOT EXISTS items (\n  value TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;",
-              "CREATE TABLE IF NOT EXISTS _electric_oplog (\n  rowid INTEGER PRIMARY KEY AUTOINCREMENT,\n  namespace String NOT NULL,\n  tablename String NOT NULL,\n  optype String NOT NULL,\n  primaryKey String NOT NULL,\n  newRow String,\n  oldRow String,\n  timestamp TEXT\n);",
-              "CREATE TABLE IF NOT EXISTS _electric_meta (\n  key TEXT PRIMARY KEY,\n  value BLOB\n);",
-              "CREATE TABLE IF NOT EXISTS _electric_migrations (\n  id INTEGER PRIMARY KEY AUTOINCREMENT,\n  name TEXT NOT NULL UNIQUE,\n  sha256 TEXT NOT NULL,\n  applied_at TEXT NOT NULL\n);",
-              "INSERT INTO _electric_meta (key, value) VALUES ('compensations', 0), ('lastAckdRowId','0'), ('lastSentRowId', '0'), ('lsn', 'MA=='), ('clientId', '');",
               "DROP TABLE IF EXISTS _electric_trigger_settings;",
               "CREATE TABLE _electric_trigger_settings(tablename STRING PRIMARY KEY, flag INTEGER);",
               "INSERT INTO _electric_trigger_settings(tablename,flag) VALUES ('main.items', 1);",

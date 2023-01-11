@@ -108,7 +108,7 @@ defmodule Electric.Command.MigrationsTest do
             unknown: nil
           })
 
-        assert msg == "New migration created"
+        assert msg =~ ~r/^New migration created/
       end)
     end
 
