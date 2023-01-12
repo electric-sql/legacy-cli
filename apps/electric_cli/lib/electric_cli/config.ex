@@ -2,14 +2,16 @@ defmodule ElectricCli.Config do
   alias ElectricCli.Migrations
   alias ElectricCli.Session
   alias ElectricCli.Client
+  alias ElectricCli.Util
+  alias __MODULE__
 
   @derive Jason.Encoder
 
   @keys [
-    :root,
-    :app_id,
+    :app,
+    :env,
     :migrations_dir,
-    :env
+    :root
   ]
 
   @rc_filename "electric.json"
@@ -18,11 +20,11 @@ defmodule ElectricCli.Config do
 
   defstruct @keys
 
-  @type t() :: %__MODULE__{
-          root: binary(),
-          app_id: binary(),
+  @type t() :: %Config{
+          app: binary(),
+          env: binary(),
           migrations_dir: binary(),
-          env: binary()
+          root: binary()
         }
 
   def new(args) do
@@ -55,7 +57,7 @@ defmodule ElectricCli.Config do
          [
            "Did you run ",
            IO.ANSI.yellow(),
-           "electric init <app_id>",
+           "electric init APP",
            IO.ANSI.reset(),
            " to make this project work with ElectricSQL?"
          ]}
@@ -81,39 +83,40 @@ defmodule ElectricCli.Config do
   """
   def init(config, no_verify \\ false)
 
-  def init(%__MODULE__{} = config, true) do
+  def init(%Config{} = config, true) do
     file_contents =
       config
       |> Map.from_struct()
       |> Map.drop([:root])
       |> Map.update!(:migrations_dir, &Path.relative_to(&1, config.root))
+      |> Util.rename_map_key(:migrations_dir, :migrations)
 
     with {:ok, json} <- Jason.encode(file_contents, pretty: true),
-         {:ok, _} <- Migrations.init_migrations(config.app_id, config),
+         {:ok, _} <- Migrations.init_migrations(config.app, config),
          path = path(config.root),
          :ok <- File.write(path, json <> "\n") do
       {:ok, path}
     end
   end
 
-  def init(%__MODULE__{} = config, false) do
+  def init(%Config{} = config, false) do
     with :ok <- Session.require_auth(),
-         :ok <- check_if_app_exists(config.app_id) do
+         :ok <- check_if_app_exists(config.app) do
       init(config, true)
     end
   end
 
-  defp check_if_app_exists(app_id) do
+  defp check_if_app_exists(app) when is_binary(app) do
     with {:ok, apps} <- list_available_apps() do
-      if app_id in apps do
+      if app in apps do
         :ok
       else
-        suggestion = Enum.max_by(apps, &String.jaro_distance(&1, app_id))
+        suggestion = Enum.max_by(apps, &String.jaro_distance(&1, app))
 
-        error = "couldn't find app with id '#{app_id}'"
+        error = "couldn't find app with id '#{app}'"
 
         error =
-          if String.jaro_distance(suggestion, app_id) > 0.6,
+          if String.jaro_distance(suggestion, app) > 0.6,
             do: error <> ". Did you mean '#{suggestion}'?",
             else: error
 

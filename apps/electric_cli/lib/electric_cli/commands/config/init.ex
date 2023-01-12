@@ -43,11 +43,12 @@ defmodule ElectricCli.Commands.Config.Init do
         ),
       options: @options ++ migrations_options("./migrations") ++ env_options(),
       args: [
-        app_id: [
+        app: [
           parser: :string,
           required: true,
-          help: "Globally unique slug generated when you create an application (required)",
-          value_name: "APP_ID"
+          help:
+            "Application identifier (required). Generated when you create an application in the console.",
+          value_name: "APP"
         ]
       ]
     ]
@@ -56,24 +57,23 @@ defmodule ElectricCli.Commands.Config.Init do
   def init(%Optimus.ParseResult{args: args} = opts) do
     root = root(opts)
 
-    verbose("Using application id '#{args.app_id}'")
+    verbose("Setting application to '#{args.app}'")
+
+    {:ok, env} = Map.fetch(opts.options, :env)
+
+    verbose("Setting environment to '#{env}'")
 
     migrations_dir = opts.options.migrations_dir
 
     verbose("Setting migrations directory to '#{migrations_dir}'")
-
-    {:ok, default_env} = Map.fetch(opts.options, :env)
-
-    verbose("Setting default environment to '#{default_env}'")
-
     verbose("Initialising migrations")
 
     config =
       Config.new(
         root: root,
-        app_id: args.app_id,
+        app: args.app,
         migrations_dir: migrations_dir,
-        env: default_env
+        env: env
       )
 
     with {:ok, path} <- Config.init(config, opts.flags.no_verify) do

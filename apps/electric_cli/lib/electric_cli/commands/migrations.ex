@@ -102,11 +102,11 @@ defmodule ElectricCli.Commands.Migrations do
           Synchronises changes you have made to migration SQL files in your local `migrations` folder up to the ElectricSQL servers,
           and builds a new javascript file at `dist/index.js` that matches the newly synchronised set of migrations.
 
-          The metadata in this file will have a `"env": ENVIRONMENT_NAME to indicate that it was built directly from and matches
+          The metadata in this file will have a `"env": ENVIRONMENT to indicate that it was built directly from and matches
           the named app environment.
 
           By default this will sync to the `default` environment for your app. If you want to use a different one give its name
-          with `--env ENVIRONMENT_NAME`
+          with `--env ENVIRONMENT`
 
           If the app environment on our servers already has a migration with the same name but different sha256 then this
           synchronization will fail because a migration cannot be modified once it has been applied.
@@ -199,10 +199,10 @@ defmodule ElectricCli.Commands.Migrations do
   end
 
   #  def apply(%{options: options, unknown: _unknown}) do
-  #    environment = Map.get(options, :env, "default")
+  #    env = Map.get(options, :env, "default")
   #
   #    Progress.run("Applying satellite migrations", fn ->
-  #      case ElectricCli.Migrations.apply_migrations(environment, options) do
+  #      case ElectricCli.Migrations.apply_migrations(env, options) do
   #        {:ok, nil} ->
   #          {:success, "Migrations applied successfully"}
   #        {:ok, warnings} ->

@@ -5,21 +5,21 @@ defmodule ElectricCli.Migrations.Sync do
 
   alias ElectricCli.Client
 
-  def sync_migrations(app_id, environment, local_bundle) do
-    with {:ok, server_manifest} <- get_migrations_from_server(app_id, environment),
+  def sync_migrations(app, env, local_bundle) do
+    with {:ok, server_manifest} <- get_migrations_from_server(app, env),
          {:ok, new_migrations} <- compare_local_with_server(local_bundle, server_manifest),
-         {:ok, msg} <- upload_new_migrations(app_id, environment, new_migrations),
-         {:ok, _} <- apply_all_migrations(app_id, environment) do
+         {:ok, msg} <- upload_new_migrations(app, env, new_migrations),
+         {:ok, _} <- apply_all_migrations(app, env) do
       {:ok, msg}
     end
   end
 
-  def apply_all_migrations(app_id, environment) do
-    with {:ok, manifest} <- get_migrations_from_server(app_id, environment) do
+  def apply_all_migrations(app, env) do
+    with {:ok, manifest} <- get_migrations_from_server(app, env) do
       last_migration = List.last(manifest["migrations"])
 
       if last_migration["status"] == "not_applied" do
-        url = "apps/#{app_id}/environments/#{environment}/migrate"
+        url = "apps/#{app}/environments/#{env}/migrate"
 
         case Client.post(url, %{"migration_name" => last_migration["name"]}) do
           {:ok, %Req.Response{status: 200, body: _body}} ->
@@ -43,12 +43,12 @@ defmodule ElectricCli.Migrations.Sync do
     end
   end
 
-  def get_migrations_from_server(app_id, environment, with_satellite \\ false) do
+  def get_migrations_from_server(app, env, with_satellite \\ false) do
     url =
       if with_satellite do
-        "apps/#{app_id}/environments/#{environment}/migrations?body=satellite"
+        "apps/#{app}/environments/#{env}/migrations?body=satellite"
       else
-        "apps/#{app_id}/environments/#{environment}/migrations"
+        "apps/#{app}/environments/#{env}/migrations"
       end
 
     case Client.get(url) do
@@ -56,7 +56,7 @@ defmodule ElectricCli.Migrations.Sync do
         {:ok, data}
 
       {:ok, %Req.Response{status: 404, body: _data}} ->
-        {:error, "app '#{app_id}' with environment '#{environment}' not found. Was it deleted?",
+        {:error, "app '#{app}' with env '#{env}' not found. Was it deleted?",
          [
            "Check ",
            IO.ANSI.yellow(),
@@ -76,8 +76,8 @@ defmodule ElectricCli.Migrations.Sync do
     end
   end
 
-  def get_full_migration_from_server(app_id, environment, migration_name) do
-    url = "apps/#{app_id}/environments/#{environment}/migrations/#{migration_name}?body=all"
+  def get_full_migration_from_server(app, env, migration_name) do
+    url = "apps/#{app}/environments/#{env}/migrations/#{migration_name}?body=all"
 
     case Client.get(url) do
       {:ok, %Req.Response{status: 200, body: data}} ->
@@ -94,10 +94,10 @@ defmodule ElectricCli.Migrations.Sync do
     end
   end
 
-  def get_all_migrations_from_server(app_id) do
-    with {:ok, env_names} <- get_environment_names_from_server(app_id) do
+  def get_all_migrations_from_server(app) do
+    with {:ok, env_names} <- get_env_names_from_server(app) do
       Enum.reduce_while(env_names, {:ok, %{}}, fn env_name, {_status, manifests} ->
-        case get_migrations_from_server(app_id, env_name) do
+        case get_migrations_from_server(app, env_name) do
           {:error, msg} ->
             {:halt, {:error, msg}}
 
@@ -108,8 +108,8 @@ defmodule ElectricCli.Migrations.Sync do
     end
   end
 
-  def get_environment_names_from_server(app_id) do
-    url = "apps/#{app_id}"
+  def get_env_names_from_server(app) do
+    url = "apps/#{app}"
 
     case Client.get(url) do
       {:ok, %Req.Response{status: 200, body: data}} ->
@@ -174,14 +174,14 @@ defmodule ElectricCli.Migrations.Sync do
     for migration <- bundle["migrations"], into: %{}, do: {migration["name"], migration}
   end
 
-  def upload_new_migrations(app_id, environment, new_migrations) do
+  def upload_new_migrations(app, env, new_migrations) do
     migrations = new_migrations["migrations"]
 
     Enum.reduce_while(
       migrations,
       {:ok, "Synchronized #{length(migrations)} new migrations successfully"},
       fn migration, status ->
-        case upload_new_migration(app_id, environment, migration) do
+        case upload_new_migration(app, env, migration) do
           {:ok, _msg} ->
             {:cont, status}
 
@@ -192,8 +192,8 @@ defmodule ElectricCli.Migrations.Sync do
     )
   end
 
-  def upload_new_migration(app_id, environment, migration) do
-    url = "apps/#{app_id}/environments/#{environment}/migrations"
+  def upload_new_migration(app, env, migration) do
+    url = "apps/#{app}/environments/#{env}/migrations"
 
     case Client.post(url, %{"migration" => migration}) do
       {:ok, %Req.Response{status: 201}} ->

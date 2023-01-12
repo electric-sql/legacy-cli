@@ -67,7 +67,7 @@ defmodule ElectricCli.ElectricCli.SyncTest do
       ]
     }
 
-    # Using app_id = "status-422" triggers hard-coded error response
+    # Using app = "status-422" triggers hard-coded error response
     {:error, ["The table items is not STRICT."]} =
       ElectricCli.Migrations.Sync.upload_new_migrations("status-422", "production", migrations)
   end
@@ -260,7 +260,7 @@ defmodule ElectricCli.ElectricCli.SyncTest do
 
   test "doing whole sync" do
     local_bundle = %{
-      "app_id" => "app-name-2",
+      "app" => "app-name-2",
       "migrations" => [
         %{
           "name" => "1666612306_test_migration",

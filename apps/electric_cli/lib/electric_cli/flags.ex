@@ -19,7 +19,7 @@ defmodule ElectricCli.Flags do
       env: [
         short: "-e",
         long: "--env",
-        value_name: "ENVIRONMENT_NAME",
+        value_name: "ENVIRONMENT",
         help: "The name of the app environment you want to use.",
         parser: :string,
         default: "default"
@@ -32,8 +32,8 @@ defmodule ElectricCli.Flags do
       app: [
         short: "-a",
         long: "--app",
-        value_name: "APP_ID",
-        help: "Globally unique slug generated when you create an application (required)",
+        value_name: "APP",
+        help: "Application identifier. Generated when you create an application in the console.",
         required: required?,
         parser: :string
       ]

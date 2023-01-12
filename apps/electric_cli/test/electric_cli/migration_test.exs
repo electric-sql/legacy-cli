@@ -640,7 +640,7 @@ defmodule ElectricCli.MigrationsTest do
       manifest = Jason.decode!(File.read!(manifest_path))
 
       expected = %{
-        "app_id" => "test_app",
+        "app" => "test_app",
         "migrations" => [
           %{
             "name" => init_migration_name,
@@ -690,7 +690,7 @@ defmodule ElectricCli.MigrationsTest do
       sha = List.first(manifest["migrations"])["sha256"]
 
       expected = %{
-        "app_id" => "test_app",
+        "app" => "test_app",
         "migrations" => [
           %{
             "encoding" => "escaped",
@@ -754,8 +754,8 @@ defmodule ElectricCli.MigrationsTest do
 
       expected = """
       export const data = {
-        "app_id": "test_app",
-        "environment": "local",
+        "app": "test_app",
+        "env": "local",
         "migrations": [
           {
             "encoding": "escaped",
@@ -792,7 +792,7 @@ defmodule ElectricCli.MigrationsTest do
         ElectricCli.Migrations.init_migrations("test_app", %{migrations_dir: migrations_dir})
 
       {:ok, _msg} =
-        ElectricCli.Migrations.update_app_id("test_app_changed", %{migrations_dir: migrations_dir})
+        ElectricCli.Migrations.update_app("test_app_changed", %{migrations_dir: migrations_dir})
 
       init_migration_name =
         most_recent_migration_file(migrations_dir)
@@ -804,7 +804,7 @@ defmodule ElectricCli.MigrationsTest do
       manifest = Jason.decode!(File.read!(manifest_path))
 
       expected = %{
-        "app_id" => "test_app_changed",
+        "app" => "test_app_changed",
         "migrations" => [
           %{
             "name" => init_migration_name,
@@ -843,11 +843,9 @@ defmodule ElectricCli.MigrationsTest do
       File.write!(manifest_path, Jason.encode!(updated) |> Jason.Formatter.pretty_print())
     end
 
-    def init_and_add_migration(app_id, temp) do
+    def init_and_add_migration(app, temp) do
       migrations_dir = Path.join([temp, "migrations"])
-
-      {:ok, _msg} =
-        ElectricCli.Migrations.init_migrations(app_id, %{migrations_dir: migrations_dir})
+      {:ok, _msg} = ElectricCli.Migrations.init_migrations(app, %{migrations_dir: migrations_dir})
 
       my_new_migration = most_recent_migration_file(migrations_dir)
 
@@ -901,7 +899,7 @@ defmodule ElectricCli.MigrationsTest do
       #      sha = List.first(manifest["migrations"])["sha256"]
 
       expected = %{
-        "app_id" => "test",
+        "app" => "test",
         "migrations" => [
           %{
             "encoding" => "escaped",
@@ -1078,8 +1076,8 @@ defmodule ElectricCli.MigrationsTest do
 
       expected = """
       export const data = {
-        "app_id": "test",
-        "environment": "default",
+        "app": "test",
+        "env": "default",
         "migrations": [
           {
             "encoding": "escaped",
@@ -1216,7 +1214,7 @@ defmodule ElectricCli.MigrationsTest do
       manifest = Jason.decode!(File.read!(manifest_path))
 
       expected = %{
-        "app_id" => "test2",
+        "app" => "test2",
         "migrations" => [
           %{
             "encoding" => "escaped",

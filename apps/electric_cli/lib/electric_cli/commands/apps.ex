@@ -4,9 +4,9 @@ defmodule ElectricCli.Commands.Apps do
   """
   use ElectricCli, :command
 
-  @app_id [
-    app_id: [
-      value_name: "APP_ID",
+  @app [
+    app: [
+      value_name: "APP",
       help: "App ID (e.g.: from `electric apps list`)",
       required: true,
       parser: :string
@@ -64,7 +64,7 @@ defmodule ElectricCli.Commands.Apps do
 
           Show informatiom about a specific application.
           """,
-          args: @app_id,
+          args: @app,
           flags: default_flags()
         ]
         # resume
@@ -131,9 +131,9 @@ defmodule ElectricCli.Commands.Apps do
   #   throw(:NotImplemented)
   # end
 
-  def show(%{args: %{app_id: app_id}}) do
+  def show(%{args: %{app: app}}) do
     with :ok <- Session.require_auth() do
-      path = "apps/#{app_id}"
+      path = "apps/#{app}"
 
       result =
         Progress.run("Getting app", false, fn ->

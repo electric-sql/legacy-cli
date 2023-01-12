@@ -92,8 +92,8 @@ defmodule ElectricCli.MockServer do
     }
   }
 
-  defp get_some_migrations(app_id) do
-    looked_up = @fixtures[app_id]
+  defp get_some_migrations(app) do
+    looked_up = @fixtures[app]
     #    IO.inspect(looked_up)
     if looked_up == nil do
       []
@@ -155,9 +155,9 @@ defmodule ElectricCli.MockServer do
     end
   end
 
-  get "api/v1/apps/:app_id/environments/:environment/migrations" do
+  get "api/v1/apps/:app/environments/:env/migrations" do
     server_manifest = %{
-      "migrations" => get_some_migrations(app_id)
+      "migrations" => get_some_migrations(app)
     }
 
     Plug.Conn.resp(conn, 200, Jason.encode!(server_manifest))
@@ -165,7 +165,7 @@ defmodule ElectricCli.MockServer do
     |> Plug.Conn.send_resp()
   end
 
-  get "api/v1/apps/:app_id/environments/:environment/migrations/:migration_name" do
+  get "api/v1/apps/:app/environments/:env/migrations/:migration_name" do
     server_manifest = %{
       "migration" => get_a_migration(migration_name)
     }
@@ -175,7 +175,7 @@ defmodule ElectricCli.MockServer do
     |> Plug.Conn.send_resp()
   end
 
-  post "api/v1/apps/status-422/environments/:environment/migrations" do
+  post "api/v1/apps/status-422/environments/:env/migrations" do
     Plug.Conn.resp(
       conn,
       422,
@@ -185,19 +185,19 @@ defmodule ElectricCli.MockServer do
     |> Plug.Conn.send_resp()
   end
 
-  post "api/v1/apps/:app_id/environments/:environment/migrations" do
+  post "api/v1/apps/:app/environments/:env/migrations" do
     Plug.Conn.resp(conn, 201, "\"ok\"")
     |> Plug.Conn.put_resp_header("Content-Type", "application/json")
     |> Plug.Conn.send_resp()
   end
 
-  post "api/v1/apps/:app_id/environments/:environment/migrate" do
+  post "api/v1/apps/:app/environments/:env/migrate" do
     Plug.Conn.resp(conn, 200, "\"ok\"")
     |> Plug.Conn.put_resp_header("Content-Type", "application/json")
     |> Plug.Conn.send_resp()
   end
 
-  get "api/v1/apps/:app_id" do
+  get "api/v1/apps/:app" do
     app_info = %{
       "data" => %{
         "databases" => [

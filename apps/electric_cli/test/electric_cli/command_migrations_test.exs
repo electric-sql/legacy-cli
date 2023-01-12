@@ -25,7 +25,7 @@ defmodule ElectricCli.Command.MigrationsTest do
         Config.new(
           root: tmp_dir,
           migrations_dir: "./migrations",
-          app_id: "cranberry-soup-1337",
+          app: "cranberry-soup-1337",
           env: "default"
         )
 
