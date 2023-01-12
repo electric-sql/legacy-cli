@@ -6,7 +6,7 @@ defmodule ElectricCli.MixProject do
   def project do
     [
       app: :electric_cli,
-      version: "0.2.1",
+      version: "0.3.0",
       elixir: "~> 1.14",
       build_path: "../../_build",
       config_path: "../../config/config.exs",

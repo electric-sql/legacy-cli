@@ -753,7 +753,7 @@ defmodule ElectricCli.MigrationsTest do
       local_js = File.read!(js_path)
 
       expected = """
-      export const data = {
+      export default {
         "app": "test_app",
         "env": "local",
         "migrations": [
@@ -1075,7 +1075,7 @@ defmodule ElectricCli.MigrationsTest do
       default_js = File.read!(js_path)
 
       expected = """
-      export const data = {
+      export default {
         "app": "test",
         "env": "default",
         "migrations": [
