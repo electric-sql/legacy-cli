@@ -27,10 +27,21 @@ defmodule ElectricCli.Config do
           root: binary()
         }
 
-  def new(args) do
-    config = struct(__MODULE__, args)
+  def new(%Config{} = args) do
+    args
+    |> Map.update!(:migrations_dir, &Path.expand(&1, args.root))
+  end
 
-    Map.update!(config, :migrations_dir, &Path.expand(&1, config.root))
+  def new(args) when is_list(args) do
+    args
+    |> Enum.into(%{})
+    |> new()
+  end
+
+  def new(%{} = args) do
+    Config
+    |> struct(args)
+    |> new()
   end
 
   def keys do
@@ -49,8 +60,13 @@ defmodule ElectricCli.Config do
 
     with {:exists, true} <- {:exists, File.exists?(path)},
          {:ok, json} <- File.read(path),
-         {:ok, map} <- Jason.decode(json, keys: :atoms!) do
-      {:ok, new(Map.put(map, :root, current_dir))}
+         {:ok, data} <- Jason.decode(json, keys: :atoms!) do
+      map =
+        data
+        |> Util.rename_map_key(:migrations, :migrations_dir)
+        |> Map.put(:root, current_dir)
+
+      {:ok, new(map)}
     else
       {:exists, false} ->
         {:error, "electric.json file is missing in this directory",

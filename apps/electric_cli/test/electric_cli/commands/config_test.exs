@@ -3,6 +3,8 @@ defmodule ElectricCli.Commands.ConfigTest do
 
   import ExUnit.CaptureIO
 
+  alias ElectricCli.Util
+
   @moduletag :tmp_dir
 
   setup %{tmp_dir: dir} = context do
@@ -16,8 +18,16 @@ defmodule ElectricCli.Commands.ConfigTest do
       on_exit(fn -> File.cd!(saved) end)
     end
 
-    if context[:logged_in] do
-      log_in()
+    if context[:login] do
+      login()
+    end
+
+    if context[:init] do
+      init()
+    end
+
+    if context[:logout] do
+      logout()
     end
 
     :ok
@@ -28,7 +38,11 @@ defmodule ElectricCli.Commands.ConfigTest do
     migrations_dir = Path.expand(expected.migrations_dir, root)
     assert File.exists?(rc_file)
 
-    assert {:ok, config} = Jason.decode(File.read!(rc_file), keys: :atoms)
+    assert %{} =
+             config =
+             File.read!(rc_file)
+             |> Jason.decode!(keys: :atoms)
+             |> Util.rename_map_key(:migrations, :migrations_dir)
 
     assert config == expected
 
@@ -83,7 +97,7 @@ defmodule ElectricCli.Commands.ConfigTest do
       end
 
       @tag :cd
-      @tag :logged_in
+      @tag :login
       test "creates an electric.json file in the pwd", cxt do
         args = argv(cxt, ["cranberry-soup-1337"])
 
@@ -93,13 +107,13 @@ defmodule ElectricCli.Commands.ConfigTest do
 
         assert_config(cxt.tmp_dir, %{
           migrations_dir: "migrations",
-          app_id: "cranberry-soup-1337",
+          app: "cranberry-soup-1337",
           env: "default"
         })
       end
 
       @tag :cd
-      @tag :logged_in
+      @tag :login
       test "should be idempotent", cxt do
         args = argv(cxt, ["cranberry-soup-1337"])
 
@@ -108,13 +122,13 @@ defmodule ElectricCli.Commands.ConfigTest do
 
         assert_config(cxt.tmp_dir, %{
           migrations_dir: "migrations",
-          app_id: "cranberry-soup-1337",
+          app: "cranberry-soup-1337",
           env: "default"
         })
       end
 
       @tag :cd
-      @tag :logged_in
+      @tag :login
       test "should error if the existing migrations belong to another app", cxt do
         args1 = argv(cxt, ["cranberry-soup-1337"])
         assert {:ok, _output} = ElectricCli.Main.run(args1)
@@ -124,26 +138,26 @@ defmodule ElectricCli.Commands.ConfigTest do
 
         assert_config(cxt.tmp_dir, %{
           migrations_dir: "migrations",
-          app_id: "cranberry-soup-1337",
+          app: "cranberry-soup-1337",
           env: "default"
         })
       end
 
       @tag :cd
-      @tag :logged_in
+      @tag :login
       test "can use a custom migrations directory", cxt do
         args = argv(cxt, ["--migrations-dir", "browser/migrations", "cranberry-soup-1337"])
         assert {:ok, _output} = ElectricCli.Main.run(args)
 
         assert_config(cxt.tmp_dir, %{
           migrations_dir: "browser/migrations",
-          app_id: "cranberry-soup-1337",
+          app: "cranberry-soup-1337",
           env: "default"
         })
       end
 
       @tag :cd
-      @tag :logged_in
+      @tag :login
       test "can use an absolute migrations directory", cxt do
         # I'm choosing to have the arg specify the full path to the migrations, rather than point
         # to the base and then we add "migrations".
@@ -159,13 +173,13 @@ defmodule ElectricCli.Commands.ConfigTest do
 
         assert_config(cxt.tmp_dir, %{
           migrations_dir: migrations_dir,
-          app_id: "cranberry-soup-1337",
+          app: "cranberry-soup-1337",
           env: "default"
         })
       end
 
       @tag :cd
-      @tag :logged_in
+      @tag :login
       test "allows for setting a custom default env", cxt do
         args = argv(cxt, ["--dir", cxt.tmp_dir, "--env", "prod", "cranberry-soup-1337"])
 
@@ -173,17 +187,117 @@ defmodule ElectricCli.Commands.ConfigTest do
 
         assert_config(cxt.tmp_dir, %{
           migrations_dir: "migrations",
-          app_id: "cranberry-soup-1337",
+          app: "cranberry-soup-1337",
           env: "prod"
         })
       end
     end
   end
 
-  defp log_in() do
+  describe "`electric config update`" do
+    setup do
+      {:ok, cmd: unquote(["config", "update"])}
+    end
+
+    test "shows help text if --help passed", cxt do
+      args = argv(cxt, ["--help"])
+      assert {:ok, output} = ElectricCli.Main.run(args)
+      assert output =~ ~r/electric.json/
+    end
+
+    test "returns error if run before electric init in this root", cxt do
+      args = argv(cxt, [])
+      assert {:error, output} = ElectricCli.Main.run(args)
+      assert output =~ "file is missing in this directory"
+    end
+
+    @tag :cd
+    @tag :login
+    @tag :init
+    @tag :logout
+    test "doesn't update the app if you're not logged in", cxt do
+      args = argv(cxt, ["--app", "french-onion-1234"])
+      assert {{:error, output}, _} = with_io(fn -> ElectricCli.Main.run(args) end)
+      assert output =~ "electric auth login <email>"
+    end
+
+    @tag :cd
+    @tag :login
+    @tag :init
+    test "unchanged says so", cxt do
+      args = argv(cxt, ["--app", "cranberry-soup-1337"])
+      assert {{:ok, output}, _} = with_io(fn -> ElectricCli.Main.run(args) end)
+      assert output =~ "Nothing to update"
+    end
+
+    @tag :cd
+    @tag :login
+    @tag :init
+    test "updates the app", cxt do
+      args = argv(cxt, ["--app", "french-onion-1234"])
+
+      capture_io(fn ->
+        assert {:ok, _output} = ElectricCli.Main.run(args)
+      end)
+
+      assert_config(cxt.tmp_dir, %{
+        migrations_dir: "migrations",
+        app: "french-onion-1234",
+        env: "default"
+      })
+    end
+
+    @tag :cd
+    @tag :login
+    @tag :init
+    test "updates the env", cxt do
+      args = argv(cxt, ["--env", "staging"])
+
+      capture_io(fn ->
+        assert {:ok, _output} = ElectricCli.Main.run(args)
+      end)
+
+      assert_config(cxt.tmp_dir, %{
+        migrations_dir: "migrations",
+        app: "cranberry-soup-1337",
+        env: "staging"
+      })
+    end
+
+    @tag :cd
+    @tag :login
+    @tag :init
+    test "changes th migrations path", cxt do
+      args = argv(cxt, ["--migrations-dir", "timbuktu"])
+
+      capture_io(fn ->
+        assert {:ok, _output} = ElectricCli.Main.run(args)
+      end)
+
+      assert_config(cxt.tmp_dir, %{
+        migrations_dir: "timbuktu",
+        app: "cranberry-soup-1337",
+        env: "default"
+      })
+    end
+  end
+
+  defp init() do
+    capture_io(fn ->
+      assert {:ok, _} = ElectricCli.Main.run(~w|init cranberry-soup-1337|)
+    end)
+  end
+
+  defp login() do
     capture_io(fn ->
       assert {:ok, _} =
                ElectricCli.Main.run(~w|auth login test@electric-sql.com --password password|)
+    end)
+  end
+
+  defp logout() do
+    capture_io(fn ->
+      assert {:ok, _} = ElectricCli.Main.run(~w|auth logout|)
     end)
   end
 end

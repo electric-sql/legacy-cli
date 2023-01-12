@@ -114,6 +114,13 @@ defmodule ElectricCli.MockServer do
       type: "postgres"
     }
 
+    staging_env = %{
+      name: "Staging",
+      slug: "staging",
+      status: "provisioned",
+      type: "postgres"
+    }
+
     app_list = %{
       data: [
         %{id: "test", name: "test", slug: "test", databases: [default_env]},
@@ -123,6 +130,12 @@ defmodule ElectricCli.MockServer do
           id: "cranberry-soup-1337",
           name: "app-name-2",
           slug: "app-name-2",
+          databases: [default_env, staging_env]
+        },
+        %{
+          id: "french-onion-1234",
+          name: "french-onion-1234",
+          slug: "french-onion-1234",
           databases: [default_env]
         }
       ]

@@ -253,18 +253,6 @@ defmodule ElectricCli.Commands.Migrations do
     end
   end
 
-  def app(%{args: %{app: _app_id}, options: _options}) do
-    # TODO: implement config app command
-    {:error, "Use `electric config app` to set the app id"}
-    # case ElectricCli.Migrations.update_app_id(app_id, options) do
-    #   {:ok, _} ->
-    #     {:success, "Changed to using app #{app_id}"}
-
-    #   {:error, errors} ->
-    #     {:error, format_messages("errors", errors)}
-    # end
-  end
-
   def revert(%{args: %{migration_name: migration_name}, options: options}) do
     with {:ok, config} <- Config.load(options.root) do
       options = Config.merge(config, options)

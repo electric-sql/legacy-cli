@@ -17,6 +17,17 @@ defmodule ElectricCli.Util do
     |> Map.put(new_key, value)
   end
 
+  def take_unless_nil(map, keys) do
+    map
+    |> Map.take(keys)
+    |> Enum.reduce(%{}, fn {k, v}, acc ->
+      case is_nil(v) do
+        true -> acc
+        false -> Map.put(acc, k, v)
+      end
+    end)
+  end
+
   def format_success(message) do
     [:green, :bright, message]
     |> IO.ANSI.format()
