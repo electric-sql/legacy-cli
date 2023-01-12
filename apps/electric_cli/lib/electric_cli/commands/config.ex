@@ -6,7 +6,7 @@ defmodule ElectricCli.Commands.Config do
   def spec do
     [
       name: "config",
-      about: "Manage configuration of ElectricSQL project",
+      about: "Manage configuration of your ElectricSQL project",
       subcommands: [
         init: Init.spec()
       ]

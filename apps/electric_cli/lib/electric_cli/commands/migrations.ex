@@ -84,7 +84,7 @@ defmodule ElectricCli.Commands.Migrations do
           about: """
           Builds a javascript file at `dist/index.js`.
 
-          This file bundles all your migrations with ElectricSQL DB's added DDL and some additional metadata.
+          This file bundles all your migrations with ElectricSQL's added DDL and some additional metadata.
 
           The metadata in this file will have a `"env": "local" to indicate the it was built from your local files
           rather that one of the named app environments.
@@ -99,8 +99,8 @@ defmodule ElectricCli.Commands.Migrations do
           about: """
           Synchronizes migrations with the server.
 
-          Synchronizes changes you have made to migration SQL files in your local `migrations` folder up to the ElectricSQL servers,
-          and builds a new javascript file at `dist/index.js` that matches the newly synchronized set of migrations.
+          Synchronises changes you have made to migration SQL files in your local `migrations` folder up to the ElectricSQL servers,
+          and builds a new javascript file at `dist/index.js` that matches the newly synchronised set of migrations.
 
           The metadata in this file will have a `"env": ENVIRONMENT_NAME to indicate that it was built directly from and matches
           the named app environment.
