@@ -11,6 +11,12 @@ on:
         default: tests
         required: false
 
+env:
+  MIX_ENV: test
+  CACHE_VERSION: v20230113
+  OTP_VERSION: "24.3"
+  ELIXIR_VERSION: "1.13"
+
 jobs:
   deps:
     name: Get all the necessary dependencies
@@ -20,30 +26,28 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
       - run: ls -lah
+
       - name: Inject slug/short variables
         uses: rlespinasse/github-slug-action@v4
+
       - uses: erlef/setup-beam@v1
         with:
-          otp-version: "24.3"
-          elixir-version: "1.13"
+          otp-version: "${{ env.OTP_VERSION }}"
+          elixir-version: "${{ env.ELIXIR_VERSION }}"
 
-      - name: Try to reuse cached deps
-        id: cache-deps
+      - name: Try to reuse cached build
+        id: cache-build-deps
         uses: actions/cache@v3
         with:
-          path: deps
-          key: ${{ runner.os }}-mixdeps-${{ hashFiles('**/mix.lock') }}
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-mix-${{ env.CACHE_VERSION }}-${{ hashFiles('**/mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-mix-
 
       - run: mix do deps.get, deps.compile, compile
-        env:
-          MIX_ENV: test
 
-      - name: Cache compiled code
-        id: cache-build
-        uses: actions/cache@v3
-        with:
-          path: _build
-          key: ${{ runner.os }}-mixbuild-${{ env.GITHUB_SHA_SHORT }}
 
   tests:
     name: elixir tests
@@ -58,30 +62,22 @@ jobs:
         uses: rlespinasse/github-slug-action@v4
       - uses: erlef/setup-beam@v1
         with:
-          otp-version: "24.3"
-          elixir-version: "1.13"
+          otp-version: "${{ env.OTP_VERSION }}"
+          elixir-version: "${{ env.ELIXIR_VERSION }}"
 
-      - name: Try to reuse cached deps
-        id: cache-deps
+      - name: Try to reuse cached build
+        id: cache-build-deps
         uses: actions/cache@v3
         with:
-          path: deps
-          key: ${{ runner.os }}-mixdeps-${{ hashFiles('**/mix.lock') }}
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-mix-${{ env.CACHE_VERSION }}-${{ hashFiles('**/mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-mix-
 
       - run: mix do deps.get, deps.compile, compile
-        env:
-          MIX_ENV: test
-
-      - name: Cache compiled code
-        id: cache-build
-        uses: actions/cache@v3
-        with:
-          path: _build
-          key: ${{ runner.os }}-mixbuild-${{ env.GITHUB_SHA_SHORT }}
-
       - run: mix test --trace
-        env:
-          MIX_ENV: test
 
 
   formatting:
@@ -97,26 +93,21 @@ jobs:
         uses: rlespinasse/github-slug-action@v4
       - uses: erlef/setup-beam@v1
         with:
-          otp-version: "24.3"
-          elixir-version: "1.13"
+          otp-version: "${{ env.OTP_VERSION }}"
+          elixir-version: "${{ env.ELIXIR_VERSION }}"
 
-      - name: Try to reuse cached deps
-        id: cache-deps
+      - name: Try to reuse cached build
+        id: cache-build-deps
         uses: actions/cache@v3
         with:
-          path: deps
-          key: ${{ runner.os }}-mixdeps-${{ hashFiles('**/mix.lock') }}
-
-      - name: Cache compiled code
-        id: cache-build
-        uses: actions/cache@v3
-        with:
-          path: _build
-          key: ${{ runner.os }}-mixbuild-${{ env.GITHUB_SHA_SHORT }}
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-mix-${{ env.CACHE_VERSION }}-${{ hashFiles('**/mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-mix-
 
       - run: mix do deps.get, deps.compile
-        env:
-          MIX_ENV: test
 
       - name: Check formatting
         run: mix format --check-formatted
