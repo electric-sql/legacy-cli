@@ -26,9 +26,6 @@ jobs:
         with:
           otp-version: "24.3"
           elixir-version: "1.13"
-      - uses: webfactory/ssh-agent@v0.5.4
-        with:
-          ssh-private-key: ${{ secrets.KEY_TO_ACCESS_SATELLITE_JS_PROTO }}
 
       - name: Try to reuse cached deps
         id: cache-deps
@@ -76,10 +73,6 @@ jobs:
           path: _build
           key: ${{ runner.os }}-mixbuild-${{ env.GITHUB_SHA_SHORT }}
 
-      - uses: webfactory/ssh-agent@v0.5.4
-        with:
-          ssh-private-key: ${{ secrets.KEY_TO_ACCESS_SATELLITE_JS_PROTO }}
-
       - run: mix test --trace
         env:
           MIX_ENV: test
@@ -115,9 +108,6 @@ jobs:
           path: _build
           key: ${{ runner.os }}-mixbuild-${{ env.GITHUB_SHA_SHORT }}
 
-      - uses: webfactory/ssh-agent@v0.5.4
-        with:
-          ssh-private-key: ${{ secrets.KEY_TO_ACCESS_SATELLITE_JS_PROTO }}
       - run: mix do deps.get, deps.compile
 
       - name: Check formatting
