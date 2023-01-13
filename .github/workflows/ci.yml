@@ -35,6 +35,8 @@ jobs:
           key: ${{ runner.os }}-mixdeps-${{ hashFiles('**/mix.lock') }}
 
       - run: mix do deps.get, deps.compile, compile
+        env:
+          MIX_ENV: test
 
       - name: Cache compiled code
         id: cache-build
@@ -109,6 +111,8 @@ jobs:
           key: ${{ runner.os }}-mixbuild-${{ env.GITHUB_SHA_SHORT }}
 
       - run: mix do deps.get, deps.compile
+        env:
+          MIX_ENV: test
 
       - name: Check formatting
         run: mix format --check-formatted
