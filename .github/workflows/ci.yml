@@ -44,7 +44,7 @@ jobs:
             _build
           key: ${{ runner.os }}-mix-${{ env.CACHE_VERSION }}-${{ hashFiles('**/mix.lock') }}
           restore-keys: |
-            ${{ runner.os }}-mix-
+            ${{ runner.os }}-mix-${{ env.CACHE_VERSION }}-
 
       - run: mix do deps.get, deps.compile, compile
 
@@ -74,7 +74,7 @@ jobs:
             _build
           key: ${{ runner.os }}-mix-${{ env.CACHE_VERSION }}-${{ hashFiles('**/mix.lock') }}
           restore-keys: |
-            ${{ runner.os }}-mix-
+            ${{ runner.os }}-mix-${{ env.CACHE_VERSION }}-
 
       - run: mix do deps.get, deps.compile, compile
       - run: mix test --trace
@@ -105,7 +105,7 @@ jobs:
             _build
           key: ${{ runner.os }}-mix-${{ env.CACHE_VERSION }}-${{ hashFiles('**/mix.lock') }}
           restore-keys: |
-            ${{ runner.os }}-mix-
+            ${{ runner.os }}-mix-${{ env.CACHE_VERSION }}-
 
       - run: mix do deps.get, deps.compile
 
