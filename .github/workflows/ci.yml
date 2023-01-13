@@ -68,6 +68,10 @@ jobs:
           path: deps
           key: ${{ runner.os }}-mixdeps-${{ hashFiles('**/mix.lock') }}
 
+      - run: mix do deps.get, deps.compile, compile
+        env:
+          MIX_ENV: test
+
       - name: Cache compiled code
         id: cache-build
         uses: actions/cache@v3
