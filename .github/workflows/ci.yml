@@ -1,0 +1,128 @@
+name: CI
+on:
+  push:
+    branches:
+      - main
+  pull_request: null
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: test_name
+        default: tests
+        required: false
+
+jobs:
+  deps:
+    name: Get all the necessary dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - run: ls -lah
+      - name: Inject slug/short variables
+        uses: rlespinasse/github-slug-action@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "24.3"
+          elixir-version: "1.13"
+      - uses: webfactory/ssh-agent@v0.5.4
+        with:
+          ssh-private-key: ${{ secrets.KEY_TO_ACCESS_SATELLITE_JS_PROTO }}
+
+      - name: Try to reuse cached deps
+        id: cache-deps
+        uses: actions/cache@v3
+        with:
+          path: deps
+          key: ${{ runner.os }}-mixdeps-${{ hashFiles('**/mix.lock') }}
+
+      - run: mix do deps.get, deps.compile, compile
+
+      - name: Cache compiled code
+        id: cache-build
+        uses: actions/cache@v3
+        with:
+          path: _build
+          key: ${{ runner.os }}-mixbuild-${{ env.GITHUB_SHA_SHORT }}
+
+  tests:
+    name: elixir tests
+    runs-on: ubuntu-latest
+    needs: deps
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Inject slug/short variables
+        uses: rlespinasse/github-slug-action@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "24.3"
+          elixir-version: "1.13"
+
+      - name: Try to reuse cached deps
+        id: cache-deps
+        uses: actions/cache@v3
+        with:
+          path: deps
+          key: ${{ runner.os }}-mixdeps-${{ hashFiles('**/mix.lock') }}
+
+      - name: Cache compiled code
+        id: cache-build
+        uses: actions/cache@v3
+        with:
+          path: _build
+          key: ${{ runner.os }}-mixbuild-${{ env.GITHUB_SHA_SHORT }}
+
+      - uses: webfactory/ssh-agent@v0.5.4
+        with:
+          ssh-private-key: ${{ secrets.KEY_TO_ACCESS_SATELLITE_JS_PROTO }}
+
+      - run: mix test --trace
+        env:
+          MIX_ENV: test
+
+
+  formatting:
+    name: formatting and warnings
+    runs-on: ubuntu-latest
+    needs: deps
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Inject slug/short variables
+        uses: rlespinasse/github-slug-action@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "24.3"
+          elixir-version: "1.13"
+
+      - name: Try to reuse cached deps
+        id: cache-deps
+        uses: actions/cache@v3
+        with:
+          path: deps
+          key: ${{ runner.os }}-mixdeps-${{ hashFiles('**/mix.lock') }}
+
+      - name: Cache compiled code
+        id: cache-build
+        uses: actions/cache@v3
+        with:
+          path: _build
+          key: ${{ runner.os }}-mixbuild-${{ env.GITHUB_SHA_SHORT }}
+
+      - uses: webfactory/ssh-agent@v0.5.4
+        with:
+          ssh-private-key: ${{ secrets.KEY_TO_ACCESS_SATELLITE_JS_PROTO }}
+      - run: mix do deps.get, deps.compile
+
+      - name: Check formatting
+        run: mix format --check-formatted
+
+      - name: Check for warnings
+        run: mix compile --force --warnings-as-errors
+
