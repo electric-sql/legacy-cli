@@ -1,4 +1,4 @@
-defmodule MigrationsLexerTest do
+defmodule Electric.MigrationsLexerTest do
   use ExUnit.Case
 
   describe "Can extract statements from SQL" do
