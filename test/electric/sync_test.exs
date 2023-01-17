@@ -1,5 +1,11 @@
 defmodule Electric.Cli.SyncTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
+
+  setup do
+    {:ok, _pid} = start_supervised(Electric.MockServer.spec())
+
+    :ok
+  end
 
   test "gets an empty set of migrations" do
     {:ok, data} = Electric.Migrations.Sync.get_migrations_from_server("app-name", "production")

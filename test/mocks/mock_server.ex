@@ -1,6 +1,10 @@
 defmodule Electric.MockServer do
   use Plug.Router
 
+  def spec do
+    {Plug.Cowboy, scheme: :http, plug: Electric.MockServer, options: [port: 4003]}
+  end
+
   plug(Plug.Parsers,
     parsers: [:json],
     pass: ["text/*"],

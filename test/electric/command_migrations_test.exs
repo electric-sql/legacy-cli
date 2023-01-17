@@ -7,6 +7,7 @@ defmodule Electric.Command.MigrationsTest do
   @moduletag :tmp_dir
 
   setup %{tmp_dir: tmp_dir} do
+    {:ok, _pid} = start_supervised(Electric.MockServer.spec())
     System.put_env("ELECTRIC_STATE_HOME", Path.join(tmp_dir, ".electric_credentials"))
     on_exit(fn -> System.delete_env("ELECTRIC_STATE_HOME") end)
 
