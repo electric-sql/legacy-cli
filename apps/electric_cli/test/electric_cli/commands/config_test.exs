@@ -75,6 +75,8 @@ defmodule ElectricCli.Commands.ConfigTest do
       end
 
       test "Doesn't initialize the app if you're not logged in", cxt do
+        on_exit(fn -> Application.put_env(:electric_cli, :verbose, false) end)
+
         args = argv(cxt, ["cranberry-soup-1337", "--verbose"])
         assert {{:error, output}, _} = with_io(fn -> ElectricCli.Main.run(args) end)
         assert output =~ "electric auth login <email>"
