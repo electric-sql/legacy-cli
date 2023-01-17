@@ -1,5 +1,5 @@
-defmodule MigrationsSyncTest do
-  use ExUnit.Case, async: false
+defmodule Electric.Cli.SyncTest do
+  use ExUnit.Case, async: true
 
   test "gets an empty set of migrations" do
     {:ok, data} = Electric.Migrations.Sync.get_migrations_from_server("app-name", "production")

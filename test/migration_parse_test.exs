@@ -118,6 +118,26 @@ defmodule MigrationsParseTest do
       assert message == expected
     end
 
+    test "test doesn't allow uppercase in column names" do
+      sql_in = """
+      CREATE TABLE IF NOT EXISTS fish (
+      Value TEXT PRIMARY KEY,
+      colour TEXT
+      )STRICT, WITHOUT ROWID;
+      """
+
+      {:error, message} =
+        Electric.Migrations.Parse.sql_ast_from_migrations([
+          %{name: "test1", original_body: sql_in}
+        ])
+
+      expected = [
+        "The name of column Value in table fish is not allowed. Please only use lowercase for column names."
+      ]
+
+      assert message == expected
+    end
+
     test "tests getting SQL structure for templating" do
       sql_in = """
       CREATE TABLE IF NOT EXISTS parent (

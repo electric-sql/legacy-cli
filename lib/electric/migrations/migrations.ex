@@ -22,6 +22,52 @@ defmodule Electric.Migrations do
 
   @type body_style() :: :none | :text | :list
 
+  if Mix.env() == :test do
+    # this is now done by satellite but we need to duplicate it here in to bootstrap a database and
+    # validate that we're correctly adding the triggers
+    @doc false
+    def __initialise_schema__(conn) do
+      Exqlite.Sqlite3.execute(
+        conn,
+        """
+        -- The ops log table
+        CREATE TABLE IF NOT EXISTS _electric_oplog (
+          rowid INTEGER PRIMARY KEY AUTOINCREMENT,
+          namespace String NOT NULL,
+          tablename String NOT NULL,
+          optype String NOT NULL,
+          primaryKey String NOT NULL,
+          newRow String,
+          oldRow String,
+          timestamp TEXT
+        );
+
+        -- Somewhere to keep our metadata
+        CREATE TABLE IF NOT EXISTS _electric_meta (
+          key TEXT PRIMARY KEY,
+          value BLOB
+        );
+
+        -- Somewhere to track migrations
+        CREATE TABLE IF NOT EXISTS _electric_migrations (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL UNIQUE,
+          sha256 TEXT NOT NULL,
+          applied_at TEXT NOT NULL
+        );
+
+        -- Initialisation of the metadata table
+        INSERT INTO _electric_meta (key, value) VALUES
+          ('compensations', 0),
+          ('lastAckdRowId','0'),
+          ('lastSentRowId', '0'),
+          ('lsn', 'MA=='),
+          ('clientId', '');
+        """
+      )
+    end
+  end
+
   @doc """
   Creates the migrations folder and adds in initial migration to it.
   optional argument:

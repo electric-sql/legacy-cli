@@ -55,7 +55,7 @@ defmodule Electric.Migrations.Sync do
       {:ok, %Req.Response{status: 200, body: data}} ->
         {:ok, data}
 
-      {:ok, %Req.Response{status: 404, body: data}} ->
+      {:ok, %Req.Response{status: 404, body: _data}} ->
         {:error, "app '#{app_id}' with environment '#{environment}' not found. Was it deleted?",
          [
            "Check ",
