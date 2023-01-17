@@ -24,6 +24,7 @@ electric-*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
+/apps/*/tmp/
 
 # Release artefacts
 /dist/

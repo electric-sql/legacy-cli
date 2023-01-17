@@ -7,7 +7,7 @@ default_console_url =
     :dev -> "http://localhost:4000"
   end
 
-config :electric_sql_cli,
+config :cli,
   default_console_url: default_console_url
 
 if config_env() == :dev do

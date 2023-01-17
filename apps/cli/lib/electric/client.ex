@@ -10,7 +10,7 @@ defmodule Electric.Client do
 
   import Electric.Util, only: [verbose: 1]
 
-  @default_console_url Application.compile_env!(:electric_sql_cli, [:default_console_url])
+  @default_console_url Application.compile_env!(:cli, [:default_console_url])
 
   def console_url do
     System.get_env("ELECTRIC_CONSOLE_URL", @default_console_url)
