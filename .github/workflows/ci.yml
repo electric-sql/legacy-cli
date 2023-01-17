@@ -15,7 +15,7 @@ env:
   MIX_ENV: test
   CACHE_VERSION: v20230113
   OTP_VERSION: "24.3"
-  ELIXIR_VERSION: "1.13"
+  ELIXIR_VERSION: "1.14"
 
 jobs:
   deps:
