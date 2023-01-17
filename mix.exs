@@ -8,6 +8,7 @@ defmodule Electric.MixProject do
       app: :electric_sql_cli,
       version: "0.2.1",
       elixir: "~> 1.13",
+      elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       build_embedded: Mix.env() == :prod,
       deps: deps(),
@@ -34,6 +35,9 @@ defmodule Electric.MixProject do
       extra_applications: [:logger, :eex]
     ]
   end
+
+  defp elixirc_paths(:test), do: ["lib", "test/mocks"]
+  defp elixirc_paths(_), do: ["lib"]
 
   # Run "mix help deps" to learn about dependencies.
   defp deps do

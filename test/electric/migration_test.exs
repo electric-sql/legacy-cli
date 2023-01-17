@@ -1,5 +1,5 @@
 defmodule Electric.MigrationsTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: false
 
   @trigger_template EEx.compile_string(
                       "<%= original_sql %><%= for {table_full_name, _table} <- tables do %>--ADD A TRIGGER FOR <%= table_full_name %>;<% end %>\n"
@@ -600,26 +600,17 @@ defmodule Electric.MigrationsTest do
       :done -> results
     end
   end
-end
-
-defmodule MigrationsFileTest do
-  use ExUnit.Case
-
-  #  @trigger_template EEx.compile_string(
-  #                      "<%= original_sql %><%= for {table_full_name, _table} <- tables do %>\n--ADD A TRIGGER FOR <%= table_full_name %>;\n<% end %>"
-  #                    )
-
-  setup_all do
-    tmp_dir = "tmp"
-    File.rm_rf(tmp_dir)
-    File.mkdir(tmp_dir)
-  end
 
   def temp_folder() do
-    Path.join(["tmp", UUID.uuid4()])
+    Path.join([System.tmp_dir!(), "#{__MODULE__}", UUID.uuid4()])
   end
 
   describe "api tests" do
+    setup do
+      {:ok, _pid} = start_supervised(Electric.MockServer.spec())
+      :ok
+    end
+
     test "tests can init" do
       temp = temp_folder()
       migrations_dir = Path.join([temp, "migrations"])
