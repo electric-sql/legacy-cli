@@ -611,7 +611,7 @@ defmodule ElectricCli.Migrations do
   end
 
   def strip_comments(sql) do
-    ElectricCli.Migrations.Lexer.clean_up_sql(sql)
+    ElectricMigrations.Sqlite.Lexer.clean_up_sql(sql)
   end
 
   @doc false
@@ -622,12 +622,15 @@ defmodule ElectricCli.Migrations do
     if hash == migration["sha256"] && add_raw_satellite === false do
       {:ok, migration, []}
     else
-      case ElectricCli.Migrations.Triggers.add_triggers_to_last_migration(migration_set, template) do
+      case ElectricMigrations.Sqlite.Triggers.add_triggers_to_last_migration(
+             migration_set,
+             template
+           ) do
         {:error, reasons} ->
           {:error, reasons}
 
         {satellite_sql, warnings} ->
-          satellite_body = ElectricCli.Migrations.Lexer.get_statements(satellite_sql)
+          satellite_body = ElectricMigrations.Sqlite.Lexer.get_statements(satellite_sql)
 
           if add_raw_satellite do
             {:ok,

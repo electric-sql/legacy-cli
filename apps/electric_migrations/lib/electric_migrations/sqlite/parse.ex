@@ -1,4 +1,4 @@
-defmodule ElectricCli.Migrations.Parse do
+defmodule ElectricMigrations.Sqlite.Parse do
   @moduledoc """
   Creates an AST from SQL migrations
   """
@@ -43,14 +43,18 @@ defmodule ElectricCli.Migrations.Parse do
     end
   end
 
+  @doc """
+  Get a list of all tables in the migration that mention database names.
+  """
   def namespaced_table_names(sql) do
     for [_match, capture] <-
-          Regex.scan(~r/create table[^(]*\ ([\w]+\.[\w]+)\W*\(/, String.downcase(sql)) do
+          Regex.scan(~r/create table[^(]*\ ([\w]+\.[\w]+)\W*\(/, String.downcase(sql)),
+        uniq: true do
       capture
     end
   end
 
-  def apply_migrations(conn, migrations) do
+  defp apply_migrations(conn, migrations) do
     sql_errors =
       Enum.flat_map(migrations, fn migration ->
         case Exqlite.Sqlite3.execute(conn, migration.original_body) do
@@ -68,8 +72,7 @@ defmodule ElectricCli.Migrations.Parse do
     end
   end
 
-  @doc false
-  def ast_from_ordered_migrations(migrations) do
+  defp ast_from_ordered_migrations(migrations) do
     namespace = @default_namespace
     # get all the table names
     {:ok, conn} = Exqlite.Sqlite3.open(":memory:")
@@ -247,16 +250,6 @@ defmodule ElectricCli.Migrations.Parse do
     []
   end
 
-  def all_index_info(all_migrations) do
-    {:ok, conn} = Exqlite.Sqlite3.open(":memory:")
-
-    for migration <- all_migrations do
-      :ok = Exqlite.Sqlite3.execute(conn, migration)
-    end
-
-    all_index_info_from_connection(conn)
-  end
-
   defp all_index_info_from_connection(conn) do
     namespace = @default_namespace
 
@@ -348,79 +341,5 @@ defmodule ElectricCli.Migrations.Parse do
           do: true
 
     Enum.any?(matching_desc_indexes)
-  end
-
-  @doc false
-  def ast_from_ordered_migrations2(migrations) do
-    bodies =
-      for migration <- migrations do
-        migration.original_body
-      end
-
-    {simple_tables_info(bodies), [], []}
-  end
-
-  @doc false
-  def simple_tables_info(all_migrations) do
-    namespace = "main"
-    # get all the table names
-    {:ok, conn} = Exqlite.Sqlite3.open(":memory:")
-
-    for migration <- all_migrations do
-      :ok = Exqlite.Sqlite3.execute(conn, migration)
-    end
-
-    {:ok, statement} =
-      Exqlite.Sqlite3.prepare(
-        conn,
-        "SELECT name, sql FROM sqlite_master WHERE type='table' AND name!='_electric_oplog';"
-      )
-
-    info = get_rows_while(conn, statement, [])
-    :ok = Exqlite.Sqlite3.release(conn, statement)
-
-    # for each table
-    infos =
-      for [table_name, _sql] <- info do
-        # column names
-        {:ok, info_statement} = Exqlite.Sqlite3.prepare(conn, "PRAGMA table_info(#{table_name});")
-        columns = Enum.reverse(get_rows_while(conn, info_statement, []))
-
-        column_names =
-          for [_cid, name, _type, _notnull, _dflt_value, _pk] <- columns do
-            name
-          end
-
-        # private keys columns
-        private_key_column_names =
-          for [_cid, name, _type, _notnull, _dflt_value, pk] when pk == 1 <- columns do
-            name
-          end
-
-        # foreign keys
-        {:ok, foreign_statement} =
-          Exqlite.Sqlite3.prepare(conn, "PRAGMA foreign_key_list(#{table_name});")
-
-        foreign_keys = get_rows_while(conn, foreign_statement, [])
-
-        foreign_keys =
-          for [_a, _b, parent_table, child_key, parent_key, _c, _d, _e] <- foreign_keys do
-            %{
-              :child_key => child_key,
-              :parent_key => parent_key,
-              :table => "#{namespace}.#{parent_table}"
-            }
-          end
-
-        %{
-          :table_name => table_name,
-          :columns => column_names,
-          :namespace => namespace,
-          :primary => private_key_column_names,
-          :foreign_keys => foreign_keys
-        }
-      end
-
-    Enum.into(infos, %{}, fn info -> {"#{namespace}.#{info.table_name}", info} end)
   end
 end

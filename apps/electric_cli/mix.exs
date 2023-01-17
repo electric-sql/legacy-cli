@@ -7,7 +7,7 @@ defmodule ElectricCli.MixProject do
     [
       app: :electric_cli,
       version: "0.2.1",
-      elixir: "~> 1.13",
+      elixir: "~> 1.14",
       build_path: "../../_build",
       config_path: "../../config/config.exs",
       deps_path: "../../deps",
@@ -59,7 +59,8 @@ defmodule ElectricCli.MixProject do
       {:req, "~> 0.3.0"},
       {:exqlite, "~> 0.11.3"},
       {:uuid, "~> 1.1.8"},
-      {:plug_cowboy, "~> 2.0", only: :test}
+      {:plug_cowboy, "~> 2.0", only: :test},
+      {:electric_migrations, in_umbrella: true}
     ]
   end
 

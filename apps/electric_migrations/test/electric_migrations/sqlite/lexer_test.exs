@@ -1,8 +1,9 @@
-defmodule ElectricCli.MigrationsLexerTest do
+defmodule ElectricMigrations.Sqlite.LexerTest do
   use ExUnit.Case
+  alias ElectricMigrations.Sqlite.Lexer
 
-  describe "Can extract statements from SQL" do
-    test "Find simple statements with comments" do
+  describe "get_statements/1" do
+    test "finds simple statements with comments" do
       sql = """
       -- this is a comment
       CREATE TABLE IF NOT EXISTS fish (
@@ -16,7 +17,7 @@ defmodule ElectricCli.MigrationsLexerTest do
       ) STRICT, WITHOUT ROWID;
       """
 
-      result = ElectricCli.Migrations.Lexer.get_statements(sql)
+      result = Lexer.get_statements(sql)
 
       expected = [
         "CREATE TABLE IF NOT EXISTS fish (\nvalue TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;",
@@ -26,7 +27,7 @@ defmodule ElectricCli.MigrationsLexerTest do
       assert result == expected
     end
 
-    test "Find simple without statements" do
+    test "finds simple without statements" do
       sql = """
       CREATE TABLE IF NOT EXISTS fish (
       value TEXT PRIMARY KEY
@@ -36,7 +37,7 @@ defmodule ElectricCli.MigrationsLexerTest do
       ) STRICT, WITHOUT ROWID;
       """
 
-      result = ElectricCli.Migrations.Lexer.get_statements(sql)
+      result = Lexer.get_statements(sql)
 
       expected = [
         "CREATE TABLE IF NOT EXISTS fish (\nvalue TEXT PRIMARY KEY\n) STRICT, WITHOUT ROWID;",
@@ -46,7 +47,7 @@ defmodule ElectricCli.MigrationsLexerTest do
       assert result == expected
     end
 
-    test "Find nested statements" do
+    test "finds nested statements" do
       sql = """
       DROP TRIGGER IF EXISTS update_main_fish_into_oplog;
       CREATE TRIGGER update_main_fish_into_oplog
@@ -67,11 +68,11 @@ defmodule ElectricCli.MigrationsLexerTest do
       END;
       """
 
-      result = ElectricCli.Migrations.Lexer.get_statements(sql)
+      [drop1, create1, drop2, create2] = Lexer.get_statements(sql)
 
-      assert Enum.at(result, 0) == "DROP TRIGGER IF EXISTS update_main_fish_into_oplog;"
+      assert drop1 == "DROP TRIGGER IF EXISTS update_main_fish_into_oplog;"
 
-      assert Enum.at(result, 1) <> "\n" == """
+      assert create1 <> "\n" == """
              CREATE TRIGGER update_main_fish_into_oplog
                AFTER UPDATE ON main.fish
                WHEN 1 == (SELECT flag from _electric_trigger_settings WHERE tablename == 'main.fish')
@@ -81,9 +82,9 @@ defmodule ElectricCli.MigrationsLexerTest do
              END;
              """
 
-      assert Enum.at(result, 2) == "DROP TRIGGER IF EXISTS delete_main_fish_into_oplog;"
+      assert drop2 == "DROP TRIGGER IF EXISTS delete_main_fish_into_oplog;"
 
-      assert Enum.at(result, 3) <> "\n" == """
+      assert create2 <> "\n" == """
              CREATE TRIGGER delete_main_fish_into_oplog
                AFTER DELETE ON main.fish
                WHEN 1 == (SELECT flag from _electric_trigger_settings WHERE tablename == 'main.fish')
@@ -94,7 +95,7 @@ defmodule ElectricCli.MigrationsLexerTest do
              """
     end
 
-    test "Find CASE inside BEGIN statements" do
+    test "correctly handles CASE inside BEGIN statements" do
       sql = """
       DROP TRIGGER IF EXISTS update_ensure_main_fish_primarykey;
       CREATE TRIGGER update_ensure_main_fish_primarykey
@@ -108,7 +109,7 @@ defmodule ElectricCli.MigrationsLexerTest do
       END;
       """
 
-      [_result1, result2] = ElectricCli.Migrations.Lexer.get_statements(sql)
+      [_result1, result2] = Lexer.get_statements(sql)
 
       expected = """
       CREATE TRIGGER update_ensure_main_fish_primarykey
@@ -125,7 +126,7 @@ defmodule ElectricCli.MigrationsLexerTest do
       assert result2 <> "\n" == expected
     end
 
-    test "Find CASE inside CASE statements" do
+    test "correctly handles CASE inside CASE statements" do
       sql = """
       DROP TRIGGER IF EXISTS update_ensure_main_fish_primarykey;
       CREATE TRIGGER update_ensure_main_fish_primarykey
@@ -143,7 +144,7 @@ defmodule ElectricCli.MigrationsLexerTest do
       END;
       """
 
-      [_result1, result2] = ElectricCli.Migrations.Lexer.get_statements(sql)
+      [_result1, result2] = Lexer.get_statements(sql)
 
       expected = """
       CREATE TRIGGER update_ensure_main_fish_primarykey
@@ -162,6 +163,35 @@ defmodule ElectricCli.MigrationsLexerTest do
       """
 
       assert result2 <> "\n" == expected
+    end
+  end
+
+  describe "clean_up_sql/1" do
+    test "removes all comments from SQL file" do
+      sql = """
+      -- this is a comment
+      CREATE TABLE IF NOT EXISTS fish (
+      value TEXT PRIMARY KEY
+      ) STRICT, WITHOUT ROWID;
+      /*
+      This is also a comment
+      */
+      CREATE TABLE IF NOT EXISTS dogs (
+      value TEXT PRIMARY KEY
+      ) STRICT, WITHOUT ROWID;
+      """
+
+      result = Lexer.clean_up_sql(sql)
+
+      assert result == """
+             CREATE TABLE IF NOT EXISTS fish (
+             value TEXT PRIMARY KEY
+             ) STRICT, WITHOUT ROWID;
+
+             CREATE TABLE IF NOT EXISTS dogs (
+             value TEXT PRIMARY KEY
+             ) STRICT, WITHOUT ROWID;
+             """
     end
   end
 end
