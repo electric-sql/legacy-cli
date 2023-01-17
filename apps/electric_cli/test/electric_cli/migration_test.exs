@@ -858,7 +858,6 @@ defmodule ElectricCli.MigrationsTest do
       """
 
       File.write!(my_new_migration, new_content, [:append])
-      Process.sleep(1000)
 
       {:ok, _msg} =
         ElectricCli.Migrations.new_migration("another", %{migrations_dir: migrations_dir})
