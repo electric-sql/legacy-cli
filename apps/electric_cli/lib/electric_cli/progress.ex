@@ -40,7 +40,7 @@ defmodule ElectricCli.Progress do
     text: "Loading",
     success: "Done.",
     failure: :derive,
-    min_duration_ms: 1_000
+    min_duration_ms: if(Mix.env() == :test, do: 0, else: 1000)
   ]
 
   def run(func) do
