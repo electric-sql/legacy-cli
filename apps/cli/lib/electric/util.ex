@@ -24,12 +24,12 @@ defmodule Electric.Util do
   end
 
   def enable_verbose(verbose?) do
-    Application.put_env(:electric_sql_cli, :verbose, verbose?)
+    Application.put_env(:cli, :verbose, verbose?)
     verbose("Enabling verbose output")
   end
 
   def verbose? do
-    Application.get_env(:electric_sql_cli, :verbose, false)
+    Application.get_env(:cli, :verbose, false)
   end
 
   def verbose(message) do
