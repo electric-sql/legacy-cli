@@ -28,7 +28,7 @@ defmodule ElectricCli.MigrationsTest do
          --ADD A TRIGGER FOR main.fish;
          """, nil}
 
-      assert ElectricCli.Migrations.Triggers.add_triggers_to_last_migration(
+      assert ElectricMigrations.Sqlite.Triggers.add_triggers_to_last_migration(
                [%{"name" => "test1", "original_body" => sql}],
                @trigger_template
              ) ==
@@ -45,7 +45,7 @@ defmodule ElectricCli.MigrationsTest do
       #      migration = %ElectricCli.Migration{name: "test1", original_body: sql}
 
       {sql, _warning} =
-        ElectricCli.Migrations.Triggers.add_triggers_to_last_migration(
+        ElectricMigrations.Sqlite.Triggers.add_triggers_to_last_migration(
           [%{"name" => "test1", "original_body" => sql}],
           ElectricCli.Migrations.get_template()
         )
@@ -85,7 +85,7 @@ defmodule ElectricCli.MigrationsTest do
       }
 
       templated =
-        ElectricCli.Migrations.Triggers.template_all_the_things(
+        ElectricMigrations.Sqlite.Triggers.template_all_the_things(
           original_sql,
           tables,
           ElectricCli.Migrations.get_template(),
@@ -234,7 +234,7 @@ defmodule ElectricCli.MigrationsTest do
       """
 
       {sql, _warning} =
-        ElectricCli.Migrations.Triggers.add_triggers_to_last_migration(
+        ElectricMigrations.Sqlite.Triggers.add_triggers_to_last_migration(
           [%{"name" => "test1", "original_body" => sql}],
           ElectricCli.Migrations.get_template()
         )
@@ -286,7 +286,7 @@ defmodule ElectricCli.MigrationsTest do
       """
 
       {sql, _warning} =
-        ElectricCli.Migrations.Triggers.add_triggers_to_last_migration(
+        ElectricMigrations.Sqlite.Triggers.add_triggers_to_last_migration(
           [%{"name" => "test1", "original_body" => sql}],
           ElectricCli.Migrations.get_template()
         )
@@ -320,12 +320,12 @@ defmodule ElectricCli.MigrationsTest do
       """
 
       {sql, _warning} =
-        ElectricCli.Migrations.Triggers.add_triggers_to_last_migration(
+        ElectricMigrations.Sqlite.Triggers.add_triggers_to_last_migration(
           [%{"name" => "test1", "original_body" => sql}],
           ElectricCli.Migrations.get_template()
         )
 
-      commands = ElectricCli.Migrations.Lexer.get_statements(sql)
+      commands = ElectricMigrations.Sqlite.Lexer.get_statements(sql)
 
       for command <- commands do
         :ok = Exqlite.Sqlite3.execute(conn, command)
@@ -500,7 +500,7 @@ defmodule ElectricCli.MigrationsTest do
       """
 
       {sql, _warning} =
-        ElectricCli.Migrations.Triggers.add_triggers_to_last_migration(
+        ElectricMigrations.Sqlite.Triggers.add_triggers_to_last_migration(
           [%{"name" => "test1", "original_body" => sql}],
           ElectricCli.Migrations.get_template()
         )
@@ -542,7 +542,7 @@ defmodule ElectricCli.MigrationsTest do
       """
 
       {sql_out1, _warning} =
-        ElectricCli.Migrations.Triggers.add_triggers_to_last_migration(
+        ElectricMigrations.Sqlite.Triggers.add_triggers_to_last_migration(
           [%{"name" => "test1", "original_body" => sql1}],
           ElectricCli.Migrations.get_template()
         )
@@ -551,7 +551,7 @@ defmodule ElectricCli.MigrationsTest do
       migration_2 = %{"name" => "test2", "original_body" => sql2}
 
       {sql_out2, _warning} =
-        ElectricCli.Migrations.Triggers.add_triggers_to_last_migration(
+        ElectricMigrations.Sqlite.Triggers.add_triggers_to_last_migration(
           [migration_1, migration_2],
           ElectricCli.Migrations.get_template()
         )

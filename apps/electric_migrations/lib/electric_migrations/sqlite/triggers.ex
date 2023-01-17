@@ -1,7 +1,9 @@
-defmodule ElectricCli.Migrations.Triggers do
+defmodule ElectricMigrations.Sqlite.Triggers do
   @moduledoc """
   Adds triggers to the Satellite SQLite files with templates to allow integration with electric
   """
+
+  alias ElectricMigrations.Sqlite.Parse
 
   @doc """
   Given an ordered set of Maps returns a templated version of the final migration
@@ -10,13 +12,10 @@ defmodule ElectricCli.Migrations.Triggers do
   def add_triggers_to_last_migration(migration_set, template) do
     migrations =
       for migration <- migration_set do
-        #      IO.puts("**************")
-        #      IO.inspect(migration)
-
         %{original_body: migration["original_body"], name: migration["name"]}
       end
 
-    case ElectricCli.Migrations.Parse.sql_ast_from_migrations(migrations) do
+    case Parse.sql_ast_from_migrations(migrations) do
       {:ok, ast, warnings} ->
         sql_in = List.last(migration_set)["original_body"]
         is_init = length(migration_set) == 1

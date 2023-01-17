@@ -1,7 +1,12 @@
-defmodule ElectricCli.Migrations.Lexer do
+defmodule ElectricMigrations.Sqlite.Lexer do
   @moduledoc """
+  Simple regex and FSM-based lexer for SQL.
   """
 
+  @doc """
+  Split SQL into statements ignoring any comments.
+  """
+  @spec get_statements(input :: String.t()) :: [String.t()]
   def get_statements(input) do
     {_stack, breaks} =
       Enum.reduce(0..(String.length(input) - 1), {[], []}, fn index, {stack, breaks} ->
@@ -17,6 +22,10 @@ defmodule ElectricCli.Migrations.Lexer do
     end
   end
 
+  @doc """
+  Remove all comments from given SQL.
+  """
+  @spec clean_up_sql(input :: String.t()) :: String.t()
   def clean_up_sql(input) do
     Enum.join(get_statements(input), "\n\n") <> "\n"
   end
@@ -60,7 +69,7 @@ defmodule ElectricCli.Migrations.Lexer do
     {stack, breaks}
   end
 
-  def remove_comments(input) do
+  defp remove_comments(input) do
     String.replace(input, ~r/\/\*[\s\S]*?(?:\z|\*\/)/, "\n")
     |> String.replace(~r/--[^\n]*(?:\z|\n)/, "\n")
   end

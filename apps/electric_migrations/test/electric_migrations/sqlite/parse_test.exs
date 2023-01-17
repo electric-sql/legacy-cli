@@ -1,78 +1,9 @@
-defmodule ElectricCli.MigrationsParseTest do
+defmodule ElectricMigrations.Sqlite.ParseTest do
   use ExUnit.Case
+  alias ElectricMigrations.Sqlite.Parse
 
-  describe "Parse sql" do
-    test "tests can get column names" do
-      sql_in = """
-      CREATE TABLE IF NOT EXISTS fish (
-      value TEXT PRIMARY KEY,
-      colour TEXT
-      ) STRICT, WITHOUT ROWID;
-      """
-
-      migration = %{name: "test1", original_body: sql_in}
-      {:ok, info, _} = ElectricCli.Migrations.Parse.sql_ast_from_migrations([migration])
-
-      column_names = info["main.fish"][:columns]
-      assert column_names == ["value", "colour"]
-    end
-
-    test "tests nonsense SQL fails" do
-      sql_in = """
-      CREATE TABLE IF NOT EXISTS fish (
-      value TEXT PRIMARY KEY
-      );
-      SOME BOLLOCKS;
-      """
-
-      migration = %{name: "test1", original_body: sql_in}
-
-      {_status, reason} = ElectricCli.Migrations.Parse.sql_ast_from_migrations([migration])
-      assert reason == ["In migration test1 SQL error: near \"SOME\": syntax error"]
-    end
-
-    test "tests can check for strictness and rowid" do
-      sql_in = """
-      CREATE TABLE IF NOT EXISTS fish (
-      value TEXT PRIMARY KEY,
-      colour TEXT
-      );
-      """
-
-      {:error, message} =
-        ElectricCli.Migrations.Parse.sql_ast_from_migrations([
-          %{name: "test1", original_body: sql_in}
-        ])
-
-      expected = [
-        "The table fish is not WITHOUT ROWID.",
-        "The primary key value in table fish isn't NOT NULL. Please add NOT NULL to this column."
-      ]
-
-      assert message == expected
-    end
-
-    test "test doesn't allow main namespace" do
-      sql_in = """
-      CREATE TABLE IF NOT EXISTS main.fish (
-      value TEXT PRIMARY KEY,
-      colour TEXT
-      )STRICT, WITHOUT ROWID;
-      """
-
-      {:error, message} =
-        ElectricCli.Migrations.Parse.sql_ast_from_migrations([
-          %{name: "test1", original_body: sql_in}
-        ])
-
-      expected = [
-        "The table main.fish has a database name. Please leave this out and only give the table name."
-      ]
-
-      assert message == expected
-    end
-
-    test "text find_table_names" do
+  describe "namespaced_table_names/2" do
+    test "finds all tables in SQL which include a database name" do
       sql_in = """
       CREATE TABLE IF NOT EXISTS main.fish (
       value TEXT PRIMARY KEY,
@@ -93,12 +24,84 @@ defmodule ElectricCli.MigrationsParseTest do
 
       """
 
-      names = ElectricCli.Migrations.Parse.namespaced_table_names(sql_in)
+      names = Parse.namespaced_table_names(sql_in)
 
       assert names == ["main.fish", "apples.house"]
     end
+  end
 
-    test "test doesn't allow any namespaces" do
+  describe "sql_ast_from_migrations/1" do
+    test "parsing column names out of migrations" do
+      sql_in = """
+      CREATE TABLE IF NOT EXISTS fish (
+      value TEXT PRIMARY KEY,
+      colour TEXT
+      ) STRICT, WITHOUT ROWID;
+      """
+
+      migration = %{name: "test1", original_body: sql_in}
+      {:ok, info, _} = Parse.sql_ast_from_migrations([migration])
+
+      column_names = info["main.fish"][:columns]
+      assert column_names == ["value", "colour"]
+    end
+
+    test "fails to parse nonsense SQL" do
+      sql_in = """
+      CREATE TABLE IF NOT EXISTS fish (
+      value TEXT PRIMARY KEY
+      );
+      SOME BOLLOCKS;
+      """
+
+      migration = %{name: "test1", original_body: sql_in}
+
+      {_status, reason} = Parse.sql_ast_from_migrations([migration])
+      assert reason == ["In migration test1 SQL error: near \"SOME\": syntax error"]
+    end
+
+    test "validates sql for `WITHOUT ROWID` and NOT NULL primary keys" do
+      sql_in = """
+      CREATE TABLE IF NOT EXISTS fish (
+      value TEXT PRIMARY KEY,
+      colour TEXT
+      );
+      """
+
+      {:error, message} =
+        Parse.sql_ast_from_migrations([
+          %{name: "test1", original_body: sql_in}
+        ])
+
+      expected = [
+        "The table fish is not WITHOUT ROWID.",
+        "The primary key value in table fish isn't NOT NULL. Please add NOT NULL to this column."
+      ]
+
+      assert message == expected
+    end
+
+    test "doesn't allow main namespace" do
+      sql_in = """
+      CREATE TABLE IF NOT EXISTS main.fish (
+      value TEXT PRIMARY KEY,
+      colour TEXT
+      )STRICT, WITHOUT ROWID;
+      """
+
+      {:error, message} =
+        Parse.sql_ast_from_migrations([
+          %{name: "test1", original_body: sql_in}
+        ])
+
+      expected = [
+        "The table main.fish has a database name. Please leave this out and only give the table name."
+      ]
+
+      assert message == expected
+    end
+
+    test "doesn't allow any namespaces" do
       sql_in = """
       CREATE TABLE IF NOT EXISTS apple.fish (
       value TEXT PRIMARY KEY,
@@ -107,7 +110,7 @@ defmodule ElectricCli.MigrationsParseTest do
       """
 
       {:error, message} =
-        ElectricCli.Migrations.Parse.sql_ast_from_migrations([
+        Parse.sql_ast_from_migrations([
           %{name: "test1", original_body: sql_in}
         ])
 
@@ -118,7 +121,7 @@ defmodule ElectricCli.MigrationsParseTest do
       assert message == expected
     end
 
-    test "test doesn't allow uppercase in column names" do
+    test "doesn't allow uppercase in column names" do
       sql_in = """
       CREATE TABLE IF NOT EXISTS fish (
       Value TEXT PRIMARY KEY,
@@ -127,7 +130,7 @@ defmodule ElectricCli.MigrationsParseTest do
       """
 
       {:error, message} =
-        ElectricCli.Migrations.Parse.sql_ast_from_migrations([
+        Parse.sql_ast_from_migrations([
           %{name: "test1", original_body: sql_in}
         ])
 
@@ -138,7 +141,7 @@ defmodule ElectricCli.MigrationsParseTest do
       assert message == expected
     end
 
-    test "tests getting SQL structure for templating" do
+    test "parses sql with foreign key references" do
       sql_in = """
       CREATE TABLE IF NOT EXISTS parent (
         id INTEGER PRIMARY KEY,
@@ -153,19 +156,19 @@ defmodule ElectricCli.MigrationsParseTest do
       """
 
       {:ok, info, _} =
-        ElectricCli.Migrations.Parse.sql_ast_from_migrations([
+        Parse.sql_ast_from_migrations([
           %{name: "test1", original_body: sql_in}
         ])
 
       expected_info = %{
         "main.parent" => %{
-          :namespace => "main",
-          :table_name => "parent",
-          :validation_fails => [],
-          :warning_messages => [],
-          :primary => ["id"],
-          :foreign_keys => [],
-          :columns => ["id", "value"],
+          namespace: "main",
+          table_name: "parent",
+          validation_fails: [],
+          warning_messages: [],
+          primary: ["id"],
+          foreign_keys: [],
+          columns: ["id", "value"],
           column_infos: %{
             0 => %{
               cid: 0,
@@ -199,15 +202,15 @@ defmodule ElectricCli.MigrationsParseTest do
           }
         },
         "main.child" => %{
-          :namespace => "main",
-          :table_name => "child",
-          :validation_fails => [],
-          :warning_messages => [],
-          :primary => ["id"],
-          :foreign_keys => [
-            %{:child_key => "daddy", :parent_key => "id", :table => "main.parent"}
+          namespace: "main",
+          table_name: "child",
+          validation_fails: [],
+          warning_messages: [],
+          primary: ["id"],
+          foreign_keys: [
+            %{child_key: "daddy", parent_key: "id", table: "main.parent"}
           ],
-          :columns => ["id", "daddy"],
+          columns: ["id", "daddy"],
           column_infos: %{
             0 => %{
               cid: 0,
@@ -256,78 +259,21 @@ defmodule ElectricCli.MigrationsParseTest do
       assert info == expected_info
     end
 
-    test "tests getting uniques" do
+    test "extracts uniqueness info" do
       sql_in = """
       CREATE TABLE IF NOT EXISTS parent (
         id INTEGER PRIMARY KEY DESC,
         value TEXT,
         email TEXT UNIQUE
       ) STRICT, WITHOUT ROWID;
-
-      CREATE TABLE IF NOT EXISTS child (
-        id INTEGER PRIMARY KEY,
-        daddy INTEGER NOT NULL,
-        FOREIGN KEY(daddy) REFERENCES parent(id)
-      ) STRICT, WITHOUT ROWID;
       """
 
       {:ok, info, _} =
-        ElectricCli.Migrations.Parse.sql_ast_from_migrations([
+        Parse.sql_ast_from_migrations([
           %{name: "test1", original_body: sql_in}
         ])
 
       expected_info = %{
-        "main.child" => %{
-          column_infos: %{
-            0 => %{
-              cid: 0,
-              dflt_value: nil,
-              name: "id",
-              notnull: 1,
-              pk: 1,
-              type: "INTEGER",
-              unique: false,
-              pk_desc: false
-            },
-            1 => %{
-              cid: 1,
-              dflt_value: nil,
-              name: "daddy",
-              notnull: 1,
-              pk: 0,
-              type: "INTEGER",
-              unique: false,
-              pk_desc: false
-            }
-          },
-          columns: ["id", "daddy"],
-          foreign_keys: [%{child_key: "daddy", parent_key: "id", table: "main.parent"}],
-          foreign_keys_info: [
-            %{
-              from: "daddy",
-              id: 0,
-              match: "NONE",
-              on_delete: "NO ACTION",
-              on_update: "NO ACTION",
-              seq: 0,
-              table: "parent",
-              to: "id"
-            }
-          ],
-          namespace: "main",
-          validation_fails: [],
-          warning_messages: [],
-          primary: ["id"],
-          table_info: %{
-            name: "child",
-            rootpage: 4,
-            sql:
-              "CREATE TABLE child (\n  id INTEGER PRIMARY KEY,\n  daddy INTEGER NOT NULL,\n  FOREIGN KEY(daddy) REFERENCES parent(id)\n) STRICT, WITHOUT ROWID",
-            tbl_name: "child",
-            type: "table"
-          },
-          table_name: "child"
-        },
         "main.parent" => %{
           column_infos: %{
             0 => %{
