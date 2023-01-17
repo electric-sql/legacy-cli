@@ -1,4 +1,4 @@
-defmodule MigrationsTest do
+defmodule Electric.MigrationsTest do
   use ExUnit.Case
 
   @trigger_template EEx.compile_string(

@@ -1,4 +1,4 @@
-defmodule MigrationsParseTest do
+defmodule Electric.MigrationsParseTest do
   use ExUnit.Case
 
   describe "Parse sql" do
