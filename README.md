@@ -122,7 +122,7 @@ current working directory.
 
 `migrations build [--help] [--verbose] [--postgres] [--satellite] [--dir MIGRATIONS_DIR]`
 
-Builds a javascript file at `dist/index.js` that contains all your migrations with Electric DB's added 
+Builds a javascript file at `dist/index.js` that contains all your migrations with ElectricSQL DB's added 
 DDL and some metadata.  
 
 The metadata in this file will have a `"env": "local" to indicate the it was built from your local files
@@ -141,7 +141,7 @@ The optional flag `--satellite` will also build a `satellite.sql` file in each m
 
 `migrations sync [--verbose] [--env ENVIRONMENT_NAME] [--dir MIGRATIONS_DIR]`
 
-Synchronises changes you have made to migration SQL files in your local `migrations` folder up to the Electric SQl servers, 
+Synchronises changes you have made to migration SQL files in your local `migrations` folder up to the ElectricSQL servers, 
 and builds a new javascript file at `dist/index.js` that matches the newly synchronised set of migrations.
 
 The metadata in this file will have a `"env": ENVIRONMENT_NAME to indicate that it was built directly from and matches
@@ -174,7 +174,7 @@ current working directory.
 
 `migrations revert [--help] [--verbose] [--dir MIGRATIONS_DIR] [--env ENVIRONMENT_NAME] MIGRATION_NAME`
 
-This will copy the named migration from the Electric SQL server to replace the local one. 
+This will copy the named migration from the ElectricSQL server to replace the local one. 
 
 By default this will use the `default` environment, if you want to use a different one you can specify it with 
 `--env ENVIRONMENT_NAME`

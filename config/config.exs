@@ -7,8 +7,9 @@ default_console_url =
     :dev -> "http://localhost:4000"
   end
 
-config :cli,
-  default_console_url: default_console_url
+config :electric_cli,
+  default_console_url: default_console_url,
+  verbose: false
 
 if config_env() == :dev do
   # Git hooks for analysis and formatting.

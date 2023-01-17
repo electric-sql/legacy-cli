@@ -23,7 +23,7 @@ defmodule Cli.MixProject do
   def releases do
     [
       electric: [
-        applications: [cli: :permanent],
+        applications: [electric_cli: :permanent],
         bakeware: [
           compression_level: compression(Mix.env()),
           start_command: "start"
