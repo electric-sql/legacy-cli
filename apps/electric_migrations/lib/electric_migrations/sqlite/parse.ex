@@ -2,6 +2,7 @@ defmodule ElectricMigrations.Sqlite.Parse do
   @moduledoc """
   Creates an AST from SQL migrations
   """
+  alias ElectricMigrations.Ast
 
   @allowed_sql_types ["integer", "real", "text", "blob"]
   @default_namespace "main"

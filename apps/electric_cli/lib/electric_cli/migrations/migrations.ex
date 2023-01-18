@@ -524,7 +524,7 @@ defmodule ElectricCli.Migrations do
 
     verbose("Generating PostgreSQL migration #{migration["name"]}")
 
-    case ElectricCli.Databases.Postgres.Generation.postgres_for_migrations_w_strings(migrations) do
+    case ElectricMigrations.Postgres.Generation.postgres_for_migrations_w_strings(migrations) do
       {:ok, postgres_body, warnings} ->
         {:ok, Map.merge(migration, %{"postgres_body" => postgres_body}), warnings}
 

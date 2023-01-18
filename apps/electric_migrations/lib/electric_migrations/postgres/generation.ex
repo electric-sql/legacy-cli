@@ -1,9 +1,9 @@
-defmodule ElectricCli.Databases.Postgres.Generation do
+defmodule ElectricMigrations.Postgres.Generation do
   @moduledoc """
   Generates PostgreSQL text from SQLite text
   """
 
-  alias ElectricMigrations.Sqlite.Parse
+  alias ElectricMigrations.Postgres.Parse
 
   @doc """
   Given an ordered list of SQLite migrations in the form of a List of Maps with %{original_body: <>, name: <>}

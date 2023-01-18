@@ -1,4 +1,4 @@
-defmodule ElectricCli.Databases.Postgres.Structure.ColumnInfo do
+defmodule ElectricMigrations.Ast.ColumnInfo do
   @moduledoc """
   A struct to hold SQLite table column info structure
   """
