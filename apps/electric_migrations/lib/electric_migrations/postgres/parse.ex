@@ -1,7 +1,8 @@
-defmodule ElectricCli.Databases.Postgres.Parse do
+defmodule ElectricMigrations.Postgres.Parse do
   @moduledoc """
   Creates an AST from SQL migrations
   """
+  alias ElectricMigrations.Ast
 
   @allowed_sql_types ["integer", "real", "text", "blob"]
   @default_namespace "public"
@@ -28,8 +29,25 @@ defmodule ElectricCli.Databases.Postgres.Parse do
     end
   end
 
-  @doc false
-  def ast_from_ordered_migrations(migrations) do
+  defp apply_migrations(conn, migrations) do
+    sql_errors =
+      Enum.flat_map(migrations, fn migration ->
+        case Exqlite.Sqlite3.execute(conn, migration.original_body) do
+          {:error, reason} -> ["In migration #{migration.name} SQL error: #{reason}"]
+          :ok -> []
+        end
+      end)
+
+    case List.flatten(sql_errors) do
+      [] ->
+        :ok
+
+      errors ->
+        {:error, errors, []}
+    end
+  end
+
+  defp ast_from_ordered_migrations(migrations) do
     namespace = @default_namespace
 
     # get all the table names
@@ -85,7 +103,7 @@ defmodule ElectricCli.Databases.Postgres.Parse do
   defp generate_table_ast(table_info, namespace, index_info, conn) do
     [type, name, tbl_name, rootpage, sql] = table_info
 
-    table_info = %ElectricCli.Databases.Postgres.Structure.TableInfo{
+    table_info = %Ast.TableInfo{
       type: type,
       name: name,
       tbl_name: tbl_name,
@@ -103,7 +121,7 @@ defmodule ElectricCli.Databases.Postgres.Parse do
     column_infos =
       for [cid, name, type, notnull, dflt_value, pk] <- columns, into: %{} do
         {cid,
-         %ElectricCli.Databases.Postgres.Structure.ColumnInfo{
+         %Ast.ColumnInfo{
            cid: cid,
            name: name,
            type: type,
@@ -131,7 +149,7 @@ defmodule ElectricCli.Databases.Postgres.Parse do
 
     foreign_keys_info =
       for [id, seq, table, from, to, on_update, on_delete, match] <- foreign_keys_rows do
-        %ElectricCli.Databases.Postgres.Structure.ForeignKeyInfo{
+        %Ast.ForeignKeyInfo{
           id: id,
           seq: seq,
           table: table,
@@ -143,7 +161,7 @@ defmodule ElectricCli.Databases.Postgres.Parse do
         }
       end
 
-    %ElectricCli.Databases.Postgres.Structure.FullTableInfo{
+    %Ast.FullTableInfo{
       table_name: tbl_name,
       table_info: table_info,
       namespace: namespace,
@@ -180,16 +198,6 @@ defmodule ElectricCli.Databases.Postgres.Parse do
 
   defp check_sql_warnings(_table_name, _sql) do
     []
-  end
-
-  def all_index_info(all_migrations) do
-    {:ok, conn} = Exqlite.Sqlite3.open(":memory:")
-
-    for migration <- all_migrations do
-      :ok = Exqlite.Sqlite3.execute(conn, migration)
-    end
-
-    all_index_info_from_connection(conn)
   end
 
   defp all_index_info_from_connection(conn) do

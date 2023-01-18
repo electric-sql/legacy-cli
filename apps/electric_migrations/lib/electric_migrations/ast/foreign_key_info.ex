@@ -1,4 +1,4 @@
-defmodule ElectricCli.Databases.Postgres.Structure.ForeignKeyInfo do
+defmodule ElectricMigrations.Ast.ForeignKeyInfo do
   @moduledoc """
   A struct to hold SQLite foreign key info structure
   """
