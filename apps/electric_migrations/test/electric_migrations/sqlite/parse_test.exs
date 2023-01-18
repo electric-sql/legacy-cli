@@ -1,6 +1,10 @@
 defmodule ElectricMigrations.Sqlite.ParseTest do
   use ExUnit.Case
   alias ElectricMigrations.Sqlite.Parse
+  alias ElectricMigrations.Ast.ColumnInfo
+  alias ElectricMigrations.Ast.ForeignKeyInfo
+  alias ElectricMigrations.Ast.FullTableInfo
+  alias ElectricMigrations.Ast.TableInfo
 
   describe "namespaced_table_names/2" do
     test "finds all tables in SQL which include a database name" do
@@ -42,7 +46,7 @@ defmodule ElectricMigrations.Sqlite.ParseTest do
       migration = %{name: "test1", original_body: sql_in}
       {:ok, info, _} = Parse.sql_ast_from_migrations([migration])
 
-      column_names = info["main.fish"][:columns]
+      column_names = info["main.fish"].columns
       assert column_names == ["value", "colour"]
     end
 
@@ -161,7 +165,7 @@ defmodule ElectricMigrations.Sqlite.ParseTest do
         ])
 
       expected_info = %{
-        "main.parent" => %{
+        "main.parent" => %FullTableInfo{
           namespace: "main",
           table_name: "parent",
           validation_fails: [],
@@ -170,7 +174,7 @@ defmodule ElectricMigrations.Sqlite.ParseTest do
           foreign_keys: [],
           columns: ["id", "value"],
           column_infos: %{
-            0 => %{
+            0 => %ColumnInfo{
               cid: 0,
               dflt_value: nil,
               name: "id",
@@ -180,7 +184,7 @@ defmodule ElectricMigrations.Sqlite.ParseTest do
               pk_desc: false,
               unique: false
             },
-            1 => %{
+            1 => %ColumnInfo{
               cid: 1,
               dflt_value: nil,
               name: "value",
@@ -192,7 +196,7 @@ defmodule ElectricMigrations.Sqlite.ParseTest do
             }
           },
           foreign_keys_info: [],
-          table_info: %{
+          table_info: %TableInfo{
             name: "parent",
             rootpage: 2,
             sql:
@@ -201,7 +205,7 @@ defmodule ElectricMigrations.Sqlite.ParseTest do
             type: "table"
           }
         },
-        "main.child" => %{
+        "main.child" => %FullTableInfo{
           namespace: "main",
           table_name: "child",
           validation_fails: [],
@@ -212,7 +216,7 @@ defmodule ElectricMigrations.Sqlite.ParseTest do
           ],
           columns: ["id", "daddy"],
           column_infos: %{
-            0 => %{
+            0 => %ColumnInfo{
               cid: 0,
               dflt_value: nil,
               name: "id",
@@ -222,7 +226,7 @@ defmodule ElectricMigrations.Sqlite.ParseTest do
               pk_desc: false,
               unique: false
             },
-            1 => %{
+            1 => %ColumnInfo{
               cid: 1,
               dflt_value: nil,
               name: "daddy",
@@ -234,7 +238,7 @@ defmodule ElectricMigrations.Sqlite.ParseTest do
             }
           },
           foreign_keys_info: [
-            %{
+            %ForeignKeyInfo{
               from: "daddy",
               id: 0,
               match: "NONE",
@@ -245,7 +249,7 @@ defmodule ElectricMigrations.Sqlite.ParseTest do
               to: "id"
             }
           ],
-          table_info: %{
+          table_info: %TableInfo{
             name: "child",
             rootpage: 3,
             sql:
@@ -274,9 +278,9 @@ defmodule ElectricMigrations.Sqlite.ParseTest do
         ])
 
       expected_info = %{
-        "main.parent" => %{
+        "main.parent" => %FullTableInfo{
           column_infos: %{
-            0 => %{
+            0 => %ColumnInfo{
               cid: 0,
               dflt_value: nil,
               name: "id",
@@ -286,7 +290,7 @@ defmodule ElectricMigrations.Sqlite.ParseTest do
               unique: false,
               pk_desc: true
             },
-            1 => %{
+            1 => %ColumnInfo{
               cid: 1,
               dflt_value: nil,
               name: "value",
@@ -296,7 +300,7 @@ defmodule ElectricMigrations.Sqlite.ParseTest do
               unique: false,
               pk_desc: false
             },
-            2 => %{
+            2 => %ColumnInfo{
               cid: 2,
               dflt_value: nil,
               name: "email",
@@ -314,7 +318,7 @@ defmodule ElectricMigrations.Sqlite.ParseTest do
           foreign_keys_info: [],
           namespace: "main",
           primary: ["id"],
-          table_info: %{
+          table_info: %TableInfo{
             name: "parent",
             rootpage: 2,
             sql:
