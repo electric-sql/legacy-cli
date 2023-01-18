@@ -9,7 +9,7 @@ defmodule ElectricMigrations.Postgres.Generation do
   Given an ordered list of SQLite migrations in the form of a List of Maps with %{original_body: <>, name: <>}
   creates PostgreSQL SQL for the last migration in the list
   """
-  def postgres_for_migrations(migrations) do
+  def postgres_sql_for_last_migration(migrations) do
     case before_and_after_ast(migrations) do
       {:ok, before_ast, after_ast, warnings} ->
         postgres_string = get_postgres_for_ast_changes(before_ast, after_ast)
@@ -20,13 +20,13 @@ defmodule ElectricMigrations.Postgres.Generation do
     end
   end
 
-  def postgres_for_migrations_w_strings(migrations) do
+  def postgres_sql_for_last_migration_w_strings(migrations) do
     originals_and_names =
       for migration <- migrations do
         %{name: migration["name"], original_body: migration["original_body"]}
       end
 
-    postgres_for_migrations(originals_and_names)
+    postgres_sql_for_last_migration(originals_and_names)
   end
 
   defp before_and_after_ast(migrations) do
@@ -189,7 +189,7 @@ defmodule ElectricMigrations.Postgres.Generation do
       []
       |> prepend_if(column_info.dflt_value != nil, "DEFAULT #{column_info.dflt_value}")
       |> prepend_if(column_info.unique, "UNIQUE")
-      |> prepend_if(column_info.notnull != 0 && column_info.pk == 0, "NOT NULL")
+      |> prepend_if(column_info.notnull && column_info.pk == 0, "NOT NULL")
       |> prepend_if(column_info.pk != 0, "PRIMARY KEY#{sorting}")
 
     elements = [col_type | elements]

@@ -178,7 +178,7 @@ defmodule ElectricMigrations.Sqlite.ParseTest do
               cid: 0,
               dflt_value: nil,
               name: "id",
-              notnull: 1,
+              notnull: true,
               pk: 1,
               type: "INTEGER",
               pk_desc: false,
@@ -188,7 +188,7 @@ defmodule ElectricMigrations.Sqlite.ParseTest do
               cid: 1,
               dflt_value: nil,
               name: "value",
-              notnull: 0,
+              notnull: false,
               pk: 0,
               type: "TEXT",
               pk_desc: false,
@@ -220,7 +220,7 @@ defmodule ElectricMigrations.Sqlite.ParseTest do
               cid: 0,
               dflt_value: nil,
               name: "id",
-              notnull: 1,
+              notnull: true,
               pk: 1,
               type: "INTEGER",
               pk_desc: false,
@@ -230,7 +230,7 @@ defmodule ElectricMigrations.Sqlite.ParseTest do
               cid: 1,
               dflt_value: nil,
               name: "daddy",
-              notnull: 1,
+              notnull: true,
               pk: 0,
               type: "INTEGER",
               pk_desc: false,
@@ -270,6 +270,7 @@ defmodule ElectricMigrations.Sqlite.ParseTest do
         value TEXT,
         email TEXT UNIQUE
       ) STRICT, WITHOUT ROWID;
+      CREATE INDEX test ON parent (value);
       """
 
       {:ok, info, _} =
@@ -284,7 +285,7 @@ defmodule ElectricMigrations.Sqlite.ParseTest do
               cid: 0,
               dflt_value: nil,
               name: "id",
-              notnull: 1,
+              notnull: true,
               pk: 1,
               type: "INTEGER",
               unique: false,
@@ -294,7 +295,7 @@ defmodule ElectricMigrations.Sqlite.ParseTest do
               cid: 1,
               dflt_value: nil,
               name: "value",
-              notnull: 0,
+              notnull: false,
               pk: 0,
               type: "TEXT",
               unique: false,
@@ -304,7 +305,7 @@ defmodule ElectricMigrations.Sqlite.ParseTest do
               cid: 2,
               dflt_value: nil,
               name: "email",
-              notnull: 0,
+              notnull: false,
               pk: 0,
               type: "TEXT",
               unique: true,
