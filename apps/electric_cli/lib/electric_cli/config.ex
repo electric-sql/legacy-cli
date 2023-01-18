@@ -1,75 +1,95 @@
 defmodule ElectricCli.Config do
-  alias ElectricCli.Migrations
-  alias ElectricCli.Session
-  alias ElectricCli.Client
+  @moduledoc """
+  Manages the `electric.json` configuration file.
+  """
   alias ElectricCli.Util
+  alias ElectricCli.Validate
+  alias ElectricCli.Config.Directories
+  alias ElectricCli.Config.Environment
+
   alias __MODULE__
 
-  @derive Jason.Encoder
+  @filename Application.compile_env!(:electric_cli, :config_filename)
 
-  @keys [
+  @derive {Jason.Encoder, except: [:root]}
+  @type t() :: %Config{
+          app: binary(),
+          debug: boolean(),
+          defaultEnv: binary(),
+          directories: %Directories{},
+          environments: %{
+            binary() => %Environment{}
+          },
+          root: binary()
+        }
+  @enforce_keys [
     :app,
-    :env,
-    :migrations_dir,
+    :defaultEnv,
+    :directories,
+    :environments,
+    :root
+  ]
+  defstruct [
+    :app,
+    :debug,
+    :defaultEnv,
+    :directories,
+    :environments,
     :root
   ]
 
-  @rc_filename "electric.json"
+  use ExConstructor
 
-  @enforce_keys @keys
+  def new(map) do
+    struct = super(map)
 
-  defstruct @keys
+    directories =
+      struct.directories
+      |> Directories.new()
 
-  @type t() :: %Config{
-          app: binary(),
-          env: binary(),
-          migrations_dir: binary(),
-          root: binary()
-        }
+    environments =
+      struct.environments
+      |> Enum.map(fn {k, v} -> {k, Environment.new(v)} end)
+      |> Enum.into(%{})
 
-  def new(%Config{} = args) do
-    args
-    |> Map.update!(:migrations_dir, &Path.expand(&1, args.root))
+    %{struct | directories: directories, environments: environments}
   end
 
-  def new(args) when is_list(args) do
-    args
-    |> Enum.into(%{})
-    |> new()
+  @doc """
+  Checks whether the config file already exists in the `dir` provided.
+
+  If so, returns `{true, filepath}`. Otherwise returns `false`.
+  """
+  def exists?(dir) do
+    path = filepath(dir)
+
+    with true <- File.exists?(path) do
+      {true, path}
+    end
   end
 
-  def new(%{} = args) do
-    Config
-    |> struct(args)
-    |> new()
-  end
+  @doc """
+  Load the config file into a `%Config{}` struct.
 
-  def keys do
-    @keys
-  end
-
-  def cwd, do: File.cwd!()
-
-  def path(dir \\ cwd()) do
-    Path.join(dir, @rc_filename)
-  end
-
+  Also adds the current `root` dir and expands the `directories`
+  so they're full paths rather than relative to the config file.
+  """
   def load(dir) do
-    current_dir = dir || cwd()
-    path = path(current_dir)
+    dir = Path.expand(dir)
 
-    with {:exists, true} <- {:exists, File.exists?(path)},
-         {:ok, json} <- File.read(path),
-         {:ok, data} <- Jason.decode(json, keys: :atoms!) do
-      map =
+    with {:exists, {true, path}} <- {:exists, exists?(dir)},
+         {:ok, json_str} <- File.read(path),
+         {:ok, data} <- Jason.decode(json_str, keys: :atoms) do
+      config =
         data
-        |> Util.rename_map_key(:migrations, :migrations_dir)
-        |> Map.put(:root, current_dir)
+        |> Map.update!(:directories, &expand_dirs(&1, dir))
+        |> Map.put(:root, dir)
+        |> Config.new()
 
-      {:ok, new(map)}
+      {:ok, config}
     else
       {:exists, false} ->
-        {:error, "electric.json file is missing in this directory",
+        {:error, "`#{@filename}` file is missing in this directory",
          [
            "Did you run ",
            IO.ANSI.yellow(),
@@ -83,83 +103,94 @@ defmodule ElectricCli.Config do
     end
   end
 
-  def merge(config, options) do
-    Enum.reduce(@keys, %{}, fn key, acc ->
-      value = options[key] || Map.fetch!(config, key)
-      Map.put(acc, key, value)
-    end)
+  @doc """
+  Saves the `%Config{}` into the config file.
+
+  Contracts the `directories` so that they're stored relative to
+  the config file (so they're easier to read and edit manually).
+  """
+  def save(%Config{root: root} = config) do
+    config =
+      config
+      |> Map.update!(:directories, &contract_dirs(&1, root))
+      |> Map.update!(:environments, &contract_envs/1)
+
+    # IO.inspect({:saving, config})
+
+    with {:ok, json} <- Jason.encode(config, pretty: true) do
+      root
+      |> filepath()
+      |> File.write(json <> "\n")
+    end
   end
 
   @doc """
-  Initialize the `electric.json` config file according to the provided settings
-
-  `no_verify` argument, if true, disables connection to the Console that makes sure
-  that the app exist to prevent typos. This is an escape hatch for E2E tests to minimize
-  external interactions.
+  Lookup a configured environment by `env` name.
   """
-  def init(config, no_verify \\ false)
+  def target_environment(%Config{environments: environments}, env) do
+    msg = "env `#{env}` not found; see `electric configure --help`"
 
-  def init(%Config{} = config, true) do
-    file_contents =
-      config
-      |> Map.from_struct()
-      |> Map.drop([:root])
-      |> Map.update!(:migrations_dir, &Path.relative_to(&1, config.root))
-      |> Util.rename_map_key(:migrations_dir, :migrations)
-
-    with {:ok, json} <- Jason.encode(file_contents, pretty: true),
-         {:ok, _} <- Migrations.init_migrations(config.app, config),
-         path = path(config.root),
-         :ok <- File.write(path, json <> "\n") do
-      {:ok, path}
+    with :ok <- Validate.validate_slug(env),
+         {:ok, key} <- Util.get_existing_atom(env, {:error, msg}),
+         %Environment{} = environment <- Map.get(environments, key, {:error, msg}) do
+      {:ok, environment}
     end
   end
 
-  def init(%Config{} = config, false) do
-    with :ok <- Session.require_auth(),
-         :ok <- check_if_app_exists(config.app) do
-      init(config, true)
+  @doc """
+  Given a %Config{} and a user specified `env`, return the `env` as an atom
+  iff it matches an existing environment.
+  """
+  def existing_env_atom(%Config{defaultEnv: env}, nil) do
+    {:ok, String.to_existing_atom(env)}
+  end
+
+  def existing_env_atom(%Config{} = config, env) when is_binary(env) do
+    with {:ok, %Environment{}} <- target_environment(config, env) do
+      {:ok, String.to_existing_atom(env)}
+    else
+      {:error, {:invalid, _}} ->
+        {:error, "invalid env `#{env}`"}
+
+      _ ->
+        {:error, "env `#{env}` not found. See `electric config add_env`."}
     end
   end
 
-  defp check_if_app_exists(app) when is_binary(app) do
-    with {:ok, apps} <- list_available_apps() do
-      if app in apps do
-        :ok
-      else
-        suggestion = Enum.max_by(apps, &String.jaro_distance(&1, app))
-
-        error = "couldn't find app with id '#{app}'"
-
-        error =
-          if String.jaro_distance(suggestion, app) > 0.6,
-            do: error <> ". Did you mean '#{suggestion}'?",
-            else: error
-
-        {:error, error,
-         [
-           "Did you create the app already? You can check with ",
-           IO.ANSI.yellow(),
-           "electric apps list",
-           IO.ANSI.reset(),
-           " to see all available apps"
-         ]}
-      end
-    end
+  def contract_dirs(%Directories{} = directories, root) do
+    directories
+    |> Map.from_struct()
+    |> Enum.map(fn {key, path} -> {key, Path.relative_to(path, root)} end)
+    |> Directories.new()
   end
 
-  defp list_available_apps() do
-    result = Client.get("apps")
+  defp contract_envs(env_map) do
+    env_map
+    |> Enum.map(fn {key, %Environment{} = env} -> {key, contract_env(env)} end)
+    |> Enum.into(%{})
+  end
 
-    case result do
-      {:ok, %Req.Response{status: 200, body: %{"data" => data}}} ->
-        {:ok, Enum.map(data, & &1["id"])}
+  defp contract_env(%Environment{replication: nil} = env) when map_size(env) == 1 do
+    %{}
+  end
 
-      {:ok, %Req.Response{}} ->
-        {:error, "invalid credentials"}
+  defp contract_env(%Environment{} = env) do
+    env
+  end
 
-      {:error, _exception} ->
-        {:error, "couldn't connect to ElectricSQL servers"}
-    end
+  defp expand_dirs(dir_map, root) do
+    dir_map
+    |> Enum.map(fn {key, path} -> {key, Path.expand(path, root)} end)
+    |> Enum.into(%{})
+  end
+
+  defp filepath(nil) do
+    File.cwd!()
+    |> filepath()
+  end
+
+  defp filepath(dir) when is_binary(dir) do
+    dir
+    |> Path.join(@filename)
   end
 end

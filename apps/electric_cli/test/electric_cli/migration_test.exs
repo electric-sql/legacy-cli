@@ -1,5 +1,7 @@
 defmodule ElectricCli.MigrationsTest do
   use ExUnit.Case, async: false
+  alias ElectricCli.Migrations
+  alias ElectricMigrations.Sqlite.Triggers
 
   @trigger_template EEx.compile_string(
                       "<%= original_sql %><%= for {table_full_name, _table} <- tables do %>--ADD A TRIGGER FOR <%= table_full_name %>;<% end %>\n"
@@ -7,7 +9,7 @@ defmodule ElectricCli.MigrationsTest do
 
   defp electric_conn do
     with {:ok, conn} <- Exqlite.Sqlite3.open(":memory:"),
-         :ok <- ElectricCli.Migrations.__initialise_schema__(conn) do
+         :ok <- Migrations.__initialise_schema__(conn) do
       {:ok, conn}
     end
   end
@@ -28,7 +30,7 @@ defmodule ElectricCli.MigrationsTest do
          --ADD A TRIGGER FOR main.fish;
          """, nil}
 
-      assert ElectricMigrations.Sqlite.add_triggers_to_last_migration(
+      assert Triggers.add_triggers_to_last_migration(
                [%{name: "test1", original_body: sql}],
                @trigger_template
              ) ==
@@ -42,12 +44,10 @@ defmodule ElectricCli.MigrationsTest do
       ) STRICT, WITHOUT ROWID;
       """
 
-      #      migration = %ElectricCli.Migration{name: "test1", original_body: sql}
-
       {sql, _warning} =
-        ElectricMigrations.Sqlite.add_triggers_to_last_migration(
+        Triggers.add_triggers_to_last_migration(
           [%{name: "test1", original_body: sql}],
-          ElectricCli.Migrations.get_template()
+          Migrations.satellite_template()
         )
 
       assert is_valid_sql(sql) == :ok
@@ -85,10 +85,10 @@ defmodule ElectricCli.MigrationsTest do
       }
 
       templated =
-        ElectricMigrations.Sqlite.Triggers.template_all_the_things(
+        Triggers.template_all_the_things(
           original_sql,
           tables,
-          ElectricCli.Migrations.get_template(),
+          Migrations.satellite_template(),
           true
         )
 
@@ -234,9 +234,9 @@ defmodule ElectricCli.MigrationsTest do
       """
 
       {sql, _warning} =
-        ElectricMigrations.Sqlite.add_triggers_to_last_migration(
+        Triggers.add_triggers_to_last_migration(
           [%{name: "test1", original_body: sql}],
-          ElectricCli.Migrations.get_template()
+          Migrations.satellite_template()
         )
 
       :ok = Exqlite.Sqlite3.execute(conn, sql)
@@ -286,9 +286,9 @@ defmodule ElectricCli.MigrationsTest do
       """
 
       {sql, _warning} =
-        ElectricMigrations.Sqlite.add_triggers_to_last_migration(
+        Triggers.add_triggers_to_last_migration(
           [%{name: "test1", original_body: sql}],
-          ElectricCli.Migrations.get_template()
+          Migrations.satellite_template()
         )
 
       :ok = Exqlite.Sqlite3.execute(conn, sql)
@@ -320,9 +320,9 @@ defmodule ElectricCli.MigrationsTest do
       """
 
       {sql, _warning} =
-        ElectricMigrations.Sqlite.add_triggers_to_last_migration(
+        Triggers.add_triggers_to_last_migration(
           [%{name: "test1", original_body: sql}],
-          ElectricCli.Migrations.get_template()
+          Migrations.satellite_template()
         )
 
       commands = ElectricMigrations.Sqlite.get_statements(sql)
@@ -378,7 +378,7 @@ defmodule ElectricCli.MigrationsTest do
 
       sql = sql <> sql2
 
-      stripped = ElectricCli.Migrations.strip_comments(sql)
+      stripped = ElectricMigrations.Sqlite.strip_comments(sql)
 
       expected = """
       CREATE TABLE IF NOT EXISTS fish (
@@ -427,7 +427,7 @@ defmodule ElectricCli.MigrationsTest do
 
       sql = sql <> sql2
 
-      stripped = ElectricCli.Migrations.strip_comments(sql)
+      stripped = ElectricMigrations.Sqlite.strip_comments(sql)
 
       expected = """
       CREATE TABLE IF NOT EXISTS fish (
@@ -456,12 +456,12 @@ defmodule ElectricCli.MigrationsTest do
       str2 =
         "\n\n/*---------------------------------------------\nBelow are templated triggers added by Satellite\n---------------------------------------------*/\n\n-- The ops log table\nCREATE TABLE IF NOT EXISTS _electric_oplog (\n  rowid INTEGER PRIMARY KEY AUTOINCREMENT,\n  namespace String NOT NULL,\n  tablename String NOT NULL,\n  optype String NOT NULL,\n  primaryKey String NOT NULL,\n  newRow String,\n  oldRow String,\n  timestamp TEXT\n);\n"
 
-      stripped_1 = ElectricCli.Migrations.strip_comments(str1)
+      stripped_1 = ElectricMigrations.Sqlite.strip_comments(str1)
 
       assert stripped_1 ==
                "\CREATE TABLE IF NOT EXISTS _electric_meta (\n  key TEXT PRIMARY KEY,\n  value BLOB\n);\n"
 
-      stripped_2 = ElectricCli.Migrations.strip_comments(str2)
+      stripped_2 = ElectricMigrations.Sqlite.strip_comments(str2)
 
       assert stripped_2 ==
                "CREATE TABLE IF NOT EXISTS _electric_oplog (\n  rowid INTEGER PRIMARY KEY AUTOINCREMENT,\n  namespace String NOT NULL,\n  tablename String NOT NULL,\n  optype String NOT NULL,\n  primaryKey String NOT NULL,\n  newRow String,\n  oldRow String,\n  timestamp TEXT\n);\n"
@@ -484,7 +484,7 @@ defmodule ElectricCli.MigrationsTest do
 
       title = " Paul's birthday  yay!!!"
 
-      fixed = ElectricCli.Migrations.slugify_title(title, dt)
+      fixed = Migrations.slugify_title(title, dt)
 
       assert fixed == "19641205_093007_345_paul_s_birthday_yay"
     end
@@ -500,9 +500,9 @@ defmodule ElectricCli.MigrationsTest do
       """
 
       {sql, _warning} =
-        ElectricMigrations.Sqlite.add_triggers_to_last_migration(
+        Triggers.add_triggers_to_last_migration(
           [%{name: "test1", original_body: sql}],
-          ElectricCli.Migrations.get_template()
+          Migrations.satellite_template()
         )
 
       :ok = Exqlite.Sqlite3.execute(conn, sql)
@@ -542,18 +542,18 @@ defmodule ElectricCli.MigrationsTest do
       """
 
       {sql_out1, _warning} =
-        ElectricMigrations.Sqlite.add_triggers_to_last_migration(
+        Triggers.add_triggers_to_last_migration(
           [%{name: "test1", original_body: sql1}],
-          ElectricCli.Migrations.get_template()
+          Migrations.satellite_template()
         )
 
       migration_1 = %{name: "test1", original_body: sql1}
       migration_2 = %{name: "test2", original_body: sql2}
 
       {sql_out2, _warning} =
-        ElectricMigrations.Sqlite.add_triggers_to_last_migration(
+        Triggers.add_triggers_to_last_migration(
           [migration_1, migration_2],
-          ElectricCli.Migrations.get_template()
+          Migrations.satellite_template()
         )
 
       :ok = Exqlite.Sqlite3.execute(conn, sql_out1)
@@ -607,7 +607,7 @@ defmodule ElectricCli.MigrationsTest do
 
   describe "api tests" do
     setup do
-      start_link_supervised!(ElectricCli.MockServer.spec())
+      {:ok, _pid} = start_supervised(ElectricCli.MockServer.spec())
       :ok
     end
 
@@ -615,8 +615,7 @@ defmodule ElectricCli.MigrationsTest do
       temp = temp_folder()
       migrations_dir = Path.join([temp, "migrations"])
 
-      {:ok, _msg} =
-        ElectricCli.Migrations.init_migrations("test_app", %{migrations_dir: migrations_dir})
+      {:ok, _msg} = Migrations.init_migrations("test_app", %{migrations_dir: migrations_dir})
 
       assert File.exists?(migrations_dir)
     end
@@ -625,8 +624,7 @@ defmodule ElectricCli.MigrationsTest do
       temp = temp_folder()
       migrations_dir = Path.join([temp, "migrations"])
 
-      {:ok, _msg} =
-        ElectricCli.Migrations.init_migrations("test_app", %{migrations_dir: migrations_dir})
+      {:ok, _msg} = Migrations.init_migrations("test_app", %{migrations_dir: migrations_dir})
 
       assert File.exists?(migrations_dir)
 
@@ -659,8 +657,7 @@ defmodule ElectricCli.MigrationsTest do
       temp = temp_folder()
       migrations_dir = Path.join([temp, "migrations"])
 
-      {:ok, _msg} =
-        ElectricCli.Migrations.init_migrations("test_app", %{migrations_dir: migrations_dir})
+      {:ok, _msg} = Migrations.init_migrations("test_app", %{migrations_dir: migrations_dir})
 
       assert File.exists?(migrations_dir)
 
@@ -677,7 +674,7 @@ defmodule ElectricCli.MigrationsTest do
       File.write!(my_new_migration, new_content, [:append])
 
       {:ok, _msg} =
-        ElectricCli.Migrations.build_migrations(%{migrations_dir: migrations_dir}, %{
+        Migrations.build_migrations(%{migrations_dir: migrations_dir}, %{
           satellite: false,
           postgres: false
         })
@@ -722,8 +719,7 @@ defmodule ElectricCli.MigrationsTest do
       temp = temp_folder()
       migrations_dir = Path.join([temp, "migrations"])
 
-      {:ok, _msg} =
-        ElectricCli.Migrations.init_migrations("test_app", %{migrations_dir: migrations_dir})
+      {:ok, _msg} = Migrations.init_migrations("test_app", %{migrations_dir: migrations_dir})
 
       assert File.exists?(migrations_dir)
 
@@ -740,7 +736,7 @@ defmodule ElectricCli.MigrationsTest do
       File.write!(my_new_migration, new_content, [:append])
 
       {:ok, _msg} =
-        ElectricCli.Migrations.build_migrations(%{migrations_dir: migrations_dir}, %{
+        Migrations.build_migrations(%{migrations_dir: migrations_dir}, %{
           satellite: false,
           postgres: false
         })
@@ -788,11 +784,9 @@ defmodule ElectricCli.MigrationsTest do
       temp = temp_folder()
       migrations_dir = Path.join([temp, "migrations"])
 
-      {:ok, _msg} =
-        ElectricCli.Migrations.init_migrations("test_app", %{migrations_dir: migrations_dir})
+      {:ok, _msg} = Migrations.init_migrations("test_app", %{migrations_dir: migrations_dir})
 
-      {:ok, _msg} =
-        ElectricCli.Migrations.update_app("test_app_changed", %{migrations_dir: migrations_dir})
+      {:ok, _msg} = Migrations.update_app("test_app_changed", %{migrations_dir: migrations_dir})
 
       init_migration_name =
         most_recent_migration_file(migrations_dir)
@@ -845,7 +839,7 @@ defmodule ElectricCli.MigrationsTest do
 
     def init_and_add_migration(app, temp) do
       migrations_dir = Path.join([temp, "migrations"])
-      {:ok, _msg} = ElectricCli.Migrations.init_migrations(app, %{migrations_dir: migrations_dir})
+      {:ok, _msg} = Migrations.init_migrations(app, %{migrations_dir: migrations_dir})
 
       my_new_migration = most_recent_migration_file(migrations_dir)
 
@@ -856,9 +850,9 @@ defmodule ElectricCli.MigrationsTest do
       """
 
       File.write!(my_new_migration, new_content, [:append])
+      Process.sleep(1000)
 
-      {:ok, _msg} =
-        ElectricCli.Migrations.new_migration("another", %{migrations_dir: migrations_dir})
+      {:ok, _msg} = Migrations.new_migration("another", %{migrations_dir: migrations_dir})
 
       cats_content = """
       CREATE TABLE IF NOT EXISTS cats (
@@ -890,7 +884,7 @@ defmodule ElectricCli.MigrationsTest do
       second_migration_name = Path.dirname(second_migration) |> Path.basename()
 
       {:ok, _msg} =
-        ElectricCli.Migrations.build_migrations(%{migrations_dir: migrations_dir}, %{
+        Migrations.build_migrations(%{migrations_dir: migrations_dir}, %{
           satellite: false,
           postgres: false
         })
@@ -962,7 +956,7 @@ defmodule ElectricCli.MigrationsTest do
       init_and_add_migration("test", temp)
 
       {:ok, _msg} =
-        ElectricCli.Migrations.build_migrations(%{migrations_dir: migrations_dir}, %{
+        Migrations.build_migrations(%{migrations_dir: migrations_dir}, %{
           satellite: false,
           postgres: false
         })
@@ -978,7 +972,7 @@ defmodule ElectricCli.MigrationsTest do
       File.write!(migration, dogs_content, [:append])
 
       {:error, msgs} =
-        ElectricCli.Migrations.build_migrations(%{migrations_dir: migrations_dir}, %{
+        Migrations.build_migrations(%{migrations_dir: migrations_dir}, %{
           satellite: false,
           postgres: false
         })
@@ -987,7 +981,7 @@ defmodule ElectricCli.MigrationsTest do
 
       assert [msg2, msg3] == [
                "The table dogs is not WITHOUT ROWID.",
-               "The primary key value in table dogs must be NOT NULL. Please add NOT NULL to this column."
+               "The primary key value in table dogs isn't NOT NULL. Please add NOT NULL to this column."
              ]
     end
 
@@ -997,7 +991,7 @@ defmodule ElectricCli.MigrationsTest do
       init_and_add_migration("test", temp)
 
       {:ok, _msg} =
-        ElectricCli.Migrations.build_migrations(%{migrations_dir: migrations_dir}, %{
+        Migrations.build_migrations(%{migrations_dir: migrations_dir}, %{
           satellite: true,
           postgres: false
         })
@@ -1013,7 +1007,7 @@ defmodule ElectricCli.MigrationsTest do
       init_and_add_migration("test", temp)
 
       {:ok, _msg} =
-        ElectricCli.Migrations.build_migrations(%{migrations_dir: migrations_dir}, %{
+        Migrations.build_migrations(%{migrations_dir: migrations_dir}, %{
           satellite: false,
           postgres: true
         })
@@ -1029,7 +1023,7 @@ defmodule ElectricCli.MigrationsTest do
       init_and_add_migration("test", temp)
 
       {:ok, _msg} =
-        ElectricCli.Migrations.build_migrations(%{migrations_dir: migrations_dir}, %{
+        Migrations.build_migrations(%{migrations_dir: migrations_dir}, %{
           satellite: false,
           postgres: false
         })
@@ -1045,7 +1039,7 @@ defmodule ElectricCli.MigrationsTest do
       File.write!(migration, dogs_content, [:append])
 
       {:error, msgs} =
-        ElectricCli.Migrations.build_migrations(%{migrations_dir: migrations_dir}, %{
+        Migrations.build_migrations(%{migrations_dir: migrations_dir}, %{
           satellite: false,
           postgres: false
         })
@@ -1066,8 +1060,7 @@ defmodule ElectricCli.MigrationsTest do
       change_migrations_name(migrations_dir, first_migration_name, "first_migration_name")
       change_migrations_name(migrations_dir, second_migration_name, "second_migration_name")
 
-      {:ok, _msg} =
-        ElectricCli.Migrations.sync_migrations("default", %{migrations_dir: migrations_dir})
+      {:ok, _msg} = Migrations.sync_migrations("default", %{migrations_dir: migrations_dir})
 
       js_path = Path.join([migrations_dir, "dist", "index.js"])
       assert File.exists?(js_path)
@@ -1117,8 +1110,7 @@ defmodule ElectricCli.MigrationsTest do
       change_migrations_name(migrations_dir, first_migration_name, "first_migration_name")
       change_migrations_name(migrations_dir, second_migration_name, "second_migration_name")
 
-      {:error, msg} =
-        ElectricCli.Migrations.sync_migrations("default", %{migrations_dir: migrations_dir})
+      {:error, msg} = Migrations.sync_migrations("default", %{migrations_dir: migrations_dir})
 
       assert msg == "The migration second_migration_name has been changed locally"
     end
@@ -1133,8 +1125,7 @@ defmodule ElectricCli.MigrationsTest do
       change_migrations_name(migrations_dir, first_migration_name, "first_migration_name")
       change_migrations_name(migrations_dir, second_migration_name, "second_migration_name")
 
-      {:ok, listing, _mismatched} =
-        ElectricCli.Migrations.list_migrations(%{migrations_dir: migrations_dir})
+      {:ok, listing, _mismatched} = Migrations.list_migrations(%{migrations_dir: migrations_dir})
 
       assert listing ==
                "\e[0m\n------ ElectricSQL Migrations ------\n\nfirst_migration_name\tdefault: \e[32mapplied\e[0m\nsecond_migration_name\tdefault: \e[32mapplied\e[0m\n"
@@ -1150,8 +1141,7 @@ defmodule ElectricCli.MigrationsTest do
       change_migrations_name(migrations_dir, first_migration_name, "first_migration_name")
       change_migrations_name(migrations_dir, second_migration_name, "second_migration_name")
 
-      {:ok, listing, _mismatched} =
-        ElectricCli.Migrations.list_migrations(%{migrations_dir: migrations_dir})
+      {:ok, listing, _mismatched} = Migrations.list_migrations(%{migrations_dir: migrations_dir})
 
       assert listing ==
                "\e[0m\n------ ElectricSQL Migrations ------\n\nfirst_migration_name\tdefault: \e[32mapplied\e[0m\nsecond_migration_name\tdefault: \e[32mapplied\e[0m\n"
@@ -1167,8 +1157,7 @@ defmodule ElectricCli.MigrationsTest do
       change_migrations_name(migrations_dir, first_migration_name, "first_migration_name")
       change_migrations_name(migrations_dir, second_migration_name, "second_migration_name")
 
-      {:ok, listing, mismatched} =
-        ElectricCli.Migrations.list_migrations(%{migrations_dir: migrations_dir})
+      {:ok, listing, mismatched} = Migrations.list_migrations(%{migrations_dir: migrations_dir})
 
       assert listing ==
                "\e[0m\n------ ElectricSQL Migrations ------\n\nfirst_migration_name\tdefault: \e[32mapplied\e[0m\nsecond_migration_name\tdefault: \e[31mdifferent\e[0m\n"
@@ -1187,7 +1176,7 @@ defmodule ElectricCli.MigrationsTest do
       change_migrations_name(migrations_dir, second_migration_name, "second_migration_name")
 
       {status, _msg} =
-        ElectricCli.Migrations.revert_migration("default", "second_migration_name", %{
+        Migrations.revert_migration("default", "second_migration_name", %{
           migrations_dir: migrations_dir
         })
 
@@ -1205,7 +1194,7 @@ defmodule ElectricCli.MigrationsTest do
       change_migrations_name(migrations_dir, second_migration_name, "second_migration_name")
 
       {status, nil} =
-        ElectricCli.Migrations.revert_migration("default", "second_migration_name", %{
+        Migrations.revert_migration("default", "second_migration_name", %{
           migrations_dir: migrations_dir
         })
 
@@ -1277,8 +1266,8 @@ defmodule ElectricCli.MigrationsTest do
       migrations_dir = Path.join([temp, "migrations"])
       opts = %{migrations_dir: migrations_dir}
 
-      {:ok, _msg} = ElectricCli.Migrations.init_migrations("test_app", opts)
-      assert {:ok, file_path} = ElectricCli.Migrations.new_migration("another", opts)
+      {:ok, _msg} = Migrations.init_migrations("test_app", opts)
+      assert {:ok, file_path} = Migrations.new_migration("another", opts)
 
       assert is_binary(file_path)
       assert String.starts_with?(file_path, migrations_dir)

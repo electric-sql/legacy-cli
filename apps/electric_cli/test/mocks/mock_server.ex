@@ -210,7 +210,30 @@ defmodule ElectricCli.MockServer do
     |> Plug.Conn.send_resp()
   end
 
+  @authenticated_apps ["tarragon-envy-1337", "french-onion-1234"]
+
   get "api/v1/apps/:app" do
+    case conn.params["app"] do
+      app when app in @authenticated_apps ->
+        case Enum.find(conn.req_headers, fn {k, _v} -> k == "authorization" end) do
+          {"authorization", "Bearer " <> _token} ->
+            conn
+            |> get_app(app)
+
+          alt ->
+            conn
+            |> Plug.Conn.resp(401, Jason.encode!(%{error: %{details: "unauthenticated"}}))
+            |> Plug.Conn.put_resp_header("Content-Type", "application/json")
+            |> Plug.Conn.send_resp()
+        end
+
+      app ->
+        conn
+        |> get_app(app)
+    end
+  end
+
+  def get_app(conn, app) do
     app_info = %{
       "data" => %{
         "databases" => [
@@ -218,7 +241,7 @@ defmodule ElectricCli.MockServer do
             "slug" => "default"
           }
         ],
-        "id" => "tame-cut-4121",
+        "id" => app,
         "name" => "Example App",
         "slug" => "example-app"
       }

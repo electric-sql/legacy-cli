@@ -1,63 +1,11 @@
 defmodule ElectricCli.Commands.Migrations do
   @moduledoc """
   The `Migrations` command.
-
-
-  # Initialise a new set of migrations and the initial migration file
-  electric migrations init --migrations-dir ./local/path/to/migrations
-
-  # Generate an new empty migration file.
-  electric migrations new :migration_name --migrations-dir ./local/path/to/migrations
-
-  # Read the migrations source folder. Validate.
-  # Create a output folder with patched files
-  # containing triggers.
-  electric migrations build --migrations-dir ./local/path/to/migrations --manifest --bundle
-
-  # Sync the migrations with the console, so that
-  # they can be applied to PG and propagated to
-  # satellite clients.
-  electric migrations push :database_id --migrations-dir ./local/path/to/migrations
   """
   use ElectricCli, :command
 
-  alias ElectricCli.Config
-
-  @migration_title [
-    migration_title: [
-      value_name: "MIGRATION_TITLE",
-      help: "Title of a new migration",
-      required: true,
-      parser: :string
-    ]
-  ]
-
-  @migration_name [
-    migration_name: [
-      value_name: "MIGRATION_NAME",
-      help: "The name of an existing migration",
-      required: true,
-      parser: :string
-    ]
-  ]
-
-  @postgres [
-    postgres: [
-      long: "--postgres",
-      short: "-p",
-      help: "Also generate PostgresSQL when building",
-      required: false
-    ]
-  ]
-
-  @satellite [
-    satellite: [
-      long: "--satellite",
-      short: "-s",
-      help: "Also generate satellite SQL when building",
-      required: false
-    ]
-  ]
+  alias ElectricCli.Config.Environment
+  alias ElectricCli.Migrations
 
   def spec do
     [
@@ -67,66 +15,93 @@ defmodule ElectricCli.Commands.Migrations do
         new: [
           name: "new",
           about: """
-          Creates a new migration.
+          Create a new migration.
 
-          MIGRATION_TITLE should be a short human readable description of the new migration.
+          NAME should be a short human readable description of the new migration,
+          such as "create items" or "add foo to bars".
 
-          This adds a new migration to the 'migrations' folder with a name automatically derived from the current
-          time in UTC and the given title.
-
+          This adds a new migration to the 'migrations' folder with a name that's
+          automatically derived from the current time in UTC and the given title.
           """,
-          args: @migration_title,
-          options: config_options() ++ migrations_options(),
-          flags: default_flags()
+          args: [
+            migration_name: [
+              value_name: "NAME",
+              help: "Name of the new migration",
+              required: true,
+              parser: :string
+            ]
+          ],
+          flags: default_flags(),
+          options: default_options()
         ],
         build: [
           name: "build",
           about: """
-          Builds a javascript file at `dist/index.js`.
+          Build your migrations.
 
-          This file bundles all your migrations with ElectricSQL's added DDL and some additional metadata.
+          You must build your migrations before importing into your local app and
+          before syncing up to the backend.
 
-          The metadata in this file will have a `"env": "local" to indicate the it was built from your local files
-          rather that one of the named app environments.
-
-          Add this file to your mobile or web project to configure your SQLite database.
+          By default this will build for your `defaultEnv`. If you want to target
+          a different one use `--env ENV`.
           """,
-          options: config_options() ++ migrations_options(),
-          flags: default_flags() |> Keyword.merge(@postgres) |> Keyword.merge(@satellite)
+          options: merge_options(env_options()),
+          flags:
+            merge_flags(
+              postgres: [
+                long: "--postgres",
+                short: "-p",
+                help: "Generate PostgresSQL migration files locally when building",
+                required: false
+              ],
+              satellite: [
+                long: "--satellite",
+                short: "-s",
+                help: "Generate Satellite (SQLite) migration files locally when building",
+                required: false
+              ]
+            )
         ],
         sync: [
           name: "sync",
           about: """
-          Synchronizes migrations with the server.
+          Sync migrations up to the server.
 
-          Synchronises changes you have made to migration SQL files in your local `migrations` folder up to the ElectricSQL servers,
-          and builds a new javascript file at `dist/index.js` that matches the newly synchronised set of migrations.
+          This synchronises your local changes up to your ElectricSQL sync service
+          and builds a new javascript file at `:output_dir/:app/:env/index.js` that
+          matches the newly synchronised set of migrations.
 
-          The metadata in this file will have a `"env": ENVIRONMENT to indicate that it was built directly from and matches
-          the named app environment.
+          The metadata in this file will have a `"env": ENVIRONMENT to indicate that
+          it was built directly from and matches the migrations applied to the target
+          app environment.
 
-          By default this will sync to the `default` environment for your app. If you want to use a different one give its name
-          with `--env ENVIRONMENT`
+          By default this will sync to your `defaultEnv`. If you want to target a
+          different one use `--env ENV`.
 
-          If the app environment on our servers already has a migration with the same name but different sha256 then this
-          synchronization will fail because a migration cannot be modified once it has been applied.
-          If this happens you have two options, either revert the local changes you have made to the conflicted migration using
-          the `revert` command below or, if you are working in a development environment that you are happy to reset,
-          you can reset the whole environment's DB using the web control panel.
+          Notes:
 
-          Also if a migration has a name that is lower in sort order than one already applied on the server this sync will fail.
+          If the app environment on your sync service already has a migration with the
+          same name but different sha256 then this sync will fail because a migration
+          cannot be modified once it has been applied.
+
+          If this happens you have two options, either revert the local changes you've
+          made to the conflicted migration using the `revert` command below. Or, if
+          you're working in a development environment that you're happy to reset,
+          you can reset the sync service using the console interface.
+
+          The sync will also fail if the migration has a name that is lower in sort order
+          than one already applied on the server.
           """,
-          options: config_options() ++ migrations_options() ++ env_options(),
+          options: merge_options(env_options()),
           flags: default_flags()
         ],
-        #        apply: [
-        #          name: "apply",
-        #          about: """
-        #          Applies all migrations
-        #          """,
-        #          options: config_options() ++ migrations_options(),
-        #          flags: default_flags()
-        #        ],
+        # apply: [
+        #   name: "apply",
+        #   about: """
+        #   Applies all migrations
+        #   """,
+        #   flags: default_flags()
+        # ],
         list: [
           name: "list",
           about: """
@@ -134,103 +109,98 @@ defmodule ElectricCli.Commands.Migrations do
 
           Shows a list of all the migrations and their status in every env in the app.
           """,
-          options: config_options() ++ migrations_options(),
-          flags: default_flags()
+          flags: default_flags(),
+          options: default_options()
         ],
         revert: [
           name: "revert",
           about: """
           Copies the named migration from the server to replace the local one.
+
+          Uses your `defaultEnv` unless you specify `--env ENV`.
           """,
-          args: @migration_name,
-          options: config_options() ++ migrations_options() ++ env_options(),
+          args: [
+            migration_name: [
+              value_name: "NAME",
+              help: "The name of the existing migration",
+              required: true,
+              parser: :string
+            ]
+          ],
+          options: merge_options(env_options()),
           flags: default_flags()
         ]
       ]
     ]
   end
 
-  def format_messages(type_of_message, messages) when is_list(messages) do
-    "There were #{length(messages)} #{type_of_message}:\n" <> Enum.join(messages, "\n")
-  end
+  def new(%{args: args, options: %{root: root}}) do
+    name = args.migration_name
 
-  def format_messages(type_of_message, messages) do
-    "There was 1 #{type_of_message}:\n" <> messages
-  end
-
-  def init(_cmd) do
-    {:error, "Please run `electric init` to initialize your application"}
-  end
-
-  def new(%{args: args, flags: _flags, options: options, unknown: _unknown}) do
-    with {:ok, config} <- Config.load(options.root) do
-      options = Config.merge(config, options)
-
-      ElectricCli.Progress.run("Creating new migration", fn ->
-        case ElectricCli.Migrations.new_migration(args.migration_title, options) do
-          {:ok, migration_file_path} ->
-            {:success, "New migration created at:\n#{migration_file_path}"}
+    with {:ok, %Config{} = config} <- Config.load(root) do
+      Progress.run("Creating new migration", fn ->
+        case Migrations.new_migration(name, config) do
+          {:ok, relative_file_path} ->
+            {:success, "New migration created at:\n#{relative_file_path}"}
 
           {:error, errors} ->
-            {:error, format_messages("errors", errors)}
+            {:error, Util.format_messages("errors", errors)}
         end
       end)
     end
   end
 
-  def build(%{options: options, flags: flags, unknown: _unknown}) do
-    with {:ok, config} <- Config.load(options.root) do
-      options = Config.merge(config, options)
-
-      Progress.run("Building satellite migrations", fn ->
-        case ElectricCli.Migrations.build_migrations(options, flags) do
+  def build(%{
+        options: %{env: env, root: root},
+        flags: %{postgres: postgres_flag, satellite: satellite_flag}
+      }) do
+    with {:ok, %Config{} = config} <- Config.load(root),
+         {:ok, env_atom} <- Config.existing_env_atom(config, env) do
+      Progress.run("Building migrations", fn ->
+        case Migrations.build_migrations(config, env_atom, postgres_flag, satellite_flag) do
           {:ok, nil} ->
             {:success, "Migrations built successfully"}
 
           {:ok, warnings} ->
-            #        IO.inspect(warnings)
-            {:success, format_messages("warnings", warnings)}
+            {:success, Util.format_messages("warnings", warnings)}
 
           {:error, errors} ->
-            {:error, format_messages("errors", errors)}
+            {:error, Util.format_messages("errors", errors)}
         end
       end)
     end
   end
 
-  #  def apply(%{options: options, unknown: _unknown}) do
-  #    env = Map.get(options, :env, "default")
-  #
-  #    Progress.run("Applying satellite migrations", fn ->
-  #      case ElectricCli.Migrations.apply_migrations(env, options) do
-  #        {:ok, nil} ->
-  #          {:success, "Migrations applied successfully"}
-  #        {:ok, warnings} ->
-  #          #        IO.inspect(warnings)
-  #          {:success, format_messages("warnings", warnings)}
-  #
-  #        {:error, errors} ->
-  #          {:error, format_messages("errors", errors)}
-  #      end
-  #    end)
-  #  end
+  # def apply(%{options: %{env: env, root: root}}) do
+  #   with {:ok, %Config{} = config} <- Config.load(root),
+  #        {:ok, %Environment{} = environment} <- Config.target_environment(config, env) do
+  #     Progress.run("Applying migrations", fn ->
+  #       case Migrations.apply_migrations(config, environment) do
+  #         {:ok, nil} ->
+  #           {:success, "Migrations applied successfully"}
+  #         {:ok, warnings} ->
+  #           {:success, Util.format_messages("warnings", warnings)}
+  #         {:error, errors} ->
+  #           {:error, Util.format_messages("errors", errors)}
+  #       end
+  #     end)
+  #   end
+  # end
 
-  def sync(%{args: _args, flags: _flags, options: options, unknown: _unknown}) do
-    with {:ok, config} <- Config.load(options.root),
+  def sync(%{options: %{env: env, root: root}}) do
+    with {:ok, %Config{} = config} <- Config.load(root),
+         {:ok, %Environment{} = environment} <- Config.target_environment(config, env),
          :ok <- Session.require_auth() do
-      options = Config.merge(config, options)
-
-      Progress.run("Synchronizing migrations", false, fn ->
-        case ElectricCli.Migrations.sync_migrations(options.env, options) do
+      Progress.run("Sync migrations", false, fn ->
+        case Migrations.sync_migrations(config, environment) do
           {:ok, nil} ->
-            {:success, "Migrations synchronized with server successfully"}
+            {:success, "Migrations synced successfully"}
 
           {:ok, warnings} ->
-            #        IO.inspect(warnings)
-            {:success, format_messages("warnings", warnings)}
+            {:success, Util.format_messages("warnings", warnings)}
 
           {:error, errors} ->
-            {:error, format_messages("errors", errors)}
+            {:error, Util.format_messages("errors", errors)}
 
           error ->
             error
@@ -239,35 +209,33 @@ defmodule ElectricCli.Commands.Migrations do
     end
   end
 
-  def list(%{options: options}) do
-    with {:ok, config} <- Config.load(options.root) do
-      options = Config.merge(config, options)
+  def list(%{options: %{root: root}}) do
+    with {:ok, %Config{} = config} <- Config.load(root) do
+      Progress.run("Listing migrations", fn ->
+        case Migrations.list_migrations(config) do
+          {:ok, listing, _mismatched} ->
+            {:success, listing}
 
-      case ElectricCli.Migrations.list_migrations(options) do
-        {:ok, listing, _mismatched} ->
-          {:success, listing}
-
-        {:error, errors} ->
-          {:error, format_messages("errors", errors)}
-      end
+          {:error, errors} ->
+            {:error, Util.format_messages("errors", errors)}
+        end
+      end)
     end
   end
 
-  def revert(%{args: %{migration_name: migration_name}, options: options}) do
-    with {:ok, config} <- Config.load(options.root) do
-      options = Config.merge(config, options)
-
+  def revert(%{options: %{env: env, migration_name: migration_name, root: root}}) do
+    with {:ok, %Config{} = config} <- Config.load(root),
+         {:ok, %Environment{} = environment} <- Config.target_environment(config, env) do
       Progress.run("Reverting migration", fn ->
-        case ElectricCli.Migrations.revert_migration(options.env, migration_name, options) do
+        case Migrations.revert_migration(config, environment, migration_name) do
           {:ok, nil} ->
             {:success, "Migration reverted successfully"}
 
           {:ok, warnings} ->
-            #        IO.inspect(warnings)
-            {:success, format_messages("warnings", warnings)}
+            {:success, Util.format_messages("warnings", warnings)}
 
           {:error, errors} ->
-            {:error, format_messages("errors", errors)}
+            {:error, Util.format_messages("errors", errors)}
         end
       end)
     end

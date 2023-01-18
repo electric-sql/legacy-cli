@@ -9,6 +9,10 @@ default_console_url =
 
 config :electric_cli,
   default_console_url: default_console_url,
+  default_env: "default",
+  default_migrations_dir: "migrations",
+  default_output_dir: ".electric",
+  config_filename: "electric.json",
   verbose: false
 
 if config_env() == :dev do

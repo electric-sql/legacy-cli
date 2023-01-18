@@ -7,7 +7,7 @@ defmodule ElectricCli.Commands.Auth do
   def spec do
     [
       name: "auth",
-      about: "Sign up, log in and manage authentication status.",
+      about: "Log-in and manage authentication status.",
       flags: default_flags(),
       subcommands: [
         login: [

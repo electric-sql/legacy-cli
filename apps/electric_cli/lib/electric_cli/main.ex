@@ -3,6 +3,7 @@ defmodule ElectricCli.Main do
 
   require Logger
 
+  alias ElectricCli.Output.Formatting
   alias ElectricCli.Commands
   alias ElectricCli.Util
 
@@ -10,9 +11,11 @@ defmodule ElectricCli.Main do
     accounts: Commands.Accounts,
     apps: Commands.Apps,
     auth: Commands.Auth,
-    init: Commands.Config.Init,
+    # build: Commands.Build,
     config: Commands.Config,
+    init: Commands.Init,
     migrations: Commands.Migrations
+    # sync: Commands.Config
   ]
 
   @project Mix.Project.config()
@@ -27,7 +30,7 @@ defmodule ElectricCli.Main do
       name: "electric",
       description: "ElectricSQL CLI",
       version: @project[:version],
-      about: "...",
+      about: "Command line interface to the https://electric-sql.com service.",
       allow_unknown_args: false,
       parse_double_dash: true,
       flags: [
@@ -43,6 +46,9 @@ defmodule ElectricCli.Main do
     )
   end
 
+  @doc """
+  Run the command, print the output and exit.
+  """
   @impl Bakeware.Script
   def main(argv \\ []) do
     case run(argv) do
@@ -61,34 +67,48 @@ defmodule ElectricCli.Main do
     end
   end
 
-  # allows for running the command without handling the result and causing the system to exit
-  @doc false
+  @doc """
+  Run the command and return the result (without exiting).
+  """
   def run(argv \\ []) do
     argv
     |> prepend_help_flag()
     |> parse()
     |> case do
       :version ->
-        spec() |> Optimus.Title.title() |> join_lines()
+        spec()
+        |> Optimus.Title.title()
+        |> join_lines()
 
       :help ->
-        spec() |> Optimus.Help.help([], columns()) |> join_lines()
+        spec()
+        |> Optimus.Help.help([], columns())
+        |> join_lines()
 
       {:help, subcommand} ->
-        spec() |> Optimus.Help.help(subcommand, columns()) |> join_lines()
+        spec()
+        |> Optimus.Help.help(subcommand, columns())
+        |> join_lines()
 
       {:error, errors} ->
-        {:error, ElectricCli.Output.Formatting.format_errors(spec(), errors) |> Enum.join("\n")}
+        formatted_errors =
+          spec()
+          |> Formatting.format_errors(errors)
+          |> Enum.join("\n")
+
+        {:error, formatted_errors}
 
       {:error, subcommand, errors} ->
-        {:error,
-         ElectricCli.Output.Formatting.format_errors(spec(), subcommand, errors)
-         |> Enum.join("\n")}
+        formatted_errors =
+          spec()
+          |> Formatting.format_errors(subcommand, errors)
+          |> Enum.join("\n")
+
+        {:error, formatted_errors}
 
       ok_tuple ->
-        request = get_subcommand_and_result(ok_tuple)
-
-        request
+        ok_tuple
+        |> get_subcommand_and_result()
         |> set_verbosity()
         |> execute()
         |> map_result()
@@ -113,7 +133,7 @@ defmodule ElectricCli.Main do
   end
 
   defp execute({[], _}), do: Optimus.parse!(spec(), ["--help"], &halt/1)
-  defp execute({[:init], options}), do: apply(Commands.Config, :init, [options])
+  defp execute({[:init], options}), do: apply(Commands.Init, :init, [options])
   defp execute({[key], _}), do: Optimus.parse!(spec(), ["help", "#{key}"], &halt/1)
   defp execute({[key, command], options}), do: apply(@commands[key], command, [options])
 

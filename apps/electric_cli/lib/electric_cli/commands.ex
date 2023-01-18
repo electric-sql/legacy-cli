@@ -5,9 +5,11 @@ defmodule ElectricCli.Commands do
 
   def command do
     quote do
-      import ElectricCli.Flags
+      import ElectricCli.Options
+      import ElectricCli.Util, only: [verbose: 1]
 
       alias ElectricCli.Client
+      alias ElectricCli.Config
       alias ElectricCli.Password
       alias ElectricCli.Progress
       alias ElectricCli.Session
