@@ -5,14 +5,13 @@ defmodule ElectricMigrations.Sqlite.Parse do
   alias ElectricMigrations.Ast
 
   @allowed_sql_types ["integer", "real", "text", "blob"]
-  @default_namespace "main"
 
   @doc """
   Given a set of Maps and returns an ugly map of maps containing info about the DB structure.
   Also validates the SQL and returns error messages if validation fails
   """
-  def sql_ast_from_migrations(migrations) do
-    case ast_from_ordered_migrations(migrations) do
+  def sql_ast_from_migrations(migrations, default_namespace \\ "main") do
+    case ast_from_ordered_migrations(migrations, default_namespace) do
       {ast, [], []} ->
         {:ok, ast, nil}
 
@@ -73,14 +72,13 @@ defmodule ElectricMigrations.Sqlite.Parse do
     end
   end
 
-  defp ast_from_ordered_migrations(migrations) do
-    namespace = @default_namespace
+  defp ast_from_ordered_migrations(migrations, namespace) do
     # get all the table names
     {:ok, conn} = Exqlite.Sqlite3.open(":memory:")
 
     with :ok <- check_for_namespaces(migrations),
          :ok <- apply_migrations(conn, migrations) do
-      index_info = all_index_info_from_connection(conn)
+      index_info = all_index_info_from_connection(conn, namespace)
 
       {:ok, statement} =
         Exqlite.Sqlite3.prepare(
@@ -135,7 +133,7 @@ defmodule ElectricMigrations.Sqlite.Parse do
     column_infos =
       for [cid, name, type, notnull, dflt_value, pk] <- columns, into: %{} do
         {cid,
-         %{
+         %Ast.ColumnInfo{
            cid: cid,
            name: name,
            type: type,
@@ -191,7 +189,7 @@ defmodule ElectricMigrations.Sqlite.Parse do
 
     foreign_keys_info =
       for [id, seq, table, from, to, on_update, on_delete, match] <- foreign_keys_rows do
-        %{
+        %Ast.ForeignKeyInfo{
           id: id,
           seq: seq,
           table: table,
@@ -203,9 +201,9 @@ defmodule ElectricMigrations.Sqlite.Parse do
         }
       end
 
-    %{
+    %Ast.FullTableInfo{
       table_name: tbl_name,
-      table_info: %{
+      table_info: %Ast.TableInfo{
         type: type,
         name: name,
         tbl_name: tbl_name,
@@ -251,9 +249,7 @@ defmodule ElectricMigrations.Sqlite.Parse do
     []
   end
 
-  defp all_index_info_from_connection(conn) do
-    namespace = @default_namespace
-
+  defp all_index_info_from_connection(conn, namespace) do
     {:ok, statement} =
       Exqlite.Sqlite3.prepare(
         conn,

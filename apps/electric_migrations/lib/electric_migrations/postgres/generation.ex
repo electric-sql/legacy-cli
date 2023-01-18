@@ -3,7 +3,7 @@ defmodule ElectricMigrations.Postgres.Generation do
   Generates PostgreSQL text from SQLite text
   """
 
-  alias ElectricMigrations.Postgres.Parse
+  alias ElectricMigrations.Sqlite.Parse
 
   @doc """
   Given an ordered list of SQLite migrations in the form of a List of Maps with %{original_body: <>, name: <>}
@@ -30,10 +30,10 @@ defmodule ElectricMigrations.Postgres.Generation do
   end
 
   defp before_and_after_ast(migrations) do
-    with {:ok, after_ast, after_warnings} <- Parse.sql_ast_from_migrations(migrations),
+    with {:ok, after_ast, after_warnings} <- Parse.sql_ast_from_migrations(migrations, "public"),
          all_but_last_migration_set = Enum.drop(migrations, -1),
          {:ok, before_ast, _warnings} <-
-           Parse.sql_ast_from_migrations(all_but_last_migration_set) do
+           Parse.sql_ast_from_migrations(all_but_last_migration_set, "public") do
       {:ok, before_ast, after_ast, after_warnings}
     end
   end

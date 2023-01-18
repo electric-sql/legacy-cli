@@ -61,7 +61,7 @@ CREATE TRIGGER insert_<%= table.namespace %>_<%= table.table_name %>_into_oplog
    WHEN 1 == (SELECT flag from _electric_trigger_settings WHERE tablename == '<%= table_full_name %>')
 BEGIN
   INSERT INTO _electric_oplog (namespace, tablename, optype, primaryKey, newRow, oldRow, timestamp)
-  VALUES ('<%= table.namespace %>', '<%= table.table_name %>', 'INSERT', json_object(<%= Enum.join(for col <- table.primary do "'#{col}', new.#{col}" end, ", ") %>), json_object(<%= Enum.join(for col <- table[:columns] do "'#{col}', new.#{col}" end, ", ") %>), NULL, NULL);
+  VALUES ('<%= table.namespace %>', '<%= table.table_name %>', 'INSERT', json_object(<%= Enum.join(for col <- table.primary do "'#{col}', new.#{col}" end, ", ") %>), json_object(<%= Enum.join(for col <- table.columns do "'#{col}', new.#{col}" end, ", ") %>), NULL, NULL);
 END;
 
 DROP TRIGGER IF EXISTS update_<%= table.namespace %>_<%= table.table_name %>_into_oplog;
