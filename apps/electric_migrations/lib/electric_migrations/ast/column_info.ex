@@ -29,7 +29,7 @@ defmodule ElectricMigrations.Ast.ColumnInfo do
           cid: integer(),
           name: String.t(),
           type: String.t(),
-          notnull: integer(),
+          notnull: boolean(),
           unique: boolean(),
           pk_desc: boolean(),
           dflt_value: boolean() | nil,

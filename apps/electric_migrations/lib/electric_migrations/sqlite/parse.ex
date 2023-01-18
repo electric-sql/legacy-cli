@@ -3,6 +3,7 @@ defmodule ElectricMigrations.Sqlite.Parse do
   Creates an AST from SQL migrations
   """
   alias ElectricMigrations.Ast
+  alias ElectricMigrations.Sqlite.Introspect
 
   @allowed_sql_types ["integer", "real", "text", "blob"]
 
@@ -74,24 +75,15 @@ defmodule ElectricMigrations.Sqlite.Parse do
 
   defp ast_from_ordered_migrations(migrations, namespace) do
     # get all the table names
-    {:ok, conn} = Exqlite.Sqlite3.open(":memory:")
+    conn = Introspect.open_in_memory!()
 
     with :ok <- check_for_namespaces(migrations),
          :ok <- apply_migrations(conn, migrations) do
-      index_info = all_index_info_from_connection(conn, namespace)
-
-      {:ok, statement} =
-        Exqlite.Sqlite3.prepare(
-          conn,
-          "SELECT * FROM sqlite_master WHERE type='table' AND name!='_electric_oplog';"
-        )
-
-      info = get_rows_while(conn, statement, [])
-      :ok = Exqlite.Sqlite3.release(conn, statement)
+      # index_info = all_index_info_from_connection(conn, namespace)
 
       ast =
-        info
-        |> generate_ast(namespace, index_info, conn)
+        Introspect.stream_all_tables(conn)
+        |> generate_ast(namespace, conn)
         |> Map.new(fn info -> {"#{namespace}.#{info.table_name}", info} end)
 
       validation_fails =
@@ -108,78 +100,67 @@ defmodule ElectricMigrations.Sqlite.Parse do
     end
   end
 
-  defp generate_ast(all_table_infos, namespace, index_info, conn) do
+  defp generate_ast(all_table_infos, namespace, conn) do
     for table_info <- all_table_infos do
-      generate_table_ast(table_info, namespace, index_info, conn)
+      generate_table_ast(
+        table_info,
+        namespace,
+        index_info_for_table(conn, table_info.tbl_name),
+        conn
+      )
     end
   end
 
-  defp generate_table_ast(table_info, namespace, index_info, conn) do
-    [type, name, tbl_name, rootpage, sql] = table_info
+  defp generate_table_ast(
+         %Ast.TableInfo{tbl_name: tbl_name} = table_info,
+         namespace,
+         table_indices,
+         conn
+       ) do
+    validation_fails = check_sql(tbl_name, table_info.sql)
+    warning_messages = check_sql_warnings(tbl_name, table_info.sql)
 
-    validation_fails = check_sql(tbl_name, sql)
-    warning_messages = check_sql_warnings(tbl_name, sql)
+    columns =
+      Introspect.stream_all_columns(conn, tbl_name)
+      |> Enum.map(fn %Ast.ColumnInfo{name: name} = info ->
+        %{
+          info
+          | unique: is_unique(name, table_indices),
+            pk_desc: is_primary_desc(name, table_indices)
+        }
+      end)
 
-    # column names
-    {:ok, info_statement} = Exqlite.Sqlite3.prepare(conn, "PRAGMA table_info(#{tbl_name});")
+    column_names = Enum.map(columns, & &1.name)
 
-    columns = Enum.reverse(get_rows_while(conn, info_statement, []))
-
-    column_names =
-      for [_cid, name, _type, _notnull, _dflt_value, _pk] <- columns do
-        name
-      end
-
-    column_infos =
-      for [cid, name, type, notnull, dflt_value, pk] <- columns, into: %{} do
-        {cid,
-         %Ast.ColumnInfo{
-           cid: cid,
-           name: name,
-           type: type,
-           notnull: notnull,
-           unique: is_unique(name, index_info["#{namespace}.#{tbl_name}"]),
-           pk_desc: is_primary_desc(name, index_info["#{namespace}.#{tbl_name}"]),
-           dflt_value: dflt_value,
-           pk: pk
-         }}
-      end
+    column_infos = Map.new(columns, &{&1.cid, &1})
 
     type_errors =
-      for {_cid, info} <- column_infos,
-          not Enum.member?(@allowed_sql_types, String.downcase(info.type)) do
-        "The type #{info.type} for column #{info.name} in table #{name} is not allowed. Please use one of INTEGER, REAL, TEXT, BLOB"
+      for info <- columns, not Enum.member?(@allowed_sql_types, String.downcase(info.type)) do
+        "The type #{info.type} for column #{info.name} in table #{table_info.name} is not allowed. Please use one of INTEGER, REAL, TEXT, BLOB"
       end
 
+    # FIXME: `pk == 1` assumes that only one PK is ever going to be present
     not_null_errors =
-      for {_cid, info} <- column_infos,
-          info.pk == 1 && info.notnull == 0 do
-        "The primary key #{info.name} in table #{name} isn't NOT NULL. Please add NOT NULL to this column."
+      for info <- columns, info.pk == 1 && not info.notnull do
+        "The primary key #{info.name} in table #{table_info.name} isn't NOT NULL. Please add NOT NULL to this column."
       end
 
     case_errors =
-      for {_cid, info} <- column_infos,
-          String.downcase(info.name) != info.name do
-        "The name of column #{info.name} in table #{name} is not allowed. Please only use lowercase for column names."
+      for info <- columns, String.downcase(info.name) != info.name do
+        "The name of column #{info.name} in table #{table_info.name} is not allowed. Please only use lowercase for column names."
       end
 
     validation_fails = validation_fails ++ type_errors ++ not_null_errors ++ case_errors
 
-    # private keys columns
-    private_key_column_names =
-      for [_cid, name, _type, _notnull, _dflt_value, pk] when pk == 1 <- columns do
-        name
-      end
+    # FIXME: `pk == 1` assumes that only one PK is ever going to be present
+    # primary keys columns
+    primary_key_column_names = Enum.filter(columns, &(&1.pk == 1)) |> Enum.map(& &1.name)
 
-    # foreign keys
-    {:ok, foreign_statement} =
-      Exqlite.Sqlite3.prepare(conn, "PRAGMA foreign_key_list(#{tbl_name});")
-
-    foreign_keys_rows = get_rows_while(conn, foreign_statement, [])
+    foreign_keys_info = Introspect.stream_all_foreign_keys(conn, tbl_name) |> Enum.to_list()
 
     foreign_keys =
-      for [_id, _seq, table, from, to, _on_update, _on_delete, _match] <-
-            foreign_keys_rows do
+      for %Ast.ForeignKeyInfo{from: from, to: to, table: table} <-
+            foreign_keys_info do
         %{
           child_key: from,
           parent_key: to,
@@ -187,32 +168,12 @@ defmodule ElectricMigrations.Sqlite.Parse do
         }
       end
 
-    foreign_keys_info =
-      for [id, seq, table, from, to, on_update, on_delete, match] <- foreign_keys_rows do
-        %Ast.ForeignKeyInfo{
-          id: id,
-          seq: seq,
-          table: table,
-          from: from,
-          to: to,
-          on_update: on_update,
-          on_delete: on_delete,
-          match: match
-        }
-      end
-
     %Ast.FullTableInfo{
       table_name: tbl_name,
-      table_info: %Ast.TableInfo{
-        type: type,
-        name: name,
-        tbl_name: tbl_name,
-        rootpage: rootpage,
-        sql: sql
-      },
+      table_info: table_info,
       columns: column_names,
       namespace: namespace,
-      primary: private_key_column_names,
+      primary: primary_key_column_names,
       foreign_keys: foreign_keys,
       column_infos: column_infos,
       foreign_keys_info: foreign_keys_info,
@@ -249,92 +210,29 @@ defmodule ElectricMigrations.Sqlite.Parse do
     []
   end
 
-  defp all_index_info_from_connection(conn, namespace) do
-    {:ok, statement} =
-      Exqlite.Sqlite3.prepare(
-        conn,
-        "SELECT * FROM sqlite_master WHERE type='index';"
-      )
-
-    info = get_rows_while(conn, statement, [])
-    :ok = Exqlite.Sqlite3.release(conn, statement)
-
-    # for each table
-    for [_type, _name, tbl_name, _rootpage, _sql] <- info, into: %{} do
-      # column names
-      {:ok, info_statement} = Exqlite.Sqlite3.prepare(conn, "PRAGMA index_list(#{tbl_name});")
-
-      indexes = Enum.reverse(get_rows_while(conn, info_statement, []))
-
-      index_infos =
-        for [seq, name, unique, origin, partial] <- indexes, into: %{} do
-          {:ok, col_info_statement} =
-            Exqlite.Sqlite3.prepare(conn, "PRAGMA index_xinfo(#{name});")
-
-          index_columns = Enum.reverse(get_rows_while(conn, col_info_statement, []))
-
-          index_column_infos =
-            for [seqno, cid, name, desc, coll, key] <- index_columns do
-              %{
-                seqno: seqno,
-                cid: cid,
-                name: name,
-                desc: desc,
-                coll: coll,
-                key: key
-              }
-            end
-
-          {seq,
-           %{
-             seq: seq,
-             name: name,
-             unique: unique,
-             origin: origin,
-             partial: partial,
-             columns: index_column_infos
-           }}
-        end
-
-      {"#{namespace}.#{tbl_name}", index_infos}
-    end
-  end
-
-  defp get_rows_while(conn, statement, rows) do
-    case Exqlite.Sqlite3.step(conn, statement) do
-      {:row, row} ->
-        get_rows_while(conn, statement, [row | rows])
-
-      :done ->
-        rows
-    end
-  end
-
-  defp is_unique(_column_name, nil) do
-    false
+  defp index_info_for_table(conn, table_name) do
+    Introspect.stream_all_indices(conn, table_name)
+    |> Enum.to_list()
   end
 
   defp is_unique(column_name, indexes) do
     matching_unique_indexes =
-      for {_, info} <- indexes,
-          info.origin == "u",
+      for info <- indexes,
+          info.unique? and info.origin != :primary_key,
           key_column <- info.columns,
-          key_column.key == 1 && key_column.name == column_name,
+          key_column.key? and key_column.column_name == column_name,
           do: true
 
     Enum.any?(matching_unique_indexes)
   end
 
-  defp is_primary_desc(_column_name, nil) do
-    false
-  end
-
   defp is_primary_desc(column_name, indexes) do
     matching_desc_indexes =
-      for {_, info} <- indexes,
-          info.origin == "pk",
+      for info <- indexes,
+          info.origin == :primary_key,
           key_column <- info.columns,
-          key_column.key == 1 && key_column.name == column_name && key_column.desc == 1,
+          key_column.key? and key_column.column_name == column_name and
+            key_column.direction == :desc,
           do: true
 
     Enum.any?(matching_desc_indexes)
