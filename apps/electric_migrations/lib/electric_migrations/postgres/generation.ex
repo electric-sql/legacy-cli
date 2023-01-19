@@ -9,6 +9,9 @@ defmodule ElectricMigrations.Postgres.Generation do
   Given an ordered list of SQLite migrations in the form of a List of Maps with %{original_body: <>, name: <>}
   creates PostgreSQL SQL for the last migration in the list
   """
+  @spec postgres_sql_for_last_migration([ElectricMigrations.raw_migration(), ...]) ::
+          {:ok, sql :: String.t(), warnings :: [String.t()] | nil}
+          | {:error, errors :: [String.t(), ...]}
   def postgres_sql_for_last_migration(migrations) do
     case before_and_after_ast(migrations) do
       {:ok, before_ast, after_ast, warnings} ->
@@ -18,15 +21,6 @@ defmodule ElectricMigrations.Postgres.Generation do
       {:error, reasons} ->
         {:error, reasons}
     end
-  end
-
-  def postgres_sql_for_last_migration_w_strings(migrations) do
-    originals_and_names =
-      for migration <- migrations do
-        %{name: migration["name"], original_body: migration["original_body"]}
-      end
-
-    postgres_sql_for_last_migration(originals_and_names)
   end
 
   defp before_and_after_ast(migrations) do

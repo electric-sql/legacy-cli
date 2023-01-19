@@ -15,6 +15,12 @@ defmodule ElectricMigrations.Sqlite do
   - `tables`: a map of AST structs with table names as keys.
     See `t:ElectricMigrations.Ast.FullTableInfo.t/0` for documentation on AST structure
   """
+  @spec add_triggers_to_last_migration(
+          migrations :: [ElectricMigrations.raw_migration(), ...],
+          template :: Macro.t()
+        ) ::
+          {:error, errors :: [String.t()]}
+          | {result :: String.t(), warnings :: [String.t()] | nil}
   defdelegate add_triggers_to_last_migration(migrations, template),
     to: ElectricMigrations.Sqlite.Triggers,
     as: :add_triggers_to_last_migration

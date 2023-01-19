@@ -503,11 +503,9 @@ defmodule ElectricCli.Migrations do
       |> Enum.reduce_while({:ok, [], []}, fn subset,
                                              {_status, migrations_with_postgres, messages} ->
         case add_postgres_to_migrations(subset) do
-          {:ok, migration, nil} ->
-            {:cont, {:ok, migrations_with_postgres ++ [migration], messages}}
-
           {:ok, migration, warnings} ->
-            {:cont, {:ok, migrations_with_postgres ++ [migration], messages ++ warnings}}
+            {:cont,
+             {:ok, migrations_with_postgres ++ [migration], messages ++ List.wrap(warnings)}}
 
           {:error, errors} ->
             {:halt, {:error, [], errors}}
@@ -522,8 +520,8 @@ defmodule ElectricCli.Migrations do
 
     verbose("Generating PostgreSQL migration #{migration["name"]}")
 
-    case ElectricMigrations.Postgres.Generation.postgres_sql_for_last_migration_w_strings(
-           migrations
+    case ElectricMigrations.Postgres.postgres_sql_for_last_migration(
+           normalize_migration_keys(migrations)
          ) do
       {:ok, postgres_body, warnings} ->
         {:ok, Map.merge(migration, %{"postgres_body" => postgres_body}), warnings}
@@ -623,7 +621,7 @@ defmodule ElectricCli.Migrations do
       {:ok, migration, []}
     else
       case ElectricMigrations.Sqlite.add_triggers_to_last_migration(
-             migration_set,
+             normalize_migration_keys(migration_set),
              template
            ) do
         {:error, reasons} ->
@@ -644,6 +642,12 @@ defmodule ElectricCli.Migrations do
              warnings}
           end
       end
+    end
+  end
+
+  defp normalize_migration_keys(migrations) do
+    for migration <- migrations do
+      %{name: migration["name"], original_body: migration["original_body"]}
     end
   end
 end

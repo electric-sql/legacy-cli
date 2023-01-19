@@ -27,7 +27,7 @@ defmodule ElectricMigrations.Sqlite.TriggersTest do
       """
 
       assert Triggers.add_triggers_to_last_migration(
-               [%{"name" => "test1", "original_body" => sql}],
+               [%{name: "test1", original_body: sql}],
                @trigger_template
              ) == {expected, nil}
     end
