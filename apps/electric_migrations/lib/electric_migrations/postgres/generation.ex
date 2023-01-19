@@ -112,12 +112,6 @@ defmodule ElectricMigrations.Postgres.Generation do
     Enum.join(all_change_lines, " ")
   end
 
-  defp table_changes(nil, after_ast) do
-    for {_, table_info} <- after_ast do
-      {nil, table_info}
-    end
-  end
-
   defp table_changes(before_ast, after_ast) do
     new_and_changed =
       for {table_name, table_info} <- after_ast, table_info != before_ast[table_name] do

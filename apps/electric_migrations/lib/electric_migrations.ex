@@ -1,18 +1,5 @@
 defmodule ElectricMigrations do
   @moduledoc """
-  Documentation for `ElectricMigrations`.
+  Parse ElectricSQL SQLite migrations and build Postgres migrations based on them
   """
-
-  @doc """
-  Hello world.
-
-  ## Examples
-
-      iex> ElectricMigrations.hello()
-      :world
-
-  """
-  def hello do
-    :world
-  end
 end

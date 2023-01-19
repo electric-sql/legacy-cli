@@ -166,7 +166,7 @@ defmodule ElectricMigrations.Sqlite.LexerTest do
     end
   end
 
-  describe "clean_up_sql/1" do
+  describe "strip_comments/1" do
     test "removes all comments from SQL file" do
       sql = """
       -- this is a comment
@@ -181,7 +181,7 @@ defmodule ElectricMigrations.Sqlite.LexerTest do
       ) STRICT, WITHOUT ROWID;
       """
 
-      result = Lexer.clean_up_sql(sql)
+      result = Lexer.strip_comments(sql)
 
       assert result == """
              CREATE TABLE IF NOT EXISTS fish (

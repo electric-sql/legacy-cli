@@ -25,8 +25,8 @@ defmodule ElectricMigrations.Sqlite.Lexer do
   @doc """
   Remove all comments from given SQL.
   """
-  @spec clean_up_sql(input :: String.t()) :: String.t()
-  def clean_up_sql(input) do
+  @spec strip_comments(input :: String.t()) :: String.t()
+  def strip_comments(input) do
     Enum.join(get_statements(input), "\n\n") <> "\n"
   end
 
