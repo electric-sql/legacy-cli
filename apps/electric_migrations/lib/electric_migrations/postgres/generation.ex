@@ -81,29 +81,13 @@ defmodule ElectricMigrations.Postgres.Generation do
 
   defp build_sql_alter_table(table_before, table_after) do
     ## add columns
-    added_colums_lines =
+    added_columns_lines =
       for {column_id, column_info} <- table_after.column_infos,
           not Map.has_key?(table_before.column_infos, column_id) do
         "ALTER TABLE #{table_full_name(table_after)} ADD COLUMN #{column_def_sql_from_info(column_info)};\n"
       end
 
-    ## delete columns
-    dropped_colums_lines =
-      for {column_id, column_info} <- table_before.column_infos,
-          not Map.has_key?(table_after.column_infos, column_id) do
-        "ALTER TABLE #{table_full_name(table_after)} DROP COLUMN #{column_info.name};\n"
-      end
-
-    ## rename columns
-    rename_colums_lines =
-      for {column_id, column_info} <- table_after.column_infos,
-          Map.has_key?(table_before.column_infos, column_id) &&
-            column_info.name != table_before.column_infos[column_id].name do
-        "ALTER TABLE #{table_full_name(table_after)} RENAME COLUMN #{table_before.column_infos[column_id].name} TO #{column_info.name};\n"
-      end
-
-    all_change_lines = added_colums_lines ++ dropped_colums_lines ++ rename_colums_lines
-    Enum.join(all_change_lines, " ")
+    Enum.join(added_columns_lines, " ")
   end
 
   defp table_changes(before_ast, after_ast) do

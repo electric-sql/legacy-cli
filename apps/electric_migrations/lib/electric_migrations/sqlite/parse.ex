@@ -26,24 +26,28 @@ defmodule ElectricMigrations.Sqlite.Parse do
     end
   end
 
-  defp check_for_namespaces(migrations) do
-    namespaced =
-      for migration <- migrations do
-        namespaced_table_names(migration.original_body)
-      end
+  defp check_for_namespaces(errors, sql) do
+    namespace_errors =
+      sql
+      |> namespaced_table_names()
+      |> Enum.map(
+        &"The table #{&1} has a database name. Please leave this out and only give the table name."
+      )
 
-    case List.flatten(namespaced) do
-      [] ->
-        :ok
+    errors ++ namespace_errors
+  end
 
-      namespaced ->
-        errors =
-          for name <- namespaced do
-            "The table #{name} has a database name. Please leave this out and only give the table name."
-          end
-
-        {:error, errors, []}
-    end
+  @alter_table_regex ~r/ALTER\s+TABLE\s+(?<table_name>(?:(?:[\w\d_]+|"(?:[^"]|"")*")\.)?(?:[\w\d_]+|"(?:[^"]|"")*"))\s+(?<action>\w+(?: to| column)?)/i
+  defp check_for_alter_table_statements(errors, sql) do
+    ElectricMigrations.Sqlite.get_statements(sql)
+    |> Enum.filter(&String.match?(String.upcase(&1), ~r"^ALTER\s+TABLE"))
+    |> Enum.map(&Regex.run(@alter_table_regex, &1, capture: ["table_name", "action"]))
+    |> Enum.reject(&is_nil/1)
+    |> Enum.reject(fn [_, action] -> String.upcase(action) =~ "ADD" end)
+    |> Enum.map(fn [table_name, action] ->
+      "Altering table #{table_name} to #{String.upcase(action)} is considered a non-backwards compatible migration. Only backwards-compatible migrations (CREATE TABLE and ADD COLUMN) are supported for now"
+    end)
+    |> then(&(errors ++ &1))
   end
 
   @doc """
@@ -55,6 +59,24 @@ defmodule ElectricMigrations.Sqlite.Parse do
         uniq: true do
       capture
     end
+  end
+
+  defp validate_migration_bodies(migrations) do
+    migrations
+    |> Enum.flat_map(fn %{name: name, original_body: sql} ->
+      validate_migration_body(sql)
+      |> Enum.map(&~s|In migration #{name}: #{&1}|)
+    end)
+    |> case do
+      [] -> :ok
+      errors -> {nil, errors, nil}
+    end
+  end
+
+  defp validate_migration_body(sql) do
+    []
+    |> check_for_namespaces(sql)
+    |> check_for_alter_table_statements(sql)
   end
 
   defp apply_migrations(conn, migrations) do
@@ -76,7 +98,7 @@ defmodule ElectricMigrations.Sqlite.Parse do
   end
 
   defp ast_from_ordered_migrations(migrations, namespace) do
-    with :ok <- check_for_namespaces(migrations),
+    with :ok <- validate_migration_bodies(migrations),
          conn = Introspect.open_in_memory!(),
          :ok <- apply_migrations(conn, migrations) do
       {validation_fails, ast} =

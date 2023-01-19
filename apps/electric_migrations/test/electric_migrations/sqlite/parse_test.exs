@@ -95,16 +95,12 @@ defmodule ElectricMigrations.Sqlite.ParseTest do
       )STRICT, WITHOUT ROWID;
       """
 
-      {:error, message} =
+      {:error, errors} =
         Parse.sql_ast_from_migrations([
           %{name: "test1", original_body: sql_in}
         ])
 
-      expected = [
-        "The table main.fish has a database name. Please leave this out and only give the table name."
-      ]
-
-      assert message == expected
+      assert "In migration test1: The table main.fish has a database name. Please leave this out and only give the table name." in errors
     end
 
     test "doesn't allow any namespaces" do
@@ -115,16 +111,12 @@ defmodule ElectricMigrations.Sqlite.ParseTest do
       )STRICT, WITHOUT ROWID;
       """
 
-      {:error, message} =
+      {:error, errors} =
         Parse.sql_ast_from_migrations([
           %{name: "test1", original_body: sql_in}
         ])
 
-      expected = [
-        "The table apple.fish has a database name. Please leave this out and only give the table name."
-      ]
-
-      assert message == expected
+      assert "In migration test1: The table apple.fish has a database name. Please leave this out and only give the table name." in errors
     end
 
     test "doesn't allow uppercase in column names" do
@@ -538,6 +530,30 @@ defmodule ElectricMigrations.Sqlite.ParseTest do
       {:error, reasons} = Parse.sql_ast_from_migrations([migration])
 
       assert ~s|Can't create index "indexed_values" on table "fish": explicit indices are not currently supported| in reasons
+    end
+
+    @tag present_because:
+           "Only backwards-compatible migrations (CREATE TABLE and ADD COLUMN) are supported for now"
+    test "fails when non-ADD COLUMN alter statements are present" do
+      sql_in = """
+      CREATE TABLE IF NOT EXISTS fish (
+        id INTEGER PRIMARY KEY,
+        value TEXT
+      ) STRICT, WITHOUT ROWID;
+      ALTER TABLE fish ADD COLUMN test TEXT;
+      ALTER TABLE fish RENAME COLUMN test TO test2;
+      ALTER TABLE fish DROP COLUMN test2;
+      ALTER TABLE fish RENAME TO fish2;
+      """
+
+      migration = %{name: "test1", original_body: sql_in}
+      {:error, reasons} = Parse.sql_ast_from_migrations([migration])
+
+      assert "In migration test1: Altering table fish to RENAME COLUMN is considered a non-backwards compatible migration. Only backwards-compatible migrations (CREATE TABLE and ADD COLUMN) are supported for now" in reasons
+
+      assert "In migration test1: Altering table fish to DROP COLUMN is considered a non-backwards compatible migration. Only backwards-compatible migrations (CREATE TABLE and ADD COLUMN) are supported for now" in reasons
+
+      assert "In migration test1: Altering table fish to RENAME TO is considered a non-backwards compatible migration. Only backwards-compatible migrations (CREATE TABLE and ADD COLUMN) are supported for now" in reasons
     end
   end
 end
