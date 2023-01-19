@@ -989,7 +989,7 @@ defmodule ElectricCli.MigrationsTest do
 
       assert [msg2, msg3] == [
                "The table dogs is not WITHOUT ROWID.",
-               "The primary key value in table dogs isn't NOT NULL. Please add NOT NULL to this column."
+               "The primary key value in table dogs must be NOT NULL. Please add NOT NULL to this column."
              ]
     end
 

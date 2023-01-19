@@ -5,6 +5,8 @@ defmodule ElectricMigrations.Sqlite.ParseTest do
   alias ElectricMigrations.Ast.ForeignKeyInfo
   alias ElectricMigrations.Ast.FullTableInfo
   alias ElectricMigrations.Ast.TableInfo
+  alias ElectricMigrations.Ast.IndexInfo
+  alias ElectricMigrations.Ast.IndexColumn
 
   describe "namespaced_table_names/2" do
     test "finds all tables in SQL which include a database name" do
@@ -79,7 +81,7 @@ defmodule ElectricMigrations.Sqlite.ParseTest do
 
       expected = [
         "The table fish is not WITHOUT ROWID.",
-        "The primary key value in table fish isn't NOT NULL. Please add NOT NULL to this column."
+        "The primary key value in table fish must be NOT NULL. Please add NOT NULL to this column."
       ]
 
       assert message == expected
@@ -195,6 +197,31 @@ defmodule ElectricMigrations.Sqlite.ParseTest do
               unique: false
             }
           },
+          indices: [
+            %IndexInfo{
+              seq: 0,
+              name: "sqlite_autoindex_parent_1",
+              unique?: true,
+              origin: :primary_key,
+              partial?: false,
+              columns: [
+                %IndexColumn{
+                  rank: 0,
+                  column_name: "id",
+                  direction: :asc,
+                  collating_sequence: "BINARY",
+                  key?: true
+                },
+                %IndexColumn{
+                  rank: 1,
+                  column_name: "value",
+                  direction: :asc,
+                  collating_sequence: "BINARY",
+                  key?: false
+                }
+              ]
+            }
+          ],
           foreign_keys_info: [],
           table_info: %TableInfo{
             name: "parent",
@@ -213,6 +240,31 @@ defmodule ElectricMigrations.Sqlite.ParseTest do
           primary: ["id"],
           foreign_keys: [
             %{child_key: "daddy", parent_key: "id", table: "main.parent"}
+          ],
+          indices: [
+            %IndexInfo{
+              seq: 0,
+              name: "sqlite_autoindex_child_1",
+              unique?: true,
+              origin: :primary_key,
+              partial?: false,
+              columns: [
+                %IndexColumn{
+                  rank: 0,
+                  column_name: "id",
+                  direction: :asc,
+                  collating_sequence: "BINARY",
+                  key?: true
+                },
+                %IndexColumn{
+                  rank: 1,
+                  column_name: "daddy",
+                  direction: :asc,
+                  collating_sequence: "BINARY",
+                  key?: false
+                }
+              ]
+            }
           ],
           columns: ["id", "daddy"],
           column_infos: %{
@@ -327,7 +379,85 @@ defmodule ElectricMigrations.Sqlite.ParseTest do
             tbl_name: "parent",
             type: "table"
           },
-          table_name: "parent"
+          table_name: "parent",
+          indices: [
+            %IndexInfo{
+              seq: 0,
+              name: "test",
+              unique?: false,
+              origin: :create_index,
+              partial?: false,
+              columns: [
+                %IndexColumn{
+                  rank: 0,
+                  column_name: "value",
+                  direction: :asc,
+                  collating_sequence: "BINARY",
+                  key?: true
+                },
+                %IndexColumn{
+                  rank: 1,
+                  column_name: "id",
+                  direction: :desc,
+                  collating_sequence: "BINARY",
+                  key?: false
+                }
+              ]
+            },
+            %IndexInfo{
+              seq: 1,
+              name: "sqlite_autoindex_parent_2",
+              unique?: true,
+              origin: :unique_constraint,
+              partial?: false,
+              columns: [
+                %IndexColumn{
+                  rank: 0,
+                  column_name: "email",
+                  direction: :asc,
+                  collating_sequence: "BINARY",
+                  key?: true
+                },
+                %IndexColumn{
+                  rank: 1,
+                  column_name: "id",
+                  direction: :asc,
+                  collating_sequence: "BINARY",
+                  key?: false
+                }
+              ]
+            },
+            %IndexInfo{
+              seq: 2,
+              name: "sqlite_autoindex_parent_1",
+              unique?: true,
+              origin: :primary_key,
+              partial?: false,
+              columns: [
+                %IndexColumn{
+                  rank: 0,
+                  column_name: "id",
+                  direction: :desc,
+                  collating_sequence: "BINARY",
+                  key?: true
+                },
+                %IndexColumn{
+                  rank: 1,
+                  column_name: "value",
+                  direction: :asc,
+                  collating_sequence: "BINARY",
+                  key?: false
+                },
+                %IndexColumn{
+                  rank: 2,
+                  column_name: "email",
+                  direction: :asc,
+                  collating_sequence: "BINARY",
+                  key?: false
+                }
+              ]
+            }
+          ]
         }
       }
 

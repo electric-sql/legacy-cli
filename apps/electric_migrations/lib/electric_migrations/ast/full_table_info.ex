@@ -8,27 +8,21 @@ defmodule ElectricMigrations.Ast.FullTableInfo do
   @enforce_keys [
     :table_name,
     :table_info,
-    :namespace,
-    :columns,
-    :column_infos,
-    :primary,
-    :foreign_keys,
-    :foreign_keys_info,
-    :validation_fails,
-    :warning_messages
+    :namespace
   ]
 
   defstruct [
     :table_name,
     :table_info,
     :namespace,
-    :columns,
-    :column_infos,
-    :primary,
-    :foreign_keys,
-    :foreign_keys_info,
-    :validation_fails,
-    :warning_messages
+    columns: [],
+    indices: [],
+    column_infos: [],
+    primary: [],
+    foreign_keys: [],
+    foreign_keys_info: [],
+    validation_fails: [],
+    warning_messages: []
   ]
 
   @type fk() :: %{
