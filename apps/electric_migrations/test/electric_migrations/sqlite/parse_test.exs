@@ -315,6 +315,7 @@ defmodule ElectricMigrations.Sqlite.ParseTest do
       assert info == expected_info
     end
 
+    @tag skip: "FIXME: UNIQUE constraints are currently not supported outside of primary keys"
     test "extracts uniqueness info" do
       sql_in = """
       CREATE TABLE IF NOT EXISTS parent (
@@ -438,6 +439,22 @@ defmodule ElectricMigrations.Sqlite.ParseTest do
       }
 
       assert info == expected_info
+    end
+
+    @tag present_because:
+           "FIXME: UNIQUE constraints are currently not supported outside of primary keys"
+    test "fails on unique constraint columns" do
+      sql_in = """
+      CREATE TABLE IF NOT EXISTS fish (
+        id1 TEXT PRIMARY KEY NOT NULL,
+        id2 TEXT UNIQUE
+      ) WITHOUT ROWID;
+      """
+
+      migration = %{name: "test1", original_body: sql_in}
+      {:error, errors} = Parse.sql_ast_from_migrations([migration])
+
+      assert ~s|Column "id2" in table "fish" cannot have a UNIQUE constraint. UNIQUE constraints are currently not supported outside of primary keys.| in errors
     end
 
     @tag skip: "FIXME: composite primary keys are not currently supported, see next test"

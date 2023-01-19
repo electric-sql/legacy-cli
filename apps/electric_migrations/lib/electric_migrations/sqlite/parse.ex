@@ -143,6 +143,10 @@ defmodule ElectricMigrations.Sqlite.Parse do
       String.downcase(col.name) != col.name,
       "The name of column #{col.name} in table #{info.table_name} is not allowed. Please only use lowercase for column names."
     )
+    |> add_if(
+      col.unique,
+      ~s|Column "#{col.name}" in table "#{info.table_name}" cannot have a UNIQUE constraint. UNIQUE constraints are currently not supported outside of primary keys.|
+    )
   end
 
   defp add_foreign_keys(%Ast.FullTableInfo{} = info, conn) do

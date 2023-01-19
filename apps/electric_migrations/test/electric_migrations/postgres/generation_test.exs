@@ -174,6 +174,7 @@ defmodule ElectricMigrations.Postgres.GenerationTest do
     assert expected == postgres_version
   end
 
+  @tag skip: "FIXME: UNIQUE constraints are currently not supported outside of primary keys"
   test "handling of unique keys" do
     sql_in = """
     CREATE TABLE IF NOT EXISTS parent (
@@ -228,7 +229,7 @@ defmodule ElectricMigrations.Postgres.GenerationTest do
     sql_in = """
     CREATE TABLE IF NOT EXISTS parent (
       id INTEGER PRIMARY KEY DESC,
-      value TEXT UNIQUE
+      value TEXT
     ) STRICT, WITHOUT ROWID;
 
     """
@@ -241,7 +242,7 @@ defmodule ElectricMigrations.Postgres.GenerationTest do
 
     CREATE TABLE public.parent (
       id bigint PRIMARY KEY DESC,
-      value text UNIQUE);
+      value text);
     ALTER TABLE public.parent REPLICA IDENTITY FULL;
     """
 
