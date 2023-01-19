@@ -16,7 +16,7 @@ defmodule ElectricCli.Commands.Apps do
   def spec do
     [
       name: "apps",
-      about: "Manage applications",
+      about: "Manage backend applications.",
       subcommands: [
         # create: [
         #   name: "create",

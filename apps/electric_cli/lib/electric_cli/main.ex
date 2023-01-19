@@ -37,7 +37,7 @@ defmodule ElectricCli.Main do
         verbose: [
           long: "--verbose",
           short: "-v",
-          help: "Output more information about the CLI actions",
+          help: "Output more information about the CLI actions.",
           required: false,
           global: true
         ]

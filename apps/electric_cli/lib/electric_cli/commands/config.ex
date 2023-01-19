@@ -20,7 +20,9 @@ defmodule ElectricCli.Commands.Config do
 
   def about do
     """
-    Update the local application configuration stored in your `electric.json` file.
+    Manage local application configuration.
+
+    Updates the local application configuration stored in your `electric.json` file.
     """
   end
 
@@ -32,7 +34,7 @@ defmodule ElectricCli.Commands.Config do
         update: [
           name: "update",
           about: """
-          Update your application configuration.
+          Update your configuration.
 
           Supports updating your `app`, `defaultEnv`, `migrationsDir`, `outputDir`
           and `debug` mode, and the replication `host`, `port` and `ssl` mode of
@@ -57,7 +59,7 @@ defmodule ElectricCli.Commands.Config do
           Add a new environment to your configuration.
 
           You can optionally specify the replication `host`, `port` and `ssl` mode
-          and add the `--set-default` flag to change your default env to this one.
+          and add the `--set-as-default` flag to change your default env to this one.
           """,
           args: [
             env: [
@@ -73,7 +75,7 @@ defmodule ElectricCli.Commands.Config do
             merge_flags(
               [
                 default: [
-                  long: "--set-default",
+                  long: "--set-as-default",
                   help: "Set this new env to be the default.",
                   required: false
                 ]
@@ -88,7 +90,7 @@ defmodule ElectricCli.Commands.Config do
           Update the configuration of an environment.
 
           You can specify the replication `host`, `port` and `ssl` mode and add the
-          `--set-default` flag to set the env as your default env.
+          `--set-as-default` flag to set the env as your default env.
           """,
           args: [
             env: [
@@ -102,7 +104,7 @@ defmodule ElectricCli.Commands.Config do
             merge_flags(
               [
                 default: [
-                  long: "--set-default",
+                  long: "--set-as-default",
                   help: "Set this new env to be the default.",
                   required: false
                 ]

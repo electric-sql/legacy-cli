@@ -10,7 +10,7 @@ defmodule ElectricCli.Commands.Migrations do
   def spec do
     [
       name: "migrations",
-      about: "Manage database schema migrations",
+      about: "Manage DDL schema migrations.",
       subcommands: [
         new: [
           name: "new",

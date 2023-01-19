@@ -8,7 +8,7 @@ defmodule ElectricCli.Commands.Accounts do
   def spec do
     [
       name: "accounts",
-      about: "Manage accounts",
+      about: "Manage accounts.",
       subcommands: [
         list: [
           name: "list",

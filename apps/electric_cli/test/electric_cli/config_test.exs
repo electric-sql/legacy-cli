@@ -253,7 +253,7 @@ defmodule ElectricCli.Commands.ConfigTest do
     test "shows help text if --help passed", cxt do
       args = argv(cxt, ["--help"])
       assert {:ok, output} = ElectricCli.Main.run(args)
-      assert output =~ ~r/Update your application configuration/
+      assert output =~ ~r/Update your configuration/
     end
 
     test "returns error if run before electric init in this root", cxt do
@@ -561,7 +561,7 @@ defmodule ElectricCli.Commands.ConfigTest do
 
   defp set_staging_default do
     capture_io(fn ->
-      assert {:ok, _} = ElectricCli.Main.run(~w|config update_env staging --set-default|)
+      assert {:ok, _} = ElectricCli.Main.run(~w|config update_env staging --set-as-default|)
     end)
   end
 
