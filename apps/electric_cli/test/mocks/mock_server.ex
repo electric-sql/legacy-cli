@@ -2,7 +2,7 @@ defmodule ElectricCli.MockServer do
   use Plug.Router
 
   def spec do
-    {Plug.Cowboy, scheme: :http, plug: ElectricCli.MockServer, options: [port: 4003]}
+    {Plug.Cowboy, scheme: :http, plug: ElectricCli.MockServer, options: [port: 4005]}
   end
 
   plug(Plug.Parsers,

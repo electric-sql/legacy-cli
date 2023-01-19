@@ -1,12 +1,12 @@
 defmodule ElectricCli.Commands.ConfigTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   import ExUnit.CaptureIO
 
   @moduletag :tmp_dir
 
   setup %{tmp_dir: dir} = context do
-    {:ok, _pid} = start_supervised(ElectricCli.MockServer.spec())
+    start_link_supervised!(ElectricCli.MockServer.spec())
     System.put_env("ELECTRIC_STATE_HOME", Path.join(dir, ".electric_credentials"))
     on_exit(fn -> System.delete_env("ELECTRIC_STATE_HOME") end)
 

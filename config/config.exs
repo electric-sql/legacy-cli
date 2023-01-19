@@ -3,7 +3,7 @@ import Config
 default_console_url =
   case config_env() do
     :prod -> "https://console.electric-sql.com"
-    :test -> "http://localhost:4003"
+    :test -> "http://localhost:4005"
     :dev -> "http://localhost:4000"
   end
 

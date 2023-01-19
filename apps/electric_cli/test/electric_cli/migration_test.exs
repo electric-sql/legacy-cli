@@ -607,7 +607,7 @@ defmodule ElectricCli.MigrationsTest do
 
   describe "api tests" do
     setup do
-      {:ok, _pid} = start_supervised(ElectricCli.MockServer.spec())
+      start_link_supervised!(ElectricCli.MockServer.spec())
       :ok
     end
 

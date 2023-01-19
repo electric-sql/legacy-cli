@@ -2,7 +2,7 @@ defmodule ElectricCli.ElectricCli.SyncTest do
   use ExUnit.Case, async: false
 
   setup do
-    {:ok, _pid} = start_supervised(ElectricCli.MockServer.spec())
+    start_link_supervised!(ElectricCli.MockServer.spec())
 
     :ok
   end
