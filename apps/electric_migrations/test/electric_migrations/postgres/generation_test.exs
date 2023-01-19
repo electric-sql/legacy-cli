@@ -225,7 +225,7 @@ defmodule ElectricMigrations.Postgres.GenerationTest do
     assert expected == postgres_version
   end
 
-  test "handling of ordering on primary keys" do
+  test "handling of ordering on primary keys: should be ignored" do
     sql_in = """
     CREATE TABLE IF NOT EXISTS parent (
       id INTEGER PRIMARY KEY DESC,
@@ -241,7 +241,7 @@ defmodule ElectricMigrations.Postgres.GenerationTest do
     expected = """
 
     CREATE TABLE public.parent (
-      id bigint PRIMARY KEY DESC,
+      id bigint PRIMARY KEY,
       value text);
     ALTER TABLE public.parent REPLICA IDENTITY FULL;
     """

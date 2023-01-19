@@ -171,14 +171,12 @@ defmodule ElectricMigrations.Postgres.Generation do
 
     col_type = type_lookup[String.downcase(column_info.type)]
 
-    sorting = if column_info.pk_desc, do: " DESC", else: ""
-
     elements =
       []
       |> prepend_if(column_info.dflt_value != nil, "DEFAULT #{column_info.dflt_value}")
       |> prepend_if(column_info.unique, "UNIQUE")
       |> prepend_if(column_info.notnull && column_info.pk == 0, "NOT NULL")
-      |> prepend_if(column_info.pk != 0, "PRIMARY KEY#{sorting}")
+      |> prepend_if(column_info.pk != 0, "PRIMARY KEY")
 
     elements = [col_type | elements]
     elements = [column_info.name | elements]
