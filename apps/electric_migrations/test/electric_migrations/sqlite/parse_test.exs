@@ -322,7 +322,6 @@ defmodule ElectricMigrations.Sqlite.ParseTest do
         value TEXT,
         email TEXT UNIQUE
       ) STRICT, WITHOUT ROWID;
-      CREATE INDEX test ON parent (value);
       """
 
       {:ok, info, _} =
@@ -383,29 +382,6 @@ defmodule ElectricMigrations.Sqlite.ParseTest do
           indices: [
             %IndexInfo{
               seq: 0,
-              name: "test",
-              unique?: false,
-              origin: :create_index,
-              partial?: false,
-              columns: [
-                %IndexColumn{
-                  rank: 0,
-                  column_name: "value",
-                  direction: :asc,
-                  collating_sequence: "BINARY",
-                  key?: true
-                },
-                %IndexColumn{
-                  rank: 1,
-                  column_name: "id",
-                  direction: :desc,
-                  collating_sequence: "BINARY",
-                  key?: false
-                }
-              ]
-            },
-            %IndexInfo{
-              seq: 1,
               name: "sqlite_autoindex_parent_2",
               unique?: true,
               origin: :unique_constraint,
@@ -428,7 +404,7 @@ defmodule ElectricMigrations.Sqlite.ParseTest do
               ]
             },
             %IndexInfo{
-              seq: 2,
+              seq: 1,
               name: "sqlite_autoindex_parent_1",
               unique?: true,
               origin: :primary_key,
@@ -462,6 +438,89 @@ defmodule ElectricMigrations.Sqlite.ParseTest do
       }
 
       assert info == expected_info
+    end
+
+    @tag skip: "FIXME: composite primary keys are not currently supported, see next test"
+    test "supports composite primary keys" do
+      sql_in = """
+      CREATE TABLE IF NOT EXISTS fish (
+        id1 TEXT NOT NULL,
+        id2 TEXT NOT NULL,
+        PRIMARY KEY (id1, id2)
+      ) WITHOUT ROWID;
+      """
+
+      migration = %{name: "test1", original_body: sql_in}
+      {:ok, ast, nil} = Parse.sql_ast_from_migrations([migration])
+
+      assert %{0 => %{pk: 1}, 1 => %{pk: 2}} = ast["main.fish"].column_infos
+      assert ["id1", "id2"] == ast["main.fish"].primary
+    end
+
+    @tag skip: "FIXME: composite primary keys are not currently supported, see next test"
+    test "all parts of a composite primary key should be non-nullable" do
+      sql_in = """
+      CREATE TABLE IF NOT EXISTS fish (
+        id1 TEXT NOT NULL,
+        id2 TEXT,
+        PRIMARY KEY (id1, id2)
+      ) WITHOUT ROWID;
+      """
+
+      migration = %{name: "test1", original_body: sql_in}
+      {:error, errors} = Parse.sql_ast_from_migrations([migration])
+
+      assert "The primary key value in table fish must be NOT NULL. Please add NOT NULL to this column." in errors
+    end
+
+    @tag present_because:
+           "FIXME: composite primary keys are not currently supported, see next test"
+    test "fails when composite primary key is present" do
+      sql_in = """
+      CREATE TABLE IF NOT EXISTS fish (
+        id1 TEXT NOT NULL,
+        id2 TEXT NOT NULL,
+        PRIMARY KEY (id1, id2)
+      ) WITHOUT ROWID;
+      """
+
+      migration = %{name: "test1", original_body: sql_in}
+      {:error, reasons} = Parse.sql_ast_from_migrations([migration])
+
+      assert ~s|Table "fish": composite primary keys are not currently supported| in reasons
+    end
+
+    # This test actually passes if validation is removed, but since PG generation has to be support this as well, we have the validation
+    @tag skip: "WIP: explicit indices are not currently supported"
+    test "extra indices are allowed" do
+      sql_in = """
+      CREATE TABLE IF NOT EXISTS fish (
+        id INTEGER PRIMARY KEY,
+        value TEXT
+      ) STRICT, WITHOUT ROWID;
+      CREATE INDEX indexed_values ON fish (value);
+      """
+
+      migration = %{name: "test1", original_body: sql_in}
+      {:ok, ast, nil} = Parse.sql_ast_from_migrations([migration])
+
+      assert [%{name: "indexed_values", origin: :create_index}, _] = ast["main.fish"].indices
+    end
+
+    @tag present_because: "WIP: explicit indices are not currently supported"
+    test "fails when extra explicit indices are present" do
+      sql_in = """
+      CREATE TABLE IF NOT EXISTS fish (
+        id INTEGER PRIMARY KEY,
+        value TEXT
+      ) STRICT, WITHOUT ROWID;
+      CREATE INDEX indexed_values ON fish (value);
+      """
+
+      migration = %{name: "test1", original_body: sql_in}
+      {:error, reasons} = Parse.sql_ast_from_migrations([migration])
+
+      assert ~s|Can't create index "indexed_values" on table "fish": explicit indices are not currently supported| in reasons
     end
   end
 end

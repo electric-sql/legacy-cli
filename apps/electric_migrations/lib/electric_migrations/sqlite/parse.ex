@@ -86,6 +86,7 @@ defmodule ElectricMigrations.Sqlite.Parse do
         |> Stream.map(&add_foreign_keys(&1, conn))
         |> Stream.map(&validate_sql_body/1)
         |> Stream.map(&get_and_validate_columns(&1, conn))
+        |> Stream.map(&validate_indices/1)
         |> Enum.flat_map_reduce(%{}, fn %Ast.FullTableInfo{} = info, ast ->
           {info.validation_fails, Map.put(ast, "#{namespace}.#{info.table_name}", info)}
         end)
@@ -130,10 +131,13 @@ defmodule ElectricMigrations.Sqlite.Parse do
       String.downcase(col.type) not in @allowed_sql_types,
       "The type #{col.type} for column #{col.name} in table #{info.table_name} is not allowed. Please use one of INTEGER, REAL, TEXT, BLOB"
     )
-    # FIXME: `pk == 1` assumes that only one PK is ever going to be present
     |> add_if(
-      col.pk == 1 and not col.notnull,
+      col.pk > 0 and not col.notnull,
       "The primary key #{col.name} in table #{info.table_name} must be NOT NULL. Please add NOT NULL to this column."
+    )
+    |> add_if(
+      col.pk > 1,
+      ~s|Table "#{info.table_name}": composite primary keys are not currently supported|
     )
     |> add_if(
       String.downcase(col.name) != col.name,
@@ -173,6 +177,19 @@ defmodule ElectricMigrations.Sqlite.Parse do
 
   defp add_indices(%Ast.FullTableInfo{} = info, conn) do
     %{info | indices: Enum.to_list(Introspect.stream_all_indices(conn, info.table_name))}
+  end
+
+  defp validate_indices(%Ast.FullTableInfo{indices: indices} = info) do
+    errors =
+      Enum.reduce(indices, [], fn %Ast.IndexInfo{} = index, errors ->
+        errors
+        |> add_if(
+          index.origin == :create_index,
+          ~s|Can't create index "#{index.name}" on table "#{info.table_name}": explicit indices are not currently supported|
+        )
+      end)
+
+    Map.update!(info, :validation_fails, &(&1 ++ errors))
   end
 
   defp is_unique(column_name, indexes) do

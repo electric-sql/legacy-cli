@@ -198,7 +198,7 @@ defmodule ElectricMigrations.Postgres.GenerationTest do
     assert expected == postgres_version
   end
 
-  @tag skip: "FIXME: explicit indices are not handled at all"
+  @tag skip: "FIXME: explicit indices are not currently supported"
   test "handling of explicit indices" do
     sql_in = """
     CREATE TABLE IF NOT EXISTS parent (
@@ -243,6 +243,32 @@ defmodule ElectricMigrations.Postgres.GenerationTest do
       id bigint PRIMARY KEY DESC,
       value text UNIQUE);
     ALTER TABLE public.parent REPLICA IDENTITY FULL;
+    """
+
+    assert expected == postgres_version
+  end
+
+  @tag skip: "FIXME: composite primary keys are not currently supported"
+  test "handling of composite primary keys" do
+    sql = """
+    CREATE TABLE IF NOT EXISTS fish (
+      id1 TEXT NOT NULL,
+      id2 TEXT NOT NULL,
+      PRIMARY KEY (id1, id2)
+    ) WITHOUT ROWID;
+    """
+
+    migration = %{name: "test1", original_body: sql}
+
+    {:ok, postgres_version, _} = Generation.postgres_sql_for_last_migration([migration])
+
+    expected = """
+
+    CREATE TABLE public.fish (
+      id1 text,
+      id2 text,
+      PRIMARY KEY (id1, id2));
+    ALTER TABLE public.fish REPLICA IDENTITY FULL;
     """
 
     assert expected == postgres_version
