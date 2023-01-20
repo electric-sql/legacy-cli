@@ -143,7 +143,7 @@ defmodule ElectricCli.Session do
        [
          "Did you run ",
          IO.ANSI.yellow(),
-         "electric auth login <email>",
+         "electric auth login EMAIL",
          IO.ANSI.reset(),
          " on this machine?"
        ]}

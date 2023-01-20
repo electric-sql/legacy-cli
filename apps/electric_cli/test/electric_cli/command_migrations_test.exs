@@ -8,8 +8,13 @@ defmodule ElectricCli.Command.MigrationsTest do
 
   setup %{tmp_dir: tmp_dir} do
     start_link_supervised!(ElectricCli.MockServer.spec())
+
     System.put_env("ELECTRIC_STATE_HOME", Path.join(tmp_dir, ".electric_credentials"))
-    on_exit(fn -> System.delete_env("ELECTRIC_STATE_HOME") end)
+
+    on_exit(fn ->
+      File.rm_rf!(dir)
+      System.delete_env("ELECTRIC_STATE_HOME")
+    end)
 
     capture_io(fn ->
       assert {:ok, _} =

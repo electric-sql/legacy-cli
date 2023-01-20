@@ -142,7 +142,20 @@ defmodule ElectricCli.Commands.Apps do
 
       case result do
         {:ok, %Req.Response{status: 200, body: %{"data" => data}}} ->
-          {:result, data}
+          rows =
+            Enum.flat_map(
+              [data],
+              &Enum.map(&1["databases"], fn db ->
+                [
+                  &1["id"],
+                  &1["name"],
+                  db["slug"],
+                  colorize_status(db["status"]) |> IO.iodata_to_binary()
+                ]
+              end)
+            )
+
+          {:results, rows, ["ID", "Name", "Environment", "Status"]}
 
         {:ok, %Req.Response{}} ->
           {:error, "invalid credentials"}

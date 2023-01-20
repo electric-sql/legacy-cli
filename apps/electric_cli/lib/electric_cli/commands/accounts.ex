@@ -32,10 +32,11 @@ defmodule ElectricCli.Commands.Accounts do
 
       case result do
         {:ok, %Req.Response{status: 200, body: %{"data" => data}}} ->
-          {:result,
-           data
-           |> Enum.map(&[IO.ANSI.green(), "* ", IO.ANSI.reset(), &1["name"]])
-           |> Enum.join("\n")}
+          rows =
+            data
+            |> Enum.map(fn %{"name" => name, "slug" => slug} -> [slug, name] end)
+
+          {:results, rows, ["ID", "Name"]}
 
         {:ok, %Req.Response{status: 403}} ->
           {:error, "invalid credentials"}

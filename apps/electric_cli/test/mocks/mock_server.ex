@@ -1,5 +1,6 @@
 defmodule ElectricCli.MockServer do
   use Plug.Router
+  alias Plug.Conn
 
   def spec do
     {Plug.Cowboy, scheme: :http, plug: ElectricCli.MockServer, options: [port: 4005]}
@@ -106,43 +107,85 @@ defmodule ElectricCli.MockServer do
     @migration_fixtures[migration_name]
   end
 
-  get "api/v1/apps" do
-    default_env = %{
-      name: "Default",
-      slug: "default",
-      status: "provisioned",
-      type: "postgres"
-    }
+  defp authenticated(conn) do
+    case Enum.find(conn.req_headers, fn {k, _v} -> k == "authorization" end) do
+      {"authorization", "Bearer " <> _token} ->
+        {:ok, conn}
 
-    staging_env = %{
-      name: "Staging",
-      slug: "staging",
-      status: "provisioned",
-      type: "postgres"
-    }
-
-    app_list = %{
-      data: [
-        %{id: "test", name: "test", slug: "test", databases: [default_env]},
-        %{id: "test2", name: "test2", slug: "test2", databases: [default_env]},
-        %{id: "app-name-2", name: "app-name-2", slug: "app-name-2", databases: [default_env]},
-        %{
-          id: "cranberry-soup-1337",
-          name: "app-name-2",
-          slug: "app-name-2",
-          databases: [default_env, staging_env]
-        },
-        %{
-          id: "french-onion-1234",
-          name: "french-onion-1234",
-          slug: "french-onion-1234",
-          databases: [default_env]
+      _alt ->
+        data = %{
+          error: %{
+            details: "unauthenticated"
+          }
         }
-      ]
-    }
 
-    Plug.Conn.resp(conn, 200, Jason.encode!(app_list))
-    |> Plug.Conn.put_resp_header("Content-Type", "application/json")
+        conn
+        |> json(401, data)
+        |> Conn.send_resp()
+    end
+  end
+
+  defp json(conn, status, data) when is_integer(status) do
+    json_str = Jason.encode!(data)
+
+    conn
+    |> Conn.resp(status, json_str)
+    |> Conn.put_resp_header("Content-Type", "application/json")
+  end
+
+  get "api/v1/accounts" do
+    with {:ok, conn} <- authenticated(conn) do
+      accounts_list = %{
+        data: [
+          %{id: "277f2cae-98e2-11ed-aa13-1778becde5cf", name: "Personal", slug: "personal"},
+          %{id: "2ef337c8-98e2-11ed-bd07-f378edb7fd12", name: "Work", slug: "work"}
+        ]
+      }
+
+      conn
+      |> json(200, accounts_list)
+    end
+  end
+
+  get "api/v1/apps" do
+    with {:ok, conn} <- authenticated(conn) do
+      default_env = %{
+        name: "Default",
+        slug: "default",
+        status: "provisioned",
+        type: "postgres"
+      }
+
+      staging_env = %{
+        name: "Staging",
+        slug: "staging",
+        status: "provisioned",
+        type: "postgres"
+      }
+
+      apps_list = %{
+        data: [
+          %{id: "test", name: "test", slug: "test", databases: [default_env]},
+          %{id: "test2", name: "test2", slug: "test2", databases: [default_env]},
+          %{id: "app-name-2", name: "app-name-2", slug: "app-name-2", databases: [default_env]},
+          %{
+            id: "cranberry-soup-1337",
+            name: "app-name-2",
+            slug: "app-name-2",
+            databases: [default_env, staging_env]
+          },
+          %{
+            id: "french-onion-1234",
+            name: "french-onion-1234",
+            slug: "french-onion-1234",
+            databases: [default_env]
+          }
+        ]
+      }
+
+      conn
+      |> json(200, apps_list)
+    end
   end
 
   post "api/v1/auth/login" do
@@ -156,58 +199,51 @@ defmodule ElectricCli.MockServer do
         }
 
         conn
-        |> Plug.Conn.resp(200, Jason.encode!(%{data: data}))
-        |> Plug.Conn.put_resp_header("Content-Type", "application/json")
-        |> Plug.Conn.send_resp()
+        |> json(200, %{data: data})
 
       _ ->
         conn
-        |> Plug.Conn.resp(401, Jason.encode!(%{error: %{details: "no account with this email"}}))
-        |> Plug.Conn.put_resp_header("Content-Type", "application/json")
-        |> Plug.Conn.send_resp()
+        |> json(401, %{error: %{details: "no account with this email"}})
     end
   end
 
   get "api/v1/apps/:app/environments/:env/migrations" do
-    server_manifest = %{
+    data = %{
       "migrations" => get_some_migrations(app)
     }
 
-    Plug.Conn.resp(conn, 200, Jason.encode!(server_manifest))
-    |> Plug.Conn.put_resp_header("Content-Type", "application/json")
-    |> Plug.Conn.send_resp()
+    conn
+    |> json(200, data)
   end
 
   get "api/v1/apps/:app/environments/:env/migrations/:migration_name" do
-    server_manifest = %{
+    data = %{
       "migration" => get_a_migration(migration_name)
     }
 
-    Plug.Conn.resp(conn, 200, Jason.encode!(server_manifest))
-    |> Plug.Conn.put_resp_header("Content-Type", "application/json")
-    |> Plug.Conn.send_resp()
+    conn
+    |> json(200, data)
   end
 
   post "api/v1/apps/status-422/environments/:env/migrations" do
-    Plug.Conn.resp(
-      conn,
-      422,
-      Jason.encode!(%{errors: %{original_body: ["The table items is not STRICT."]}})
-    )
-    |> Plug.Conn.put_resp_header("Content-Type", "application/json")
-    |> Plug.Conn.send_resp()
+    data = %{
+      errors: %{
+        original_body: ["The table items is not STRICT."]
+      }
+    }
+
+    conn
+    |> json(422, data)
   end
 
   post "api/v1/apps/:app/environments/:env/migrations" do
-    Plug.Conn.resp(conn, 201, "\"ok\"")
-    |> Plug.Conn.put_resp_header("Content-Type", "application/json")
-    |> Plug.Conn.send_resp()
+    conn
+    |> json(201, "\"ok\"")
   end
 
   post "api/v1/apps/:app/environments/:env/migrate" do
-    Plug.Conn.resp(conn, 200, "\"ok\"")
-    |> Plug.Conn.put_resp_header("Content-Type", "application/json")
-    |> Plug.Conn.send_resp()
+    conn
+    |> json(200, "\"ok\"")
   end
 
   @authenticated_apps ["tarragon-envy-1337", "french-onion-1234"]
@@ -215,16 +251,9 @@ defmodule ElectricCli.MockServer do
   get "api/v1/apps/:app" do
     case conn.params["app"] do
       app when app in @authenticated_apps ->
-        case Enum.find(conn.req_headers, fn {k, _v} -> k == "authorization" end) do
-          {"authorization", "Bearer " <> _token} ->
-            conn
-            |> get_app(app)
-
-          alt ->
-            conn
-            |> Plug.Conn.resp(401, Jason.encode!(%{error: %{details: "unauthenticated"}}))
-            |> Plug.Conn.put_resp_header("Content-Type", "application/json")
-            |> Plug.Conn.send_resp()
+        with {:ok, conn} <- authenticated(conn) do
+          conn
+          |> get_app(app)
         end
 
       app ->
@@ -238,7 +267,10 @@ defmodule ElectricCli.MockServer do
       "data" => %{
         "databases" => [
           %{
-            "slug" => "default"
+            "slug" => "default",
+            "name" => "Default",
+            "status" => "provisioned",
+            "type" => "postgres"
           }
         ],
         "id" => app,
@@ -247,8 +279,7 @@ defmodule ElectricCli.MockServer do
       }
     }
 
-    Plug.Conn.resp(conn, 200, Jason.encode!(app_info))
-    |> Plug.Conn.put_resp_header("Content-Type", "application/json")
-    |> Plug.Conn.send_resp()
+    conn
+    |> json(200, app_info)
   end
 end

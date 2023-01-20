@@ -40,7 +40,8 @@ defmodule ElectricCli.MixProject do
     ]
   end
 
-  defp elixirc_paths(:test), do: ["lib", "test/mocks"]
+  # Specifies which paths to compile per environment.
+  defp elixirc_paths(:test), do: ["lib", "test/mocks", "test/support"]
   defp elixirc_paths(_), do: ["lib"]
 
   # Run "mix help deps" to learn about dependencies.

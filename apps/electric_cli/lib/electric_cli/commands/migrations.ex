@@ -65,7 +65,7 @@ defmodule ElectricCli.Commands.Migrations do
         sync: [
           name: "sync",
           about: """
-          Sync migrations up to the server.
+          Sync migrations with the backend.
 
           This synchronises your local changes up to your ElectricSQL sync service
           and builds a new javascript file at `:output_dir/:app/:env/index.js` that
