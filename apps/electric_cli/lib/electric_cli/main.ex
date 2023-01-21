@@ -11,11 +11,19 @@ defmodule ElectricCli.Main do
     accounts: Commands.Accounts,
     apps: Commands.Apps,
     auth: Commands.Auth,
-    # build: Commands.Build,
+    build: Commands.Build,
     config: Commands.Config,
     init: Commands.Init,
-    migrations: Commands.Migrations
-    # sync: Commands.Config
+    migrations: Commands.Migrations,
+    reset: Commands.Reset,
+    sync: Commands.Sync
+  ]
+
+  @top_level_commands [
+    :build,
+    :init,
+    :reset,
+    :sync
   ]
 
   @project Mix.Project.config()
@@ -133,9 +141,14 @@ defmodule ElectricCli.Main do
   end
 
   defp execute({[], _}), do: Optimus.parse!(spec(), ["--help"], &halt/1)
-  defp execute({[:init], options}), do: apply(Commands.Init, :init, [options])
-  defp execute({[key], _}), do: Optimus.parse!(spec(), ["help", "#{key}"], &halt/1)
   defp execute({[key, command], options}), do: apply(@commands[key], command, [options])
+
+  defp execute({[key], options}) when key in @top_level_commands do
+    @commands[key]
+    |> apply(key, [options])
+  end
+
+  defp execute({[key], _options}), do: Optimus.parse!(spec(), ["help", "#{key}"], &halt/1)
 
   defp map_result({:result, data}) when is_binary(data) do
     {:ok, data}

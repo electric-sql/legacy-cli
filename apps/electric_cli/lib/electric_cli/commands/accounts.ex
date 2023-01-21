@@ -2,7 +2,6 @@ defmodule ElectricCli.Commands.Accounts do
   @moduledoc """
   The `Accounts` command.
   """
-  alias ElectricCli.Session
   use ElectricCli, :command
 
   def spec do

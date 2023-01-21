@@ -2,11 +2,11 @@ defmodule ElectricCli.Commands.Config do
   use ElectricCli, :command
 
   alias ElectricCli.Apps
-  alias ElectricCli.Config
+
   alias ElectricCli.Config.Environment
   alias ElectricCli.Config.Replication
+
   alias ElectricCli.Migrations
-  alias ElectricCli.Validate
 
   @options [
     app: [

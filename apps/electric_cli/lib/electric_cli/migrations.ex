@@ -164,7 +164,7 @@ defmodule ElectricCli.Migrations do
     raise RuntimeError, message: "Not implemented"
   end
 
-  def list_migrations(_options) do
+  def list_migrations(_options, _env) do
     # template = Map.get(options, :template, @satellite_template)
 
     # with {:ok, src_folder} <- check_migrations_folder(options),

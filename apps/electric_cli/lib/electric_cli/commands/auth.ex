@@ -60,14 +60,10 @@ defmodule ElectricCli.Commands.Auth do
   # *** Login ***
 
   def login(%{args: %{email: email}, options: %{password: password}}) do
-    case handle_password(password) do
-      {:ok, password} ->
-        Progress.run("Authenticating", fn ->
-          perform_login(email, password)
-        end)
-
-      _ ->
-        {:error, "failed to read password"}
+    with {:ok, password} <- handle_password(password) do
+      Progress.run("Authenticating", fn ->
+        perform_login(email, password)
+      end)
     end
   end
 

@@ -14,6 +14,7 @@ defmodule ElectricCli.Commands do
       alias ElectricCli.Progress
       alias ElectricCli.Session
       alias ElectricCli.Util
+      alias ElectricCli.Validate
     end
   end
 end

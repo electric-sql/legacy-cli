@@ -9,6 +9,7 @@ defmodule ElectricCli.Commands.CommandFixtures do
 
   @default_app "tarragon-envy-1337"
   @additional_env "staging"
+  @default_migration_name "create foos"
 
   def init(%{} = ctx) when not is_map_key(ctx, :app) do
     ctx
@@ -66,6 +67,42 @@ defmodule ElectricCli.Commands.CommandFixtures do
 
   def logout(%{} = ctx) do
     {{:ok, _}, _} = run_cmd("auth logout")
+
+    ctx
+  end
+
+  def new_migration(%{} = ctx) when not is_map_key(ctx, :migration_name) do
+    ctx
+    |> Map.put(:migration_name, @default_migration_name)
+    |> new_migration()
+  end
+
+  def new_migration(%{migration_name: migration_name, tmp_dir: root} = ctx) do
+    {{:ok, _}, _} = run_cmd(["migrations", "new", migration_name])
+
+    ctx
+  end
+
+  def build(%{} = ctx) when not is_map_key(ctx, :env) do
+    {{:ok, _}, _} = run_cmd("build")
+
+    ctx
+  end
+
+  def build(%{env: env} = ctx) do
+    {{:ok, _}, _} = run_cmd("build --env #{env}")
+
+    ctx
+  end
+
+  def sync(%{} = ctx) when not is_map_key(ctx, :env) do
+    {{:ok, _}, _} = run_cmd("sync")
+
+    ctx
+  end
+
+  def sync(%{env: env} = ctx) do
+    {{:ok, _}, _} = run_cmd("sync --env #{env}")
 
     ctx
   end

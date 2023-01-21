@@ -546,35 +546,4 @@ defmodule ElectricCli.Commands.ConfigTest do
       assert not Map.has_key?(environments, :staging)
     end
   end
-
-  defp init do
-    capture_io(fn ->
-      assert {:ok, _} = ElectricCli.Main.run(~w|init tarragon-envy-1337|)
-    end)
-  end
-
-  defp add_staging_env do
-    capture_io(fn ->
-      assert {:ok, _} = ElectricCli.Main.run(~w|config add_env staging|)
-    end)
-  end
-
-  defp set_staging_default do
-    capture_io(fn ->
-      assert {:ok, _} = ElectricCli.Main.run(~w|config update_env staging --set-as-default|)
-    end)
-  end
-
-  defp login do
-    capture_io(fn ->
-      assert {:ok, _} =
-               ElectricCli.Main.run(~w|auth login test@electric-sql.com --password password|)
-    end)
-  end
-
-  defp logout do
-    capture_io(fn ->
-      assert {:ok, _} = ElectricCli.Main.run(~w|auth logout|)
-    end)
-  end
 end
