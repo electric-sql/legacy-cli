@@ -49,7 +49,7 @@ defmodule ElectricCli.Config do
 
     environments =
       struct.environments
-      |> Enum.map(fn {k, v} -> {k, Environment.new(v)} end)
+      |> Enum.map(fn {k, v} -> {k, Environment.create(v, "#{k}")} end)
       |> Enum.into(%{})
 
     %{struct | directories: directories, environments: environments}
@@ -82,7 +82,7 @@ defmodule ElectricCli.Config do
          {:ok, data} <- Jason.decode(json_str, keys: :atoms) do
       config =
         data
-        |> Map.update!(:directories, &expand_dirs(&1, dir))
+        |> Map.update!(:directories, &expand_directories(&1, dir))
         |> Map.put(:root, dir)
         |> Config.new()
 
@@ -112,8 +112,8 @@ defmodule ElectricCli.Config do
   def save(%Config{root: root} = config) do
     config =
       config
-      |> Map.update!(:directories, &contract_dirs(&1, root))
-      |> Map.update!(:environments, &contract_envs/1)
+      |> Map.update!(:directories, &contract_directories(&1, root))
+      |> Map.update!(:environments, &contract_environments/1)
 
     # IO.inspect({:saving, config})
 
@@ -127,6 +127,11 @@ defmodule ElectricCli.Config do
   @doc """
   Lookup a configured environment by `env` name.
   """
+  def target_environment(%Config{defaultEnv: default_env} = config, nil) do
+    config
+    |> target_environment(default_env)
+  end
+
   def target_environment(%Config{environments: environments}, env) do
     msg = "env `#{env}` not found; see `electric configure --help`"
 
@@ -134,20 +139,6 @@ defmodule ElectricCli.Config do
          {:ok, key} <- Util.get_existing_atom(env, {:error, msg}),
          %Environment{} = environment <- Map.get(environments, key, {:error, msg}) do
       {:ok, environment}
-    end
-  end
-
-  @doc """
-  Given a %Config{} and a user specified `env`, return the `env` as an atom
-  iff it matches an existing environment.
-  """
-  def existing_env_atom(%Config{defaultEnv: env}, nil) do
-    {:ok, String.to_existing_atom(env)}
-  end
-
-  def existing_env_atom(%Config{} = config, env) when is_binary(env) do
-    with {:ok, %Environment{}} <- target_environment(config, env) do
-      {:ok, String.to_existing_atom(env)}
     else
       {:error, {:invalid, _}} ->
         {:error, "invalid env `#{env}`"}
@@ -157,29 +148,33 @@ defmodule ElectricCli.Config do
     end
   end
 
-  def contract_dirs(%Directories{} = directories, root) do
+  def contract_directories(%Directories{} = directories, root) do
     directories
     |> Map.from_struct()
     |> Enum.map(fn {key, path} -> {key, Path.relative_to(path, root)} end)
     |> Directories.new()
   end
 
-  defp contract_envs(env_map) do
-    env_map
-    |> Enum.map(fn {key, %Environment{} = env} -> {key, contract_env(env)} end)
+  defp contract_environments(%{} = environments) do
+    environments
+    |> Enum.map(fn {key, %Environment{} = environment} ->
+      {key, contract_environment(environment)}
+    end)
     |> Enum.into(%{})
   end
 
-  defp contract_env(%Environment{replication: nil} = env) when map_size(env) == 1 do
-    %{}
+  defp contract_environment(%Environment{replication: nil} = environment) do
+    environment
+    |> Map.from_struct()
+    |> Map.drop([:replication])
   end
 
-  defp contract_env(%Environment{} = env) do
-    env
+  defp contract_environment(%Environment{} = environment) do
+    environment
   end
 
-  defp expand_dirs(dir_map, root) do
-    dir_map
+  defp expand_directories(%{} = directories, root) do
+    directories
     |> Enum.map(fn {key, path} -> {key, Path.expand(path, root)} end)
     |> Enum.into(%{})
   end

@@ -59,7 +59,7 @@ defmodule ElectricCli.Commands.ConfigTest do
     assert expected.app == config.app
     assert expected.env == config.defaultEnv
 
-    directories = Config.contract_dirs(directories, root)
+    directories = Config.contract_directories(directories, root)
     assert expected.migrations_dir == directories.migrations
 
     migrations_dir = Path.expand(directories.migrations, root)

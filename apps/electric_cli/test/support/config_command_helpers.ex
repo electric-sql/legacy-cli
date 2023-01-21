@@ -18,7 +18,7 @@ defmodule ElectricCli.Commands.ConfigCommandHelpers do
 
     relative_migrations_dir =
       directories
-      |> Config.contract_dirs(root)
+      |> Config.contract_directories(root)
       |> Map.get(:migrations)
 
     migrations_dir =

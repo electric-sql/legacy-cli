@@ -162,12 +162,11 @@ defmodule ElectricCli.Commands.Config do
           Path.expand(dir, root)
       end
 
-    with {:ok, %Config{directories: directories} = config} <- Config.load(root),
-         {:ok, env_atom} <- Config.existing_env_atom(config, env),
+    with {:ok, %Config{directories: directories, environments: environments} = config} <-
+           Config.load(root),
+         {:ok, %Environment{slug: env_slug} = environment} <-
+           Config.target_environment(config, env),
          :ok <- Apps.can_show_app(app, should_verify_app) do
-      environments = config.environments
-      %Environment{} = environment = Map.fetch!(environments, env_atom)
-
       replication =
         case environment.replication do
           nil ->
@@ -194,6 +193,8 @@ defmodule ElectricCli.Commands.Config do
         environment
         |> Util.map_put_if(:replication, replication, not replication_empty?)
 
+      env_atom = String.to_existing_atom(env_slug)
+
       environments =
         environments
         |> Map.put(env_atom, environment)
@@ -207,7 +208,7 @@ defmodule ElectricCli.Commands.Config do
         config
         |> Util.map_put_if(:app, app, not is_nil(app))
         |> Map.put(:debug, debug)
-        |> Map.put(:defaultEnv, "#{env_atom}")
+        |> Map.put(:defaultEnv, env_slug)
         |> Map.put(:directories, directories)
         |> Map.put(:environments, environments)
 
@@ -253,7 +254,7 @@ defmodule ElectricCli.Commands.Config do
         |> Enum.empty?()
 
       environment =
-        %{}
+        %{slug: env}
         |> Util.map_put_if(:replication, replication, not replication_empty?)
         |> Environment.new()
 
@@ -286,9 +287,8 @@ defmodule ElectricCli.Commands.Config do
     should_set_default = flags.default
 
     with {:ok, %Config{environments: environments} = config} <- Config.load(root),
-         {:ok, env_atom} <- Config.existing_env_atom(config, env) do
-      %Environment{replication: replication} = Map.fetch!(environments, env_atom)
-
+         {:ok, %Environment{replication: replication, slug: env_slug} = environment} <-
+           Config.target_environment(config, env) do
       replication =
         case replication do
           nil ->
@@ -312,9 +312,11 @@ defmodule ElectricCli.Commands.Config do
         |> Enum.empty?()
 
       environment =
-        %{}
+        environment
         |> Util.map_put_if(:replication, replication, not replication_empty?)
         |> Environment.new()
+
+      env_atom = String.to_existing_atom(env_slug)
 
       environments =
         environments
@@ -339,11 +341,13 @@ defmodule ElectricCli.Commands.Config do
 
     with {:ok, %Config{defaultEnv: default_env, environments: environments} = config} <-
            Config.load(root),
-         {:ok, env_atom} <- Config.existing_env_atom(config, env),
+         {:ok, %Environment{slug: env_slug}} <- Config.target_environment(config, env),
          false <- env == default_env do
-      {_, environments} =
+      env_atom = String.to_existing_atom(env_slug)
+
+      environments =
         environments
-        |> Map.pop(env_atom)
+        |> Map.drop([env_atom])
 
       config = %{config | environments: environments}
 

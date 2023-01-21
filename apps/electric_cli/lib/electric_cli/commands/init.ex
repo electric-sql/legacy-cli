@@ -88,7 +88,7 @@ defmodule ElectricCli.Commands.Init do
         )
 
       environment =
-        %{}
+        %{slug: String.to_atom(env)}
         |> Util.map_put_if("replication", replication, not Enum.empty?(replication))
 
       attrs = %{
