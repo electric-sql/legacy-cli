@@ -11,20 +11,20 @@ defmodule ElectricCli.Commands.InitTest do
       [cmd: ["init"]]
     end
 
-    test "shows help text if --help passed", cxt do
-      args = argv(cxt, ["--help"])
+    test "shows help text if --help passed", ctx do
+      args = argv(ctx, ["--help"])
       assert {{:ok, output}, _} = run_cmd(args)
       assert output =~ ~r/electric.json/
     end
 
-    test "returns error and shows usage if app id not specified", cxt do
-      args = argv(cxt, [])
+    test "returns error and shows usage if app id not specified", ctx do
+      args = argv(ctx, [])
       assert {{:error, output}, _} = run_cmd(args)
       assert output =~ ~r/Usage: /
     end
 
-    test "requires authentication", cxt do
-      args = argv(cxt, ["tarragon-envy-1337", "--verbose"])
+    test "requires authentication", ctx do
+      args = argv(ctx, ["tarragon-envy-1337", "--verbose"])
       assert {{:error, output}, _} = run_cmd(args)
       assert output =~ "electric auth login"
     end
@@ -37,8 +37,8 @@ defmodule ElectricCli.Commands.InitTest do
       [cmd: ["init"]]
     end
 
-    test "creates an electric.json file in the pwd", %{tmp_dir: root} = cxt do
-      args = argv(cxt, ["tarragon-envy-1337"])
+    test "creates an electric.json file in the pwd", %{tmp_dir: root} = ctx do
+      args = argv(ctx, ["tarragon-envy-1337"])
       assert {{:ok, _output}, _} = run_cmd(args)
 
       assert_config(root, %{
@@ -48,8 +48,8 @@ defmodule ElectricCli.Commands.InitTest do
       })
     end
 
-    test "warns on rerun", %{tmp_dir: root} = cxt do
-      args = argv(cxt, ["tarragon-envy-1337"])
+    test "warns on rerun", %{tmp_dir: root} = ctx do
+      args = argv(ctx, ["tarragon-envy-1337"])
 
       assert {{:ok, _output}, _} = run_cmd(args)
       assert {{:error, output}, _} = run_cmd(args)
@@ -64,8 +64,8 @@ defmodule ElectricCli.Commands.InitTest do
       })
     end
 
-    test "can use a custom migrations directory", %{tmp_dir: root} = cxt do
-      args = argv(cxt, ["--migrations-dir", "browser/migrations", "tarragon-envy-1337"])
+    test "can use a custom migrations directory", %{tmp_dir: root} = ctx do
+      args = argv(ctx, ["--migrations-dir", "browser/migrations", "tarragon-envy-1337"])
 
       assert {{:ok, _output}, _} = run_cmd(args)
 
@@ -76,7 +76,7 @@ defmodule ElectricCli.Commands.InitTest do
       })
     end
 
-    test "can use an absolute migrations directory", %{tmp_dir: root} = cxt do
+    test "can use an absolute migrations directory", %{tmp_dir: root} = ctx do
       # I'm choosing to have the arg specify the full path to the migrations,
       # rather than point to the base and then add "migrations".
 
@@ -88,7 +88,7 @@ defmodule ElectricCli.Commands.InitTest do
         File.rm_rf!(migrations_dir)
       end)
 
-      args = argv(cxt, ["--migrations-dir", migrations_dir, "tarragon-envy-1337"])
+      args = argv(ctx, ["--migrations-dir", migrations_dir, "tarragon-envy-1337"])
       assert {{:ok, _output}, _} = run_cmd(args)
 
       assert_config(root, %{
@@ -98,8 +98,8 @@ defmodule ElectricCli.Commands.InitTest do
       })
     end
 
-    test "allows for setting a custom default env", %{tmp_dir: root} = cxt do
-      args = argv(cxt, ["--env", "prod", "tarragon-envy-1337"])
+    test "allows for setting a custom default env", %{tmp_dir: root} = ctx do
+      args = argv(ctx, ["--env", "prod", "tarragon-envy-1337"])
       assert {{:ok, _output}, _} = run_cmd(args)
 
       assert_config(root, %{
@@ -109,17 +109,17 @@ defmodule ElectricCli.Commands.InitTest do
       })
     end
 
-    test "by default replication data is empty", %{tmp_dir: root} = cxt do
-      args = argv(cxt, ["tarragon-envy-1337"])
+    test "by default replication data is empty", %{tmp_dir: root} = ctx do
+      args = argv(ctx, ["tarragon-envy-1337"])
       assert {{:ok, _output}, _} = run_cmd(args)
 
       assert {:ok, %Config{environments: environments}} = Config.load(root)
       assert %Environment{replication: nil} = Map.get(environments, :default)
     end
 
-    test "sets replication data if provided", %{tmp_dir: root} = cxt do
+    test "sets replication data if provided", %{tmp_dir: root} = ctx do
       args =
-        argv(cxt, [
+        argv(ctx, [
           "tarragon-envy-1337",
           "--replication-host",
           "localhost",
@@ -139,7 +139,9 @@ defmodule ElectricCli.Commands.InitTest do
       args = argv(ctx, ["tarragon-envy-1337"])
       assert {{:ok, _output}, _} = run_cmd(args)
 
-      assert {:ok, %Config{app: app, directories: %{migrations: migrations_dir}}} = Config.load(root)
+      assert {:ok, %Config{app: app, directories: %{migrations: migrations_dir}}} =
+               Config.load(root)
+
       assert {:ok, %Manifest{migrations: migrations}} = Manifest.load(app, migrations_dir, false)
 
       assert Enum.count(migrations) == 1
@@ -164,8 +166,8 @@ defmodule ElectricCli.Commands.InitTest do
       assert link_target == Path.join(app, default_env)
     end
 
-    test "sets @app symlink", %{tmp_dir: root} = cxt do
-      args = argv(cxt, ["tarragon-envy-1337"])
+    test "sets @app symlink", %{tmp_dir: root} = ctx do
+      args = argv(ctx, ["tarragon-envy-1337"])
       assert {{:ok, _output}, _} = run_cmd(args)
       assert {:ok, %Config{app: app, directories: %{output: output_dir}}} = Config.load(root)
 

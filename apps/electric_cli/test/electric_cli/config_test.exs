@@ -93,15 +93,15 @@ defmodule ElectricCli.Commands.ConfigTest do
       {:ok, cmd: ["init"]}
     end
 
-    test "shows help text if --help passed", cxt do
-      args = argv(cxt, ["--help"])
+    test "shows help text if --help passed", ctx do
+      args = argv(ctx, ["--help"])
 
       assert {:ok, output} = ElectricCli.Main.run(args)
       assert output =~ ~r/electric.json/
     end
 
-    test "returns error and shows usage if app id not specified", cxt do
-      args = argv(cxt, [])
+    test "returns error and shows usage if app id not specified", ctx do
+      args = argv(ctx, [])
       assert {:error, output} = ElectricCli.Main.run(args)
       assert output =~ ~r/Usage: /
     end
@@ -109,22 +109,22 @@ defmodule ElectricCli.Commands.ConfigTest do
     @tag :cd
     @tag :login
     @tag :logout
-    test "Doesn't initialize the app if you're not logged in", cxt do
-      args = argv(cxt, ["tarragon-envy-1337", "--verbose"])
+    test "Doesn't initialize the app if you're not logged in", ctx do
+      args = argv(ctx, ["tarragon-envy-1337", "--verbose"])
       assert {{:error, output}, _} = with_io(fn -> ElectricCli.Main.run(args) end)
       assert output =~ "electric auth login"
     end
 
     @tag :cd
     @tag :login
-    test "creates an electric.json file in the pwd", cxt do
-      args = argv(cxt, ["tarragon-envy-1337"])
+    test "creates an electric.json file in the pwd", ctx do
+      args = argv(ctx, ["tarragon-envy-1337"])
 
       capture_io(fn ->
         assert {:ok, _output} = ElectricCli.Main.run(args)
       end)
 
-      assert_config(cxt.tmp_dir, %{
+      assert_config(ctx.tmp_dir, %{
         app: "tarragon-envy-1337",
         env: "default",
         migrations_dir: "migrations"
@@ -133,8 +133,8 @@ defmodule ElectricCli.Commands.ConfigTest do
 
     @tag :cd
     @tag :login
-    test "warns on rerun", cxt do
-      args = argv(cxt, ["tarragon-envy-1337"])
+    test "warns on rerun", ctx do
+      args = argv(ctx, ["tarragon-envy-1337"])
 
       capture_io(fn ->
         assert {:ok, _output} = ElectricCli.Main.run(args)
@@ -144,7 +144,7 @@ defmodule ElectricCli.Commands.ConfigTest do
         assert output =~ "electric config update"
       end)
 
-      assert_config(cxt.tmp_dir, %{
+      assert_config(ctx.tmp_dir, %{
         app: "tarragon-envy-1337",
         env: "default",
         migrations_dir: "migrations"
@@ -153,14 +153,14 @@ defmodule ElectricCli.Commands.ConfigTest do
 
     @tag :cd
     @tag :login
-    test "can use a custom migrations directory", cxt do
-      args = argv(cxt, ["--migrations-dir", "browser/migrations", "tarragon-envy-1337"])
+    test "can use a custom migrations directory", ctx do
+      args = argv(ctx, ["--migrations-dir", "browser/migrations", "tarragon-envy-1337"])
 
       capture_io(fn ->
         assert {:ok, _output} = ElectricCli.Main.run(args)
       end)
 
-      assert_config(cxt.tmp_dir, %{
+      assert_config(ctx.tmp_dir, %{
         app: "tarragon-envy-1337",
         env: "default",
         migrations_dir: "browser/migrations"
@@ -169,7 +169,7 @@ defmodule ElectricCli.Commands.ConfigTest do
 
     @tag :cd
     @tag :login
-    test "can use an absolute migrations directory", cxt do
+    test "can use an absolute migrations directory", ctx do
       # I'm choosing to have the arg specify the full path to the migrations, rather than point
       # to the base and then we add "migrations".
 
@@ -178,13 +178,13 @@ defmodule ElectricCli.Commands.ConfigTest do
 
       on_exit(fn -> File.rm_rf!(migrations_dir) end)
 
-      args = argv(cxt, ["--migrations-dir", migrations_dir, "tarragon-envy-1337"])
+      args = argv(ctx, ["--migrations-dir", migrations_dir, "tarragon-envy-1337"])
 
       capture_io(fn ->
         assert {:ok, _output} = ElectricCli.Main.run(args)
       end)
 
-      assert_config(cxt.tmp_dir, %{
+      assert_config(ctx.tmp_dir, %{
         app: "tarragon-envy-1337",
         env: "default",
         migrations_dir: migrations_dir
@@ -193,14 +193,14 @@ defmodule ElectricCli.Commands.ConfigTest do
 
     @tag :cd
     @tag :login
-    test "allows for setting a custom default env", cxt do
-      args = argv(cxt, ["--env", "prod", "tarragon-envy-1337"])
+    test "allows for setting a custom default env", ctx do
+      args = argv(ctx, ["--env", "prod", "tarragon-envy-1337"])
 
       capture_io(fn ->
         assert {:ok, _output} = ElectricCli.Main.run(args)
       end)
 
-      assert_config(cxt.tmp_dir, %{
+      assert_config(ctx.tmp_dir, %{
         app: "tarragon-envy-1337",
         env: "prod",
         migrations_dir: "migrations"
@@ -209,23 +209,23 @@ defmodule ElectricCli.Commands.ConfigTest do
 
     @tag :cd
     @tag :login
-    test "by default replication data is empty", cxt do
-      args = argv(cxt, ["tarragon-envy-1337"])
+    test "by default replication data is empty", ctx do
+      args = argv(ctx, ["tarragon-envy-1337"])
 
       capture_io(fn ->
         assert {:ok, _output} = ElectricCli.Main.run(args)
       end)
 
-      root = cxt.tmp_dir
+      root = ctx.tmp_dir
       assert {:ok, %Config{environments: environments}} = Config.load(root)
       assert %Environment{replication: nil} = Map.get(environments, :default)
     end
 
     @tag :cd
     @tag :login
-    test "sets replication data if provided", cxt do
+    test "sets replication data if provided", ctx do
       args =
-        argv(cxt, [
+        argv(ctx, [
           "tarragon-envy-1337",
           "--replication-host",
           "localhost",
@@ -238,7 +238,7 @@ defmodule ElectricCli.Commands.ConfigTest do
         assert {:ok, _output} = ElectricCli.Main.run(args)
       end)
 
-      root = cxt.tmp_dir
+      root = ctx.tmp_dir
       assert {:ok, %Config{environments: environments}} = Config.load(root)
       assert %Environment{replication: replication} = Map.get(environments, :default)
       assert %Replication{host: "localhost", port: 5133, ssl: false} = replication
@@ -250,14 +250,14 @@ defmodule ElectricCli.Commands.ConfigTest do
       {:ok, cmd: ["config", "update"]}
     end
 
-    test "shows help text if --help passed", cxt do
-      args = argv(cxt, ["--help"])
+    test "shows help text if --help passed", ctx do
+      args = argv(ctx, ["--help"])
       assert {:ok, output} = ElectricCli.Main.run(args)
       assert output =~ ~r/Update your configuration/
     end
 
-    test "returns error if run before electric init in this root", cxt do
-      args = argv(cxt, [])
+    test "returns error if run before electric init in this root", ctx do
+      args = argv(ctx, [])
       assert {:error, output} = ElectricCli.Main.run(args)
       assert output =~ "file is missing in this directory"
     end
@@ -266,8 +266,8 @@ defmodule ElectricCli.Commands.ConfigTest do
     @tag :login
     @tag :init
     @tag :logout
-    test "doesn't update the app if you're not logged in", cxt do
-      args = argv(cxt, ["--app", "french-onion-1234"])
+    test "doesn't update the app if you're not logged in", ctx do
+      args = argv(ctx, ["--app", "french-onion-1234"])
       assert {{:error, output}, _} = with_io(fn -> ElectricCli.Main.run(args) end)
       assert output =~ "electric auth login EMAIL"
     end
@@ -275,8 +275,8 @@ defmodule ElectricCli.Commands.ConfigTest do
     @tag :cd
     @tag :login
     @tag :init
-    test "unchanged says so", cxt do
-      args = argv(cxt, ["--app", "tarragon-envy-1337"])
+    test "unchanged says so", ctx do
+      args = argv(ctx, ["--app", "tarragon-envy-1337"])
       assert {{:ok, output}, _} = with_io(fn -> ElectricCli.Main.run(args) end)
       assert output =~ "Nothing to update"
     end
@@ -284,14 +284,14 @@ defmodule ElectricCli.Commands.ConfigTest do
     @tag :cd
     @tag :login
     @tag :init
-    test "updates the app", cxt do
-      args = argv(cxt, ["--app", "french-onion-1234"])
+    test "updates the app", ctx do
+      args = argv(ctx, ["--app", "french-onion-1234"])
 
       capture_io(fn ->
         assert {:ok, _output} = ElectricCli.Main.run(args)
       end)
 
-      assert_config(cxt.tmp_dir, %{
+      assert_config(ctx.tmp_dir, %{
         migrations_dir: "migrations",
         app: "french-onion-1234",
         env: "default"
@@ -301,8 +301,8 @@ defmodule ElectricCli.Commands.ConfigTest do
     @tag :cd
     @tag :login
     @tag :init
-    test "env must exists when updating the default env", cxt do
-      args = argv(cxt, ["--env", "staging"])
+    test "env must exists when updating the default env", ctx do
+      args = argv(ctx, ["--env", "staging"])
       assert {{:error, output}, _} = with_io(fn -> ElectricCli.Main.run(args) end)
       assert output =~ "env `staging` not found"
       assert output =~ "electric config add_env"
@@ -312,14 +312,14 @@ defmodule ElectricCli.Commands.ConfigTest do
     @tag :login
     @tag :init
     @tag :add_staging_env
-    test "updates default env", cxt do
-      args = argv(cxt, ["--env", "staging"])
+    test "updates default env", ctx do
+      args = argv(ctx, ["--env", "staging"])
 
       capture_io(fn ->
         assert {:ok, _output} = ElectricCli.Main.run(args)
       end)
 
-      assert_config(cxt.tmp_dir, %{
+      assert_config(ctx.tmp_dir, %{
         migrations_dir: "migrations",
         app: "tarragon-envy-1337",
         env: "staging"
@@ -329,14 +329,14 @@ defmodule ElectricCli.Commands.ConfigTest do
     @tag :cd
     @tag :login
     @tag :init
-    test "changes the migrations path", cxt do
-      args = argv(cxt, ["--migrations-dir", "timbuktu"])
+    test "changes the migrations path", ctx do
+      args = argv(ctx, ["--migrations-dir", "timbuktu"])
 
       capture_io(fn ->
         assert {:ok, _output} = ElectricCli.Main.run(args)
       end)
 
-      assert_config(cxt.tmp_dir, %{
+      assert_config(ctx.tmp_dir, %{
         migrations_dir: "timbuktu",
         app: "tarragon-envy-1337",
         env: "default"
@@ -346,9 +346,9 @@ defmodule ElectricCli.Commands.ConfigTest do
     @tag :cd
     @tag :login
     @tag :init
-    test "sets replication data if provided", cxt do
+    test "sets replication data if provided", ctx do
       args =
-        argv(cxt, [
+        argv(ctx, [
           "--replication-host",
           "localhost",
           "--replication-port",
@@ -360,7 +360,7 @@ defmodule ElectricCli.Commands.ConfigTest do
         assert {:ok, _output} = ElectricCli.Main.run(args)
       end)
 
-      root = cxt.tmp_dir
+      root = ctx.tmp_dir
       assert {:ok, %Config{environments: environments}} = Config.load(root)
       assert %Environment{replication: replication} = Map.get(environments, :default)
       assert %Replication{host: "localhost", port: 5133, ssl: false} = replication
@@ -372,14 +372,14 @@ defmodule ElectricCli.Commands.ConfigTest do
       {:ok, cmd: ["config", "add_env"]}
     end
 
-    test "shows help text if --help passed", cxt do
-      args = argv(cxt, ["--help"])
+    test "shows help text if --help passed", ctx do
+      args = argv(ctx, ["--help"])
       assert {:ok, output} = ElectricCli.Main.run(args)
       assert output =~ ~r/Add a new environment/
     end
 
-    test "returns error if run before electric init in this root", cxt do
-      args = argv(cxt, ["some-env"])
+    test "returns error if run before electric init in this root", ctx do
+      args = argv(ctx, ["some-env"])
       assert {:error, output} = ElectricCli.Main.run(args)
       assert output =~ "file is missing in this directory"
     end
@@ -387,8 +387,8 @@ defmodule ElectricCli.Commands.ConfigTest do
     @tag :cd
     @tag :login
     @tag :init
-    test "errors if env already exists", cxt do
-      args = argv(cxt, ["default"])
+    test "errors if env already exists", ctx do
+      args = argv(ctx, ["default"])
       assert {{:error, output}, _} = with_io(fn -> ElectricCli.Main.run(args) end)
       assert output =~ "already exists"
     end
@@ -396,14 +396,14 @@ defmodule ElectricCli.Commands.ConfigTest do
     @tag :cd
     @tag :login
     @tag :init
-    test "adds the env", cxt do
-      args = argv(cxt, ["staging"])
+    test "adds the env", ctx do
+      args = argv(ctx, ["staging"])
 
       capture_io(fn ->
         assert {:ok, _output} = ElectricCli.Main.run(args)
       end)
 
-      root = cxt.tmp_dir
+      root = ctx.tmp_dir
       assert {:ok, %Config{environments: environments}} = Config.load(root)
       assert Map.has_key?(environments, :staging)
     end
@@ -411,9 +411,9 @@ defmodule ElectricCli.Commands.ConfigTest do
     @tag :cd
     @tag :login
     @tag :init
-    test "sets replication data if provided", cxt do
+    test "sets replication data if provided", ctx do
       args =
-        argv(cxt, [
+        argv(ctx, [
           "staging",
           "--replication-host",
           "localhost",
@@ -426,7 +426,7 @@ defmodule ElectricCli.Commands.ConfigTest do
         assert {:ok, _output} = ElectricCli.Main.run(args)
       end)
 
-      root = cxt.tmp_dir
+      root = ctx.tmp_dir
       assert {:ok, %Config{environments: environments}} = Config.load(root)
       assert %Environment{replication: replication} = Map.get(environments, :staging)
       assert %Replication{host: "localhost", port: 5133, ssl: false} = replication
@@ -438,14 +438,14 @@ defmodule ElectricCli.Commands.ConfigTest do
       {:ok, cmd: ["config", "update_env"]}
     end
 
-    test "shows help text if --help passed", cxt do
-      args = argv(cxt, ["--help"])
+    test "shows help text if --help passed", ctx do
+      args = argv(ctx, ["--help"])
       assert {:ok, output} = ElectricCli.Main.run(args)
       assert output =~ ~r/Update the configuration of an environment/
     end
 
-    test "returns error if run before electric init in this root", cxt do
-      args = argv(cxt, ["some-env"])
+    test "returns error if run before electric init in this root", ctx do
+      args = argv(ctx, ["some-env"])
       assert {:error, output} = ElectricCli.Main.run(args)
       assert output =~ "file is missing in this directory"
     end
@@ -453,8 +453,8 @@ defmodule ElectricCli.Commands.ConfigTest do
     @tag :cd
     @tag :login
     @tag :init
-    test "errors if env does not exist", cxt do
-      args = argv(cxt, ["staging"])
+    test "errors if env does not exist", ctx do
+      args = argv(ctx, ["staging"])
       assert {{:error, output}, _} = with_io(fn -> ElectricCli.Main.run(args) end)
       assert output =~ "not found"
     end
@@ -462,9 +462,9 @@ defmodule ElectricCli.Commands.ConfigTest do
     @tag :cd
     @tag :login
     @tag :init
-    test "sets replication data if provided", cxt do
+    test "sets replication data if provided", ctx do
       args =
-        argv(cxt, [
+        argv(ctx, [
           "default",
           "--replication-host",
           "localhost",
@@ -477,7 +477,7 @@ defmodule ElectricCli.Commands.ConfigTest do
         assert {:ok, _output} = ElectricCli.Main.run(args)
       end)
 
-      root = cxt.tmp_dir
+      root = ctx.tmp_dir
       assert {:ok, %Config{environments: environments}} = Config.load(root)
       assert %Environment{replication: replication} = Map.get(environments, :default)
       assert %Replication{host: "localhost", port: 5133, ssl: false} = replication
@@ -489,14 +489,14 @@ defmodule ElectricCli.Commands.ConfigTest do
       {:ok, cmd: ["config", "remove_env"]}
     end
 
-    test "shows help text if --help passed", cxt do
-      args = argv(cxt, ["--help"])
+    test "shows help text if --help passed", ctx do
+      args = argv(ctx, ["--help"])
       assert {:ok, output} = ElectricCli.Main.run(args)
       assert output =~ ~r/Remove an environment/
     end
 
-    test "returns error if run before electric init in this root", cxt do
-      args = argv(cxt, ["some-env"])
+    test "returns error if run before electric init in this root", ctx do
+      args = argv(ctx, ["some-env"])
       assert {:error, output} = ElectricCli.Main.run(args)
       assert output =~ "file is missing in this directory"
     end
@@ -504,8 +504,8 @@ defmodule ElectricCli.Commands.ConfigTest do
     @tag :cd
     @tag :login
     @tag :init
-    test "errors if env does not exist", cxt do
-      args = argv(cxt, ["staging"])
+    test "errors if env does not exist", ctx do
+      args = argv(ctx, ["staging"])
       assert {{:error, output}, _} = with_io(fn -> ElectricCli.Main.run(args) end)
       assert output =~ "not found"
     end
@@ -513,8 +513,8 @@ defmodule ElectricCli.Commands.ConfigTest do
     @tag :cd
     @tag :login
     @tag :init
-    test "errors if env is the default env", cxt do
-      args = argv(cxt, ["default"])
+    test "errors if env is the default env", ctx do
+      args = argv(ctx, ["default"])
       assert {{:error, output}, _} = with_io(fn -> ElectricCli.Main.run(args) end)
       assert output =~ "can't remove your default env."
     end
@@ -524,8 +524,8 @@ defmodule ElectricCli.Commands.ConfigTest do
     @tag :init
     @tag :add_staging_env
     @tag :set_staging_default
-    test "even if the default env has been set", cxt do
-      args = argv(cxt, ["staging"])
+    test "even if the default env has been set", ctx do
+      args = argv(ctx, ["staging"])
       assert {{:error, output}, _} = with_io(fn -> ElectricCli.Main.run(args) end)
       assert output =~ "can't remove your default env."
     end
@@ -534,14 +534,14 @@ defmodule ElectricCli.Commands.ConfigTest do
     @tag :login
     @tag :init
     @tag :add_staging_env
-    test "removes env", cxt do
-      args = argv(cxt, ["staging"])
+    test "removes env", ctx do
+      args = argv(ctx, ["staging"])
 
       capture_io(fn ->
         assert {:ok, _output} = ElectricCli.Main.run(args)
       end)
 
-      root = cxt.tmp_dir
+      root = ctx.tmp_dir
       assert {:ok, %Config{environments: environments}} = Config.load(root)
       assert not Map.has_key?(environments, :staging)
     end

@@ -9,14 +9,14 @@ defmodule ElectricCli.Commands.SyncTest do
       [cmd: ["sync"]]
     end
 
-    test "shows help text if --help passed", cxt do
-      args = argv(cxt, ["--help"])
+    test "shows help text if --help passed", ctx do
+      args = argv(ctx, ["--help"])
       assert {{:ok, output}, _} = run_cmd(args)
       assert output =~ ~r/Sync local migrations with the backend/
     end
 
-    test "returns error if run before electric init in this root", cxt do
-      args = argv(cxt, [])
+    test "returns error if run before electric init in this root", ctx do
+      args = argv(ctx, [])
       assert {{:error, output}, _} = run_cmd(args)
       assert output =~ "file is missing in this directory"
     end
@@ -64,7 +64,8 @@ defmodule ElectricCli.Commands.SyncTest do
     end
 
     test "rebuilds bundle using server data", %{tmp_dir: root} = ctx do
-      assert {:ok, %Config{defaultEnv: env, directories: %{output: output_dir}}} = Config.load(root)
+      assert {:ok, %Config{defaultEnv: env, directories: %{output: output_dir}}} =
+               Config.load(root)
 
       bundle_path = Path.join(output_dir, "@config")
       assert {:ok, %Bundle{env: "local"}} = Bundle.load(bundle_path)

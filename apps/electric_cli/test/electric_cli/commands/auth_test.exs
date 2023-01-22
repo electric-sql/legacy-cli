@@ -6,8 +6,8 @@ defmodule ElectricCli.Commands.AuthTest do
       [cmd: ["auth"]]
     end
 
-    test "shows help text if --help passed", cxt do
-      args = argv(cxt, ["--help"])
+    test "shows help text if --help passed", ctx do
+      args = argv(ctx, ["--help"])
       assert {{:ok, output}, _} = run_cmd(args)
       assert output =~ ~r/Log-in and manage authentication status/
     end
@@ -18,26 +18,26 @@ defmodule ElectricCli.Commands.AuthTest do
       [cmd: ["auth", "login"]]
     end
 
-    test "shows help text if --help passed", cxt do
-      args = argv(cxt, ["--help"])
+    test "shows help text if --help passed", ctx do
+      args = argv(ctx, ["--help"])
       assert {{:ok, output}, _} = run_cmd(args)
       assert output =~ ~r/Log in by email address./
     end
 
-    test "requires email", cxt do
-      args = argv(cxt, [])
+    test "requires email", ctx do
+      args = argv(ctx, [])
       assert {{:error, output}, _} = run_cmd(args)
       assert output =~ "missing required arguments: EMAIL"
     end
 
-    test "log in with invalid credentials fails", cxt do
-      args = argv(cxt, ["invalid@example.com", "--password", "wrong"])
+    test "log in with invalid credentials fails", ctx do
+      args = argv(ctx, ["invalid@example.com", "--password", "wrong"])
       assert {{:error, output}, _} = run_cmd(args)
       assert output =~ "invalid credentials"
     end
 
-    test "log in with valid credentials works", cxt do
-      args = argv(cxt, ["test@electric-sql.com", "--password", "password"])
+    test "log in with valid credentials works", ctx do
+      args = argv(ctx, ["test@electric-sql.com", "--password", "password"])
       assert {{:ok, output}, _} = run_cmd(args)
       assert output =~ "Logged in successfully as test@electric-sql.com"
     end
@@ -48,8 +48,8 @@ defmodule ElectricCli.Commands.AuthTest do
       [cmd: ["auth", "logout"]]
     end
 
-    test "no-ops", cxt do
-      args = argv(cxt, [])
+    test "no-ops", ctx do
+      args = argv(ctx, [])
       assert {{:ok, output}, _} = run_cmd(args)
       assert output =~ "You are logged out"
     end
@@ -62,8 +62,8 @@ defmodule ElectricCli.Commands.AuthTest do
       [cmd: ["auth", "logout"]]
     end
 
-    test "logs out", cxt do
-      args = argv(cxt, [])
+    test "logs out", ctx do
+      args = argv(ctx, [])
       assert {{:ok, output}, _} = run_cmd(args)
       assert output =~ "Logged out successfully"
     end
@@ -74,8 +74,8 @@ defmodule ElectricCli.Commands.AuthTest do
       [cmd: ["auth", "whoami"]]
     end
 
-    test "logs out", cxt do
-      args = argv(cxt, [])
+    test "logs out", ctx do
+      args = argv(ctx, [])
       assert {{:error, output}, _} = run_cmd(args)
       assert output =~ "not logged in"
     end
@@ -88,8 +88,8 @@ defmodule ElectricCli.Commands.AuthTest do
       [cmd: ["auth", "whoami"]]
     end
 
-    test "tells you who you are", cxt do
-      args = argv(cxt, [])
+    test "tells you who you are", ctx do
+      args = argv(ctx, [])
       assert {{:ok, output}, _} = run_cmd(args)
       assert output =~ "You are logged in as test@electric-sql.com"
     end

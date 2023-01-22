@@ -9,8 +9,8 @@ defmodule ElectricCli.Commands.MigrationsTest do
       [cmd: ["migrations"]]
     end
 
-    test "shows help text if --help passed", cxt do
-      args = argv(cxt, ["--help"])
+    test "shows help text if --help passed", ctx do
+      args = argv(ctx, ["--help"])
       assert {{:ok, output}, _} = run_cmd(args)
       assert output =~ ~r/Manage DDL schema migrations/
     end
@@ -21,20 +21,20 @@ defmodule ElectricCli.Commands.MigrationsTest do
       [cmd: ["migrations", "new"]]
     end
 
-    test "shows help text if --help passed", cxt do
-      args = argv(cxt, ["--help"])
+    test "shows help text if --help passed", ctx do
+      args = argv(ctx, ["--help"])
       assert {{:ok, output}, _} = run_cmd(args)
       assert output =~ ~r/Create a new migration/
     end
 
-    test "returns error and shows usage if app id not specified", cxt do
-      args = argv(cxt, [])
+    test "returns error and shows usage if app id not specified", ctx do
+      args = argv(ctx, [])
       assert {{:error, output}, _} = run_cmd(args)
       assert output =~ ~r/Usage: /
     end
 
-    test "returns error if run before electric init in this root", cxt do
-      args = argv(cxt, ["create foos"])
+    test "returns error if run before electric init in this root", ctx do
+      args = argv(ctx, ["create foos"])
       assert {{:error, output}, _} = run_cmd(args)
       assert output =~ "file is missing in this directory"
     end
@@ -48,8 +48,8 @@ defmodule ElectricCli.Commands.MigrationsTest do
       [cmd: ["migrations", "new"]]
     end
 
-    test "creates migration", cxt do
-      args = argv(cxt, ["create foos"])
+    test "creates migration", ctx do
+      args = argv(ctx, ["create foos"])
       assert {{:ok, output}, _} = run_cmd(args)
       assert output =~ "New migration created at:"
 
@@ -60,11 +60,11 @@ defmodule ElectricCli.Commands.MigrationsTest do
       assert File.exists?(relative_file_path)
     end
 
-    test "updates manifest", %{tmp_dir: root} = cxt do
+    test "updates manifest", %{tmp_dir: root} = ctx do
       {:ok, %Manifest{migrations: migrations}} = load_manifest(root)
       assert Enum.count(migrations) == 1
 
-      args = argv(cxt, ["create foos"])
+      args = argv(ctx, ["create foos"])
       assert {{:ok, _output}, _} = run_cmd(args)
 
       {:ok, %Manifest{migrations: migrations}} = load_manifest(root)
@@ -78,8 +78,8 @@ defmodule ElectricCli.Commands.MigrationsTest do
       [cmd: ["migrations", "list"]]
     end
 
-    test "shows help text if --help passed", cxt do
-      args = argv(cxt, ["--help"])
+    test "shows help text if --help passed", ctx do
+      args = argv(ctx, ["--help"])
       assert {{:ok, output}, _} = run_cmd(args)
       assert output =~ ~r/Lists migrations/
     end

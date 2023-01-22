@@ -22,14 +22,14 @@ defmodule ElectricCli.Commands.ResetTest do
       [cmd: ["reset"]]
     end
 
-    test "shows help text if --help passed", cxt do
-      args = argv(cxt, ["--help"])
+    test "shows help text if --help passed", ctx do
+      args = argv(ctx, ["--help"])
       assert {{:ok, output}, _} = run_cmd(args)
       assert output =~ ~r/Reset your backend./
     end
 
-    test "returns error if run before electric init in this root", cxt do
-      args = argv(cxt, [])
+    test "returns error if run before electric init in this root", ctx do
+      args = argv(ctx, [])
       assert {{:error, output}, _} = run_cmd(args)
       assert output =~ "file is missing in this directory"
     end
