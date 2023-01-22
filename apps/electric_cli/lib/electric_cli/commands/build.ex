@@ -2,7 +2,7 @@ defmodule ElectricCli.Commands.Build do
   use ElectricCli, :command
 
   alias ElectricCli.Config.Environment
-  alias ElectricCli.Migrations
+  alias ElectricCli.Core
 
   def about() do
     """
@@ -43,18 +43,15 @@ defmodule ElectricCli.Commands.Build do
     ]
   end
 
-  def build(%{
-        options: %{env: env, root: root},
-        flags: %{postgres: postgres_flag, satellite: satellite_flag}
-      }) do
+  def build(%{options: %{env: env, root: root}, flags: flags}) do
     with {:ok, %Config{} = config} <- Config.load(root),
          {:ok, %Environment{} = environment} <- Config.target_environment(config, env) do
-      Progress.run("Building migrations", fn ->
-        case Migrations.build_migrations(config, environment, postgres_flag, satellite_flag) do
-          {:ok, nil} ->
-            {:success, "Migrations built successfully"}
+      Progress.run("Building", fn ->
+        case Core.build(config, environment, flags.postgres, flags.satellite) do
+          :ok ->
+            {:success, "Built successfully"}
 
-          {:ok, warnings} ->
+          {:warning, warnings} ->
             {:success, Util.format_messages("warnings", warnings)}
 
           {:error, errors} ->

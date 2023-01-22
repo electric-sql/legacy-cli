@@ -10,7 +10,6 @@ defmodule ElectricCli.Manifest do
   @derive Jason.Encoder
   @type t() :: %Manifest{
           app: binary(),
-          env: binary(),
           migrations: [%Migration{}]
         }
   @enforce_keys [
@@ -19,11 +18,20 @@ defmodule ElectricCli.Manifest do
   ]
   defstruct [
     :app,
-    :env,
     :migrations
   ]
 
   use ExConstructor
+
+  def new(map) do
+    struct = super(map)
+
+    migrations =
+      struct.migrations
+      |> Enum.map(&Migration.new/1)
+
+    %{struct | migrations: migrations}
+  end
 
   @doc """
   Checks whether the config file already exists in the `dir` provided.

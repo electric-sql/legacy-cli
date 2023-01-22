@@ -6,21 +6,24 @@ defmodule ElectricCli.Migrations do
   import ElectricCli.Util, only: [verbose: 1]
 
   alias ElectricCli.Config
+  alias ElectricCli.Config.Environment
   alias ElectricCli.Manifest
   alias ElectricCli.Manifest.Migration
   alias ElectricCli.Util
 
-  for template <- Path.wildcard("#{__DIR__}/migrations/templates/*.eex") do
-    @external_resource template
-  end
-
   @migration_filename "migration.sql"
   @postgres_filename "postgres.sql"
   @satellite_filename "satellite.sql"
-  @js_bundle_filename "index.js"
-  @migration_template EEx.compile_file("#{__DIR__}/migrations/templates/migration.sql.eex")
-  @satellite_template EEx.compile_file("#{__DIR__}/migrations/templates/satellite.sql.eex")
-  @bundle_template EEx.compile_file("#{__DIR__}/migrations/templates/index.js.eex")
+
+  @migration_template_path "#{__DIR__}/templates/#{@migration_filename}.eex"
+  @satellite_template_path "#{__DIR__}/templates/#{@satellite_filename}.eex"
+
+  @migration_template EEx.compile_file(@migration_template_path)
+  @satellite_template EEx.compile_file(@satellite_template_path)
+
+  for template <- [@migration_template_path, @satellite_template_path] do
+    @external_resource template
+  end
 
   @type body_style() :: :none | :text | :list
 
@@ -85,7 +88,7 @@ defmodule ElectricCli.Migrations do
 
     exists = File.exists?(migrations_dir)
 
-    with :ok <- init_mainfest(app, migrations_dir, exists),
+    with :ok <- init_manifest(app, migrations_dir, exists),
          {:ok, %Manifest{} = manifest} <- Manifest.load(app, migrations_dir, should_verify_app),
          false <- has_init_migration(manifest),
          {:ok, _path} <- add_migration(manifest, migrations_dir, "init") do
@@ -112,56 +115,6 @@ defmodule ElectricCli.Migrations do
     with {:ok, %Manifest{} = manifest} <- Manifest.load(app, migrations_dir, false) do
       add_migration(manifest, migrations_dir, migration_name)
     end
-  end
-
-  @doc """
-  Write migrations files and bundle an importable js module.
-  """
-  def build_migrations(
-        %Config{app: app, directories: %{migrations: migrations_dir, output: output_dir}},
-        target_env,
-        postgres_flag,
-        satellite_flag
-      ) do
-    with {:ok, %Manifest{} = manifest} <- Manifest.load(app, migrations_dir, false),
-         {:ok, %Manifest{} = manifest, warnings} <-
-           hydrate_manifest(manifest, migrations_dir, postgres_flag, satellite_flag),
-         :ok <- optionally_write(&write_satellite/2, manifest, migrations_dir, satellite_flag),
-         :ok <- optionally_write(&write_postgres/2, manifest, migrations_dir, postgres_flag),
-         :ok <- write_js_bundle(manifest, output_dir, target_env, "local") do
-      {:ok, warnings}
-    end
-  end
-
-  @doc """
-  Does nothing yet
-  """
-  def sync_migrations(_env, _options) do
-    # template = Map.get(options, :template, @satellite_template)
-
-    # with {:ok, src_folder} <- check_migrations_folder(options),
-    #      {:ok, app} <- check_app(src_folder),
-    #      {:ok, updated_manifest, warnings} <- update_manifest(src_folder, template),
-    #      {:ok, _msg} <-
-    #        Migrations.Sync.sync_migrations(app, env, updated_manifest),
-    #      {:ok, server_manifest} <-
-    #        Migrations.Sync.get_migrations_from_server(app, env, true),
-    #      :ok <- write_js_bundle(src_folder, server_manifest, app, env) do
-    #   if length(warnings) > 0 do
-    #     {:ok, warnings}
-    #   else
-    #     {:ok, nil}
-    #   end
-    # end
-    raise RuntimeError, message: "Not implemented"
-  end
-
-  def apply_migrations(_env, _options) do
-    # with {:ok, src_folder} <- check_migrations_folder(options),
-    #      {:ok, app} <- check_app(src_folder) do
-    #   Migrations.Sync.apply_all_migrations(app, env)
-    # end
-    raise RuntimeError, message: "Not implemented"
   end
 
   def list_migrations(_options, _env) do
@@ -198,11 +151,11 @@ defmodule ElectricCli.Migrations do
     raise RuntimeError, message: "Not implemented"
   end
 
-  defp init_mainfest(_app, _migrations_dir, true) do
+  defp init_manifest(_app, _migrations_dir, true) do
     :ok
   end
 
-  defp init_mainfest(app, migrations_dir, false) do
+  defp init_manifest(app, migrations_dir, false) do
     verbose("Creating `#{migrations_dir}`")
 
     with :ok <- File.mkdir_p(migrations_dir) do
@@ -212,7 +165,7 @@ defmodule ElectricCli.Migrations do
 
   defp has_init_migration(%Manifest{migrations: migrations}) do
     migrations
-    |> Enum.any?(fn %{"title" => title} -> title == "init" end)
+    |> Enum.any?(fn %Migration{title: title} -> title == "init" end)
   end
 
   # defp do_revert(src_folder, app, env, migration_name, current_manifest) do
@@ -284,12 +237,17 @@ defmodule ElectricCli.Migrations do
   #   {IO.ANSI.reset() <> "\n------ ElectricSQL Migrations ------\n\n" <> lines, mismatched}
   # end
 
-  defp optionally_write(_func, _manifest, _migrations_dir, flag) when flag !== true do
-    :ok
+  def optionally_write_postgres(_, _, false), do: :ok
+
+  def optionally_write_postgres(%Manifest{} = manifest, migrations_dir, true) do
+    manifest
+    |> write_postgres(migrations_dir)
   end
 
-  defp optionally_write(func, %Manifest{} = manifest, migrations_dir, _flag) do
-    func.(manifest, migrations_dir)
+  def optionally_write_satellite(_, _, false), do: :ok
+
+  def optionally_write_satellite(%Manifest{} = manifest, migrations_dir, true) do
+    write_satellite(manifest, migrations_dir)
   end
 
   def write_postgres(%Manifest{migrations: migrations}, migrations_dir) do
@@ -322,12 +280,10 @@ defmodule ElectricCli.Migrations do
     error
   end
 
-  defp hydrate_manifest(%Manifest{} = manifest, migrations_dir, postgres_flag, satellite_flag) do
-    with {:ok, %Manifest{} = manifest} <- add_original_bodies(manifest, migrations_dir),
-         {:ok, %Manifest{} = manifest, satellite_warnings} <-
-           add_satellite_triggers(manifest, satellite_flag),
-         {:ok, %Manifest{} = manifest, postgres_warnings} <-
-           add_postgres_bodies(manifest, postgres_flag) do
+  def hydrate_manifest(%Manifest{} = manifest, migrations_dir, postgres_flag, satellite_flag) do
+    with {:ok, manifest} <- add_original_bodies(manifest, migrations_dir),
+         {:ok, manifest, postgres_warnings} <- add_postgres_bodies(manifest, postgres_flag),
+         {:ok, manifest, satellite_warnings} <- add_satellite_triggers(manifest, satellite_flag) do
       {:ok, manifest, satellite_warnings ++ postgres_warnings}
     else
       {:error, _updated_manifest, errors} ->
@@ -343,8 +299,7 @@ defmodule ElectricCli.Migrations do
       migrations
       |> Enum.map(&add_original_body(&1, migrations_dir))
 
-    manifest
-    |> Map.put(:migrations, migrations)
+    {:ok, %{manifest | migrations: migrations}}
   end
 
   defp add_original_body(%Migration{name: name} = migration, migrations_dir) do
@@ -475,26 +430,6 @@ defmodule ElectricCli.Migrations do
 
       {:error, reasons} ->
         {:error, reasons}
-    end
-  end
-
-  defp write_js_bundle(%Manifest{app: app} = manifest, output_dir, target_env, json_env_value) do
-    manifest =
-      manifest
-      |> Map.put(:env, json_env_value)
-
-    dist_folder =
-      [output_dir, app, target_env]
-      |> Path.join()
-
-    bundle_file =
-      dist_folder
-      |> Path.join(@js_bundle_filename)
-
-    with {:ok, json_str} <- Jason.encode(manifest, pretty: true),
-         {result, _} <- Code.eval_quoted(@bundle_template, migrations: json_str),
-         :ok <- File.mkdir_p(dist_folder) do
-      File.write(bundle_file, result)
     end
   end
 

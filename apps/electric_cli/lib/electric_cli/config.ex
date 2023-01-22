@@ -11,6 +11,9 @@ defmodule ElectricCli.Config do
 
   @filename Application.compile_env!(:electric_cli, :config_filename)
 
+  @app_symlink_name "@app"
+  @config_symlink_name "@config"
+
   @derive {Jason.Encoder, except: [:root]}
   @type t() :: %Config{
           app: binary(),
@@ -109,18 +112,27 @@ defmodule ElectricCli.Config do
   Contracts the `directories` so that they're stored relative to
   the config file (so they're easier to read and edit manually).
   """
-  def save(%Config{root: root} = config) do
+  def save(
+        %Config{
+          app: app,
+          defaultEnv: default_env,
+          directories: %Directories{output: output_dir},
+          root: root
+        } = config
+      ) do
     config =
       config
       |> Map.update!(:directories, &contract_directories(&1, root))
       |> Map.update!(:environments, &contract_environments/1)
 
-    # IO.inspect({:saving, config})
-
-    with {:ok, json} <- Jason.encode(config, pretty: true) do
+    config_filepath =
       root
       |> filepath()
-      |> File.write(json <> "\n")
+
+    with {:ok, json} <- Jason.encode(config, pretty: true),
+         :ok <- File.write(config_filepath, json <> "\n"),
+         :ok <- update_symlinks(app, default_env, output_dir) do
+      :ok
     end
   end
 
@@ -187,5 +199,24 @@ defmodule ElectricCli.Config do
   defp filepath(dir) when is_binary(dir) do
     dir
     |> Path.join(@filename)
+  end
+
+  defp update_symlinks(app, default_env, output_dir) do
+    app_link_path = Path.join(output_dir, @app_symlink_name)
+    config_link_path = Path.join(output_dir, @config_symlink_name)
+    config_target = Path.join(app, default_env)
+
+    with :ok <- File.mkdir_p(output_dir),
+         :ok <- overwrite_symlink(app_link_path, app),
+         :ok <- overwrite_symlink(config_link_path, config_target) do
+      :ok
+    end
+  end
+
+  defp overwrite_symlink(path, target) do
+    with {:ok, _} <- File.rm_rf(path) do
+      target
+      |> File.ln_s(path)
+    end
   end
 end

@@ -133,5 +133,35 @@ defmodule ElectricCli.Commands.InitTest do
       assert %Environment{replication: replication} = Map.get(environments, :default)
       assert %Replication{host: "localhost", port: 5133, ssl: false} = replication
     end
+
+    test "sets @config symlink", %{tmp_dir: root} = cxt do
+      args = argv(cxt, ["tarragon-envy-1337"])
+      assert {{:ok, _output}, _} = run_cmd(args)
+
+      assert {:ok,
+              %Config{
+                app: app,
+                defaultEnv: default_env,
+                directories: %{output: output_dir}
+              }} = Config.load(root)
+
+      assert {:ok, link_target} =
+               output_dir
+               |> Path.join("@config")
+               |> File.read_link()
+
+      assert link_target == Path.join(app, default_env)
+    end
+
+    test "sets @app symlink", %{tmp_dir: root} = cxt do
+      args = argv(cxt, ["tarragon-envy-1337"])
+      assert {{:ok, _output}, _} = run_cmd(args)
+      assert {:ok, %Config{app: app, directories: %{output: output_dir}}} = Config.load(root)
+
+      assert {:ok, ^app} =
+               output_dir
+               |> Path.join("@app")
+               |> File.read_link()
+    end
   end
 end

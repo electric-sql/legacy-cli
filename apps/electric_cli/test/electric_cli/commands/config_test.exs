@@ -80,6 +80,32 @@ defmodule ElectricCli.Commands.ConfigTest do
       })
     end
 
+    test "setting app updates @app symlink", %{tmp_dir: root} = cxt do
+      args = argv(cxt, ["--app", "french-onion-1234"])
+      assert {{:ok, _output}, _} = run_cmd(args)
+      assert {:ok, %Config{directories: %{output: output_dir}}} = Config.load(root)
+
+      assert {:ok, "french-onion-1234"} =
+               output_dir
+               |> Path.join("@app")
+               |> File.read_link()
+    end
+
+    test "setting app updates @config symlink", %{tmp_dir: root} = cxt do
+      args = argv(cxt, ["--app", "french-onion-1234"])
+      assert {{:ok, _output}, _} = run_cmd(args)
+
+      assert {:ok, %Config{defaultEnv: default_env, directories: %{output: output_dir}}} =
+               Config.load(root)
+
+      assert {:ok, link_target} =
+               output_dir
+               |> Path.join("@config")
+               |> File.read_link()
+
+      assert link_target == Path.join("french-onion-1234", default_env)
+    end
+
     test "env must exists when updating the default env", cxt do
       args = argv(cxt, ["--env", "staging"])
       assert {{:error, output}, _} = run_cmd(args)
@@ -98,6 +124,21 @@ defmodule ElectricCli.Commands.ConfigTest do
         app: "tarragon-envy-1337",
         env: env
       })
+    end
+
+    test "setting env updates @config symlink", %{tmp_dir: root} = cxt do
+      %{env: env} = add_env(cxt)
+
+      args = argv(cxt, ["--env", env])
+      assert {{:ok, _output}, _} = run_cmd(args)
+      assert {:ok, %Config{app: app, directories: %{output: output_dir}}} = Config.load(root)
+
+      assert {:ok, link_target} =
+               output_dir
+               |> Path.join("@config")
+               |> File.read_link()
+
+      assert link_target == Path.join(app, env)
     end
 
     test "changes the migrations path", %{tmp_dir: root} = cxt do
@@ -166,6 +207,45 @@ defmodule ElectricCli.Commands.ConfigTest do
       args = argv(cxt, ["staging"])
       assert {{:ok, _output}, _} = run_cmd(args)
       assert {:ok, %Config{environments: %{staging: %Environment{}}}} = Config.load(root)
+    end
+
+    test "defaults to not setting as default", %{tmp_dir: root} = cxt do
+      args = argv(cxt, ["staging"])
+      assert {{:ok, _output}, _} = run_cmd(args)
+      assert {:ok, %Config{defaultEnv: default_env}} = Config.load(root)
+      assert default_env != "staging"
+    end
+
+    test "sets as default if instructed", %{tmp_dir: root} = cxt do
+      args = argv(cxt, ["staging", "--set-as-default"])
+      assert {{:ok, _output}, _} = run_cmd(args)
+      assert {:ok, %Config{defaultEnv: "staging"}} = Config.load(root)
+    end
+
+    test "doesn't updates @config symlink if not set as default", %{tmp_dir: root} = cxt do
+      args = argv(cxt, ["staging"])
+      assert {{:ok, _output}, _} = run_cmd(args)
+      assert {:ok, %Config{app: app, directories: %{output: output_dir}}} = Config.load(root)
+
+      assert {:ok, link_target} =
+               output_dir
+               |> Path.join("@config")
+               |> File.read_link()
+
+      assert link_target != Path.join(app, "staging")
+    end
+
+    test "updates @config symlink if set as default", %{tmp_dir: root} = cxt do
+      args = argv(cxt, ["staging", "--set-as-default"])
+      assert {{:ok, _output}, _} = run_cmd(args)
+      assert {:ok, %Config{app: app, directories: %{output: output_dir}}} = Config.load(root)
+
+      assert {:ok, link_target} =
+               output_dir
+               |> Path.join("@config")
+               |> File.read_link()
+
+      assert link_target == Path.join(app, "staging")
     end
 
     test "sets replication data if provided", %{tmp_dir: root} = cxt do
@@ -247,6 +327,57 @@ defmodule ElectricCli.Commands.ConfigTest do
                   }
                 }
               }} = Config.load(root)
+    end
+  end
+
+  describe "electric config update_env --set-as-default" do
+    setup [
+      :login,
+      :init,
+      :add_env
+    ]
+
+    setup do
+      [cmd: ["config", "update_env"]]
+    end
+
+    test "defaults to not setting as default", %{tmp_dir: root} = cxt do
+      args = argv(cxt, ["staging"])
+      assert {{:ok, _output}, _} = run_cmd(args)
+      assert {:ok, %Config{defaultEnv: default_env}} = Config.load(root)
+      assert default_env != "staging"
+    end
+
+    test "sets as default if instructed", %{tmp_dir: root} = cxt do
+      args = argv(cxt, ["staging", "--set-as-default"])
+      assert {{:ok, _output}, _} = run_cmd(args)
+      assert {:ok, %Config{defaultEnv: "staging"}} = Config.load(root)
+    end
+
+    test "doesn't updates @config symlink if not set as default", %{tmp_dir: root} = cxt do
+      args = argv(cxt, ["staging"])
+      assert {{:ok, _output}, _} = run_cmd(args)
+      assert {:ok, %Config{app: app, directories: %{output: output_dir}}} = Config.load(root)
+
+      assert {:ok, link_target} =
+               output_dir
+               |> Path.join("@config")
+               |> File.read_link()
+
+      assert link_target != Path.join(app, "staging")
+    end
+
+    test "updates @config symlink if set as default", %{tmp_dir: root} = cxt do
+      args = argv(cxt, ["staging", "--set-as-default"])
+      assert {{:ok, _output}, _} = run_cmd(args)
+      assert {:ok, %Config{app: app, directories: %{output: output_dir}}} = Config.load(root)
+
+      assert {:ok, link_target} =
+               output_dir
+               |> Path.join("@config")
+               |> File.read_link()
+
+      assert link_target == Path.join(app, "staging")
     end
   end
 

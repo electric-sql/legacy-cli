@@ -77,7 +77,7 @@ defmodule ElectricCli.Commands.CommandFixtures do
     |> new_migration()
   end
 
-  def new_migration(%{migration_name: migration_name, tmp_dir: root} = ctx) do
+  def new_migration(%{migration_name: migration_name} = ctx) do
     {{:ok, _}, _} = run_cmd(["migrations", "new", migration_name])
 
     ctx

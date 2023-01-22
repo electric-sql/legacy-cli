@@ -84,7 +84,7 @@ defmodule ElectricCli.Commands.Migrations do
 
     with {:ok, %Config{} = config} <- Config.load(root) do
       Progress.run("Creating new migration", fn ->
-        case Migrations.new_migration(name, config) do
+        case Migrations.new_migration(config, name) do
           {:ok, relative_file_path} ->
             {:success, "New migration created at:\n#{relative_file_path}"}
 

@@ -2,7 +2,7 @@ defmodule ElectricCli.Commands.Reset do
   use ElectricCli, :command
 
   alias ElectricCli.Config.Environment
-  alias ElectricCli.Migrations
+  alias ElectricCli.Core
 
   def about() do
     """
@@ -49,20 +49,21 @@ defmodule ElectricCli.Commands.Reset do
 
   def reset(%{options: %{env: env, root: root}, flags: %{skip_confirmation: skip_confirmation}}) do
     with {:ok, %Config{app: app} = config} <- Config.load(root),
-         {:ok, %Environment{slug: env_slug}} <- Config.target_environment(config, env),
-         true <- confirm_absolutely_sure(skip_confirmation, app, "#{env_slug}") do
-      # Progress.run("Building migrations", fn ->
-      #   case Migrations.build_migrations(config, env_atom, postgres_flag, satellite_flag) do
-      #     {:ok, nil} ->
-      #       {:success, "Migrations built successfully"}
+         {:ok, %Environment{slug: env_slug} = environment} <-
+           Config.target_environment(config, env),
+         true <- confirm_absolutely_sure(skip_confirmation, app, env_slug) do
+      Progress.run("Resetting", fn ->
+        case Core.reset(config, environment) do
+          {:ok, nil} ->
+            {:success, "Reset #{app}/#{env_slug} successfully"}
 
-      #     {:ok, warnings} ->
-      #       {:success, Util.format_messages("warnings", warnings)}
+          {:ok, warnings} ->
+            {:success, Util.format_messages("warnings", warnings)}
 
-      #     {:error, errors} ->
-      #       {:error, Util.format_messages("errors", errors)}
-      #   end
-      # end)
+          {:error, errors} ->
+            {:error, Util.format_messages("errors", errors)}
+        end
+      end)
     else
       false ->
         {:success, "Reset aborted."}

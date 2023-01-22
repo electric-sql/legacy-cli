@@ -2,7 +2,7 @@ defmodule ElectricCli.Commands.Sync do
   use ElectricCli, :command
 
   alias ElectricCli.Config.Environment
-  alias ElectricCli.Migrations
+  alias ElectricCli.Core
 
   def about() do
     """
@@ -53,10 +53,10 @@ defmodule ElectricCli.Commands.Sync do
     with {:ok, %Config{} = config} <- Config.load(root),
          {:ok, %Environment{} = environment} <- Config.target_environment(config, env),
          :ok <- Session.require_auth() do
-      Progress.run("Sync migrations", false, fn ->
-        case Migrations.sync_migrations(config, environment) do
+      Progress.run("Syncing", false, fn ->
+        case Core.sync(config, environment) do
           {:ok, nil} ->
-            {:success, "Migrations synced successfully"}
+            {:success, "Synced successfully"}
 
           {:ok, warnings} ->
             {:success, Util.format_messages("warnings", warnings)}
