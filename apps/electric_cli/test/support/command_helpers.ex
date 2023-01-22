@@ -1,4 +1,4 @@
-defmodule ElectricCli.Commands.CommandHelpers do
+defmodule ElectricCli.CommandHelpers do
   @moduledoc """
   Helper and fixture-like functions for the command tests.
   """

@@ -48,7 +48,8 @@ defmodule ElectricCli.Commands.Reset do
   end
 
   def reset(%{options: %{env: env, root: root}, flags: %{skip_confirmation: skip_confirmation}}) do
-    with {:ok, %Config{app: app} = config} <- Config.load(root),
+    with :ok <- Session.require_auth(),
+         {:ok, %Config{app: app} = config} <- Config.load(root),
          {:ok, %Environment{slug: env_slug} = environment} <-
            Config.target_environment(config, env),
          true <- confirm_absolutely_sure(skip_confirmation, app, env_slug) do
@@ -56,9 +57,6 @@ defmodule ElectricCli.Commands.Reset do
         case Core.reset(config, environment) do
           {:ok, nil} ->
             {:success, "Reset #{app}/#{env_slug} successfully"}
-
-          {:ok, warnings} ->
-            {:success, Util.format_messages("warnings", warnings)}
 
           {:error, errors} ->
             {:error, Util.format_messages("errors", errors)}

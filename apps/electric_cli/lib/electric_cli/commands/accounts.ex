@@ -38,7 +38,7 @@ defmodule ElectricCli.Commands.Accounts do
           {:results, rows, ["ID", "Name"]}
 
         {:ok, %Req.Response{status: 403}} ->
-          {:error, "invalid credentials"}
+          {:error, :invalid_credentials}
 
         {:error, _exception} ->
           {:error, "couldn't connect to ElectricSQL servers"}

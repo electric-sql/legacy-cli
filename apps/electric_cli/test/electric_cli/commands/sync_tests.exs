@@ -1,7 +1,8 @@
 defmodule ElectricCli.Commands.SyncTest do
   use ElectricCli.CommandCase, async: false
 
-  # alias ElectricCli.Config
+  alias ElectricCli.Bundle
+  alias ElectricCli.Config
 
   describe "electric sync pre init" do
     setup do
@@ -11,7 +12,7 @@ defmodule ElectricCli.Commands.SyncTest do
     test "shows help text if --help passed", cxt do
       args = argv(cxt, ["--help"])
       assert {{:ok, output}, _} = run_cmd(args)
-      assert output =~ ~r/Reset your backend./
+      assert output =~ ~r/Sync local migrations with the backend/
     end
 
     test "returns error if run before electric init in this root", cxt do
@@ -29,13 +30,12 @@ defmodule ElectricCli.Commands.SyncTest do
       [cmd: ["sync"]]
     end
 
-    test "requires electric build", cxt do
-      args = argv(cxt, [])
-      assert {{:error, output}, _} = run_cmd(args)
-      assert output =~ "XXXXXX"
-    end
+    test "sync works without running build first", ctx do
+      args = argv(ctx, [])
+      assert {{:ok, output}, _} = run_cmd(args)
 
-    test "requires electric build for target env"
+      assert output =~ "Synced 1 new migration"
+    end
   end
 
   describe "electric sync" do
@@ -47,17 +47,53 @@ defmodule ElectricCli.Commands.SyncTest do
       [cmd: ["sync"]]
     end
 
-    test "syncs local migrations up"
-    test "syncs backend migrations down"
-    test "syncs target environment"
+    test "syncs initial migration up", ctx do
+      args = argv(ctx, [])
+      assert {{:ok, output}, _} = run_cmd(args)
 
-    # If the app environment on your sync service already has a migration with the
-    # same name but different sha256 then this sync will fail because a migration
-    # cannot be modified once it has been applied.
-    test "same name different sha256 fails"
+      assert output =~ "Synced 1 new migration"
+    end
 
-    # The sync will also fail if the migration has a name that is lower in sort order
-    # than one already applied on the server.
-    test "earlier name fails"
+    test "syncs new migrations up", ctx do
+      new_migration(ctx)
+
+      args = argv(ctx, [])
+      assert {{:ok, output}, _} = run_cmd(args)
+
+      assert output =~ "Synced 2 new migrations"
+    end
+
+    test "rebuilds bundle using server data", %{tmp_dir: root} = ctx do
+      assert {:ok, %Config{defaultEnv: env, directories: %{output: output_dir}}} = Config.load(root)
+
+      bundle_path = Path.join(output_dir, "@config")
+      assert {:ok, %Bundle{env: "local"}} = Bundle.load(bundle_path)
+
+      args = argv(ctx, [])
+      assert {{:ok, _}, _} = run_cmd(args)
+
+      assert {:ok, %Bundle{env: ^env}} = Bundle.load(bundle_path)
+    end
+  end
+
+  describe "electric sync --env ENV" do
+    setup :login
+    setup :init
+    setup :add_env
+    setup :build
+
+    setup do
+      [cmd: ["sync"]]
+    end
+
+    test "syncs target environment", %{env: env, tmp_dir: root} = ctx do
+      assert {:ok, %Config{directories: %{output: output_dir}}} = Config.load(root)
+
+      args = argv(ctx, ["--env", env])
+      assert {{:ok, _}, _} = run_cmd(args)
+
+      bundle_path = Path.join([output_dir, "@app", env])
+      assert {:ok, %Bundle{env: ^env}} = Bundle.load(bundle_path)
+    end
   end
 end

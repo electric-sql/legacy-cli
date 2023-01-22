@@ -1,8 +1,8 @@
-defmodule ElectricCli.Commands.CommandFixtures do
+defmodule ElectricCli.CommandFixtures do
   @moduledoc """
   Helper and fixture-like functions for the command tests.
   """
-  import ElectricCli.Commands.CommandHelpers, only: [run_cmd: 1]
+  import ElectricCli.CommandHelpers, only: [run_cmd: 1]
 
   @default_email "test@electric-sql.com"
   @default_password "password"
@@ -18,7 +18,7 @@ defmodule ElectricCli.Commands.CommandFixtures do
   end
 
   def init(%{app: app} = ctx) do
-    {{:ok, _}, _} = run_cmd("init #{app}")
+    {{:ok, _output}, _} = run_cmd("init #{app}")
 
     ctx
   end

@@ -7,6 +7,8 @@ defmodule ElectricCli.Core do
   alias ElectricCli.Config.Environment
   alias ElectricCli.Manifest
   alias ElectricCli.Migrations
+  alias ElectricCli.Migrations.Api
+  alias ElectricCli.Migrations.Sync
 
   @doc """
   Update the manifest, write out postgres and satellite migrations
@@ -25,7 +27,7 @@ defmodule ElectricCli.Core do
          :ok <- Migrations.optionally_write_postgres(manifest, migrations_dir, has_postgres),
          :ok <- Migrations.optionally_write_satellite(manifest, migrations_dir, has_satellite),
          :ok <- Bundle.write(manifest, environment, output_dir, "local"),
-         {:warning, nil} <- {:warning, warnings} do
+         {:warning, []} <- {:warning, warnings} do
       :ok
     end
   end
@@ -39,11 +41,15 @@ defmodule ElectricCli.Core do
         %Environment{slug: env} = environment
       ) do
     with {:ok, %Manifest{} = manifest} <- Manifest.load(app, migrations_dir, false),
-         {:ok, _msg} <- Migrations.Sync.sync_migrations(manifest, environment),
-         {:ok, %Manifest{} = server_manifest} <-
-           Migrations.Sync.get_migrations_from_server(manifest, environment, true) do
-      server_manifest
-      |> Bundle.write(environment, output_dir, env)
+         {:ok, dynamic_success_message} <- Sync.sync_migrations(manifest, environment),
+         {:ok, %Manifest{} = server_manifest} <- Api.get_server_migrations(app, env, true),
+         :ok <- Bundle.write(server_manifest, environment, output_dir, env) do
+      {:ok, dynamic_success_message}
+    else
+      alt ->
+        IO.inspect({:alt, alt})
+
+        alt
     end
   end
 

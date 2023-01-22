@@ -1,10 +1,12 @@
-defmodule ElectricCli.Commands.ConfigCommandHelpers do
+defmodule ElectricCli.ConfigCommandHelpers do
   @moduledoc """
   Helper and fixture-like functions for the command tests.
   """
   import ExUnit.Assertions, only: [assert: 1]
 
   alias ElectricCli.Config
+  alias ElectricCli.Manifest
+  alias ElectricCli.Manifest.Migration
 
   def assert_config(root, %{
         app: expected_app,
@@ -47,6 +49,9 @@ defmodule ElectricCli.Commands.ConfigCommandHelpers do
              init_migration
              |> Path.join("migration.sql")
              |> File.exists?()
+
+    assert {:ok, %Manifest{migrations: [%Migration{}]}} =
+             Manifest.load(app, migrations_dir, false)
   end
 
   defp is_init_migration(path) do

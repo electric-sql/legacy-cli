@@ -1,5 +1,7 @@
 defmodule ElectricCli.MigrationsTest do
   use ExUnit.Case, async: false
+
+  alias ElectricCli.DatabaseHelpers
   alias ElectricCli.Migrations
   alias ElectricMigrations.Sqlite.Triggers
 
@@ -9,7 +11,7 @@ defmodule ElectricCli.MigrationsTest do
 
   defp electric_conn do
     with {:ok, conn} <- Exqlite.Sqlite3.open(":memory:"),
-         :ok <- Migrations.__initialise_schema__(conn) do
+         :ok <- DatabaseHelpers.init_schema(conn) do
       {:ok, conn}
     end
   end

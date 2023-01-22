@@ -108,7 +108,7 @@ defmodule ElectricCli.Commands.Apps do
           {:results, rows, ["ID", "Name", "Environment", "Status"]}
 
         {:ok, %Req.Response{}} ->
-          {:error, "invalid credentials"}
+          {:error, :invalid_credentials}
 
         {:error, _exception} ->
           {:error, "couldn't connect to ElectricSQL servers"}
@@ -158,7 +158,7 @@ defmodule ElectricCli.Commands.Apps do
           {:results, rows, ["ID", "Name", "Environment", "Status"]}
 
         {:ok, %Req.Response{}} ->
-          {:error, "invalid credentials"}
+          {:error, :invalid_credentials}
 
         {:error, _exception} ->
           {:error, "couldn't connect to ElectricSQL servers"}

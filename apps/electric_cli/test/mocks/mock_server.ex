@@ -93,18 +93,18 @@ defmodule ElectricCli.MockServer do
     }
   }
 
-  defp get_some_migrations(app) do
-    looked_up = @fixtures[app]
-    #    IO.inspect(looked_up)
-    if looked_up == nil do
-      []
-    else
-      looked_up
+  defp get_migrations(app) do
+    case @fixtures[app] do
+      nil ->
+        []
+
+      alt ->
+        alt
     end
   end
 
-  defp get_a_migration(migration_name) do
-    @migration_fixtures[migration_name]
+  defp get_migration(name) do
+    @migration_fixtures[name]
   end
 
   defp authenticated(conn) do
@@ -131,6 +131,25 @@ defmodule ElectricCli.MockServer do
     conn
     |> Conn.resp(status, json_str)
     |> Conn.put_resp_header("Content-Type", "application/json")
+  end
+
+  post "api/v1/auth/login" do
+    case conn.body_params do
+      %{"data" => %{"email" => "test@electric-sql.com", "password" => "password"}} ->
+        data = %{
+          email: "test@electric-sql.com",
+          id: "00000000-0000-0000-0000-000000000000",
+          token: "test_JWT_token",
+          refreshToken: "test_refresh_JWT_token"
+        }
+
+        conn
+        |> json(200, %{data: data})
+
+      _ ->
+        conn
+        |> json(401, %{error: %{details: "no account with this email"}})
+    end
   end
 
   get "api/v1/accounts" do
@@ -188,98 +207,77 @@ defmodule ElectricCli.MockServer do
     end
   end
 
-  post "api/v1/auth/login" do
-    case conn.body_params do
-      %{"data" => %{"email" => "test@electric-sql.com", "password" => "password"}} ->
-        data = %{
-          email: "test@electric-sql.com",
-          id: "00000000-0000-0000-0000-000000000000",
-          token: "test_JWT_token",
-          refreshToken: "test_refresh_JWT_token"
+  get "api/v1/apps/:app" do
+    with {:ok, conn} <- authenticated(conn) do
+      app_info = %{
+        "data" => %{
+          "databases" => [
+            %{
+              "slug" => "default",
+              "name" => "Default",
+              "status" => "provisioned",
+              "type" => "postgres"
+            }
+          ],
+          "id" => app,
+          "name" => "Example App",
+          "slug" => "example-app"
         }
+      }
 
-        conn
-        |> json(200, %{data: data})
-
-      _ ->
-        conn
-        |> json(401, %{error: %{details: "no account with this email"}})
+      conn
+      |> json(200, app_info)
     end
   end
 
   get "api/v1/apps/:app/environments/:env/migrations" do
-    data = %{
-      "migrations" => get_some_migrations(app)
-    }
+    IO.inspect({:XXX, app, get_migrations(app)})
 
-    conn
-    |> json(200, data)
-  end
-
-  get "api/v1/apps/:app/environments/:env/migrations/:migration_name" do
-    data = %{
-      "migration" => get_a_migration(migration_name)
-    }
-
-    conn
-    |> json(200, data)
-  end
-
-  post "api/v1/apps/status-422/environments/:env/migrations" do
-    data = %{
-      errors: %{
-        original_body: ["The table items is not STRICT."]
+    with {:ok, conn} <- authenticated(conn) do
+      data = %{
+        "migrations" => get_migrations(app)
       }
-    }
 
-    conn
-    |> json(422, data)
-  end
-
-  post "api/v1/apps/:app/environments/:env/migrations" do
-    conn
-    |> json(201, "\"ok\"")
-  end
-
-  post "api/v1/apps/:app/environments/:env/migrate" do
-    conn
-    |> json(200, "\"ok\"")
-  end
-
-  @authenticated_apps ["tarragon-envy-1337", "french-onion-1234"]
-
-  get "api/v1/apps/:app" do
-    case conn.params["app"] do
-      app when app in @authenticated_apps ->
-        with {:ok, conn} <- authenticated(conn) do
-          conn
-          |> get_app(app)
-        end
-
-      app ->
-        conn
-        |> get_app(app)
+      conn
+      |> json(200, data)
     end
   end
 
-  def get_app(conn, app) do
-    app_info = %{
-      "data" => %{
-        "databases" => [
-          %{
-            "slug" => "default",
-            "name" => "Default",
-            "status" => "provisioned",
-            "type" => "postgres"
-          }
-        ],
-        "id" => app,
-        "name" => "Example App",
-        "slug" => "example-app"
+  get "api/v1/apps/:app/environments/:env/migrations/:name" do
+    with {:ok, conn} <- authenticated(conn) do
+      data = %{
+        "migration" => get_migration(name)
       }
-    }
 
-    conn
-    |> json(200, app_info)
+      conn
+      |> json(200, data)
+    end
+  end
+
+  post "api/v1/apps/status-422/environments/:env/migrations" do
+    with {:ok, conn} <- authenticated(conn) do
+      data = %{
+        errors: %{
+          original_body: ["The table items is not STRICT."]
+        }
+      }
+
+      conn
+      |> json(422, data)
+    end
+  end
+
+  post "api/v1/apps/:app/environments/:env/migrations" do
+    with {:ok, conn} <- authenticated(conn) do
+      conn
+      |> json(201, "\"ok\"")
+    end
+  end
+
+  post "api/v1/apps/:app/environments/:env/migrate" do
+    with {:ok, conn} <- authenticated(conn) do
+      conn
+      |> json(200, "\"ok\"")
+    end
   end
 end

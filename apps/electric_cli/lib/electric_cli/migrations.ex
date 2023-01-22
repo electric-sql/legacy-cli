@@ -9,6 +9,7 @@ defmodule ElectricCli.Migrations do
   alias ElectricCli.Config.Environment
   alias ElectricCli.Manifest
   alias ElectricCli.Manifest.Migration
+  alias ElectricCli.Migrations.Api
   alias ElectricCli.Util
 
   @migration_filename "migration.sql"
@@ -29,52 +30,6 @@ defmodule ElectricCli.Migrations do
 
   def satellite_template do
     @satellite_template
-  end
-
-  if Mix.env() == :test do
-    # this is now done by satellite but we need to duplicate it here in to bootstrap a database and
-    # validate that we're correctly adding the triggers
-    @doc false
-    def __initialise_schema__(conn) do
-      Exqlite.Sqlite3.execute(
-        conn,
-        """
-        -- The ops log table
-        CREATE TABLE IF NOT EXISTS _electric_oplog (
-          rowid INTEGER PRIMARY KEY AUTOINCREMENT,
-          namespace String NOT NULL,
-          tablename String NOT NULL,
-          optype String NOT NULL,
-          primaryKey String NOT NULL,
-          newRow String,
-          oldRow String,
-          timestamp TEXT
-        );
-
-        -- Somewhere to keep our metadata
-        CREATE TABLE IF NOT EXISTS _electric_meta (
-          key TEXT PRIMARY KEY,
-          value BLOB
-        );
-
-        -- Somewhere to track migrations
-        CREATE TABLE IF NOT EXISTS _electric_migrations (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          name TEXT NOT NULL UNIQUE,
-          sha256 TEXT NOT NULL,
-          applied_at TEXT NOT NULL
-        );
-
-        -- Initialisation of the metadata table
-        INSERT INTO _electric_meta (key, value) VALUES
-          ('compensations', 0),
-          ('lastAckdRowId','0'),
-          ('lastSentRowId', '0'),
-          ('lsn', 'MA=='),
-          ('clientId', '');
-        """
-      )
-    end
   end
 
   @doc """
@@ -117,18 +72,17 @@ defmodule ElectricCli.Migrations do
     end
   end
 
-  def list_migrations(_options, _env) do
-    # template = Map.get(options, :template, @satellite_template)
-
-    # with {:ok, src_folder} <- check_migrations_folder(options),
-    #      {:ok, app} <- check_app(src_folder),
-    #      {:ok, updated_manifest, _warnings} <- update_manifest(src_folder, template),
-    #      {:ok, all_env_manifests} <-
-    #        Migrations.Sync.get_all_migrations_from_server(app) do
-    #   {listing, mismatched} = format_listing(updated_manifest, all_env_manifests)
-    #   {:ok, listing, mismatched}
-    # end
-    raise RuntimeError, message: "Not implemented"
+  @doc """
+  List migrations and their status for a given app and env.
+  """
+  def list_migrations(%Config{app: app, directories: %{migrations: migrations_dir}}, %Environment{
+        slug: env
+      }) do
+    with {:ok, %Manifest{} = manifest} <- Manifest.load(app, migrations_dir, true),
+         {:ok, %Manifest{} = manifest, []} <- hydrate_manifest(manifest, migrations_dir),
+         {:ok, %Manifest{} = server_manifest} <- Api.get_server_migrations(app, env) do
+      format_migration_listing(manifest, server_manifest)
+    end
   end
 
   def revert_migration(_env, _migration_name, _options) do
@@ -168,9 +122,56 @@ defmodule ElectricCli.Migrations do
     |> Enum.any?(fn %Migration{title: title} -> title == "init" end)
   end
 
+  defp format_migration_listing(
+         %Manifest{migrations: local_migrations},
+         %Manifest{migrations: server_migrations}
+       ) do
+    IO.inspect({:format_migration_listing, local_migrations, server_migrations})
+
+    server_migration_map =
+      server_migrations
+      |> Enum.map(fn %Migration{name: name} = migration -> {name, migration} end)
+      |> Enum.into(%{})
+
+    {rows, mismatched} =
+      local_migrations
+      |> Enum.reduce({[], []}, fn %Migration{name: name, sha256: sha256, title: title} = migration,
+                                  {rows, mismatched} ->
+        {status, is_mismatch} =
+          case Map.get(server_migration_map, name) do
+            nil ->
+              {"-", false}
+
+            %{"sha256" => ^sha256, "status" => status} ->
+              {IO.ANSI.green() <> status <> IO.ANSI.reset(), false}
+
+            _ ->
+              {IO.ANSI.red() <> "different" <> IO.ANSI.reset(), true}
+          end
+
+        row = [name, title, status]
+        rows = rows ++ [row]
+
+        mismatched =
+          case is_mismatch do
+            true ->
+              mismatched ++ [migration]
+
+            false ->
+              mismatched
+          end
+
+        {rows, mismatched}
+      end)
+
+    IO.inspect({:results, rows, mismatched})
+
+    {:ok, {:results, rows, ["Name", "Title", "Status"]}, mismatched}
+  end
+
   # defp do_revert(src_folder, app, env, migration_name, current_manifest) do
   #   with {:ok, %{"migration" => server_migration}} <-
-  #          Migrations.Sync.get_full_migration_from_server(
+  #          Api.get_full_server_migration(
   #            app,
   #            env,
   #            migration_name
@@ -198,45 +199,6 @@ defmodule ElectricCli.Migrations do
   #   end
   # end
 
-  # defp format_listing(local_manifest, all_env_manifests) do
-  #   manifest_lookup =
-  #     for {env_name, manifest} <- all_env_manifests do
-  #       lookup =
-  #         for migration <- manifest["migrations"], into: %{} do
-  #           {migration["name"], migration}
-  #         end
-
-  #       %{"name" => env_name, "lookup" => lookup}
-  #     end
-
-  #   {lines, mismatched} =
-  #     Enum.reduce(local_manifest["migrations"], {"", []}, fn migration, {lines, mismatched} ->
-  #       {line, mismatches} =
-  #         Enum.reduce(manifest_lookup, {"#{migration["name"]}", []}, fn env, {line, mismatches} ->
-  #           sha256 = migration["sha256"]
-
-  #           {status, mismatch} =
-  #             case env["lookup"][migration["name"]] do
-  #               nil ->
-  #                 {"-", []}
-
-  #               %{"sha256" => ^sha256, "status" => status} ->
-  #                 {IO.ANSI.green() <> status <> IO.ANSI.reset(), []}
-
-  #               _ ->
-  #                 {IO.ANSI.red() <> "different" <> IO.ANSI.reset(),
-  #                  [{migration["name"], env["name"]}]}
-  #             end
-
-  #           {line <> "\t#{env["name"]}: #{status}", mismatches ++ mismatch}
-  #         end)
-
-  #       {lines <> line <> "\n", mismatched ++ mismatches}
-  #     end)
-
-  #   {IO.ANSI.reset() <> "\n------ ElectricSQL Migrations ------\n\n" <> lines, mismatched}
-  # end
-
   def optionally_write_postgres(_, _, false), do: :ok
 
   def optionally_write_postgres(%Manifest{} = manifest, migrations_dir, true) do
@@ -250,7 +212,7 @@ defmodule ElectricCli.Migrations do
     write_satellite(manifest, migrations_dir)
   end
 
-  def write_postgres(%Manifest{migrations: migrations}, migrations_dir) do
+  defp write_postgres(%Manifest{migrations: migrations}, migrations_dir) do
     migrations
     |> Enum.reduce(:ok, &write_postgres(&1, &2, migrations_dir))
   end
@@ -265,7 +227,7 @@ defmodule ElectricCli.Migrations do
     error
   end
 
-  def write_satellite(%Manifest{migrations: migrations}, migrations_dir) do
+  defp write_satellite(%Manifest{migrations: migrations}, migrations_dir) do
     migrations
     |> Enum.reduce(:ok, &write_satellite(&1, &2, migrations_dir))
   end
@@ -280,7 +242,12 @@ defmodule ElectricCli.Migrations do
     error
   end
 
-  def hydrate_manifest(%Manifest{} = manifest, migrations_dir, postgres_flag, satellite_flag) do
+  def hydrate_manifest(
+        %Manifest{} = manifest,
+        migrations_dir,
+        postgres_flag \\ false,
+        satellite_flag \\ false
+      ) do
     with {:ok, manifest} <- add_original_bodies(manifest, migrations_dir),
          {:ok, manifest, postgres_warnings} <- add_postgres_bodies(manifest, postgres_flag),
          {:ok, manifest, satellite_warnings} <- add_satellite_triggers(manifest, satellite_flag) do
@@ -382,7 +349,7 @@ defmodule ElectricCli.Migrations do
 
   # XXX switch from typed to string keyed map.
   defp add_postgres_bodies(%Manifest{} = manifest, false) do
-    {:ok, manifest, nil}
+    {:ok, manifest, []}
   end
 
   defp add_postgres_bodies(%Manifest{} = manifest, true) do
@@ -416,7 +383,7 @@ defmodule ElectricCli.Migrations do
     {status, Map.merge(manifest, %{"migrations" => migrations}), messages}
   end
 
-  def add_postgres_to_migrations(migrations) do
+  defp add_postgres_to_migrations(migrations) do
     migration = List.last(migrations)
 
     verbose("Generating PostgreSQL migration `#{migration["name"]}`")
@@ -463,8 +430,7 @@ defmodule ElectricCli.Migrations do
     {status, Map.merge(manifest, %{"migrations" => migrations}), messages}
   end
 
-  @doc false
-  def add_triggers_to_migration(migration_set, template, add_raw_satellite \\ false) do
+  defp add_triggers_to_migration(migration_set, template, add_raw_satellite) do
     migration = List.last(migration_set)
     hash = calc_hash(migration["original_body"])
 

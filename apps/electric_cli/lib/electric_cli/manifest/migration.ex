@@ -1,5 +1,5 @@
 defmodule ElectricCli.Manifest.Migration do
-  @derive {Jason.Encoder, except: [:original_body, :satellite_raw]}
+  @derive {Jason.Encoder, except: [:original_body, :satellite_raw, :status]}
   @type t() :: %__MODULE__{
           encoding: binary(),
           name: binary(),
@@ -8,6 +8,7 @@ defmodule ElectricCli.Manifest.Migration do
           satellite_body: [binary()],
           satellite_raw: binary(),
           sha256: binary(),
+          status: binary(),
           title: binary()
         }
   @enforce_keys [
@@ -25,6 +26,7 @@ defmodule ElectricCli.Manifest.Migration do
     :satellite_body,
     :satellite_raw,
     :sha256,
+    :status,
     :title
   ]
 

@@ -46,7 +46,7 @@ defmodule ElectricCli.ElectricCli.SyncTest do
     {:ok, msg} =
       ElectricCli.Migrations.Sync.upload_new_migrations("app-name", "production", migrations)
 
-    assert msg == "Synchronized 2 new migrations successfully"
+    assert msg == "Synced 2 new migrations successfully"
   end
 
   test "handles 422 error responses for invalid migrations" do
@@ -293,6 +293,6 @@ defmodule ElectricCli.ElectricCli.SyncTest do
     {:ok, msg} =
       ElectricCli.Migrations.Sync.sync_migrations("app-name-2", "production", local_bundle)
 
-    assert msg == "Synchronized 1 new migrations successfully"
+    assert msg == "Synced 1 new migrations successfully"
   end
 end

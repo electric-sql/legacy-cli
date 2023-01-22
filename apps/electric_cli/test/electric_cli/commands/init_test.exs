@@ -4,6 +4,7 @@ defmodule ElectricCli.Commands.InitTest do
   alias ElectricCli.Config
   alias ElectricCli.Config.Environment
   alias ElectricCli.Config.Replication
+  alias ElectricCli.Manifest
 
   describe "electric init unauthenticated" do
     setup do
@@ -134,8 +135,18 @@ defmodule ElectricCli.Commands.InitTest do
       assert %Replication{host: "localhost", port: 5133, ssl: false} = replication
     end
 
-    test "sets @config symlink", %{tmp_dir: root} = cxt do
-      args = argv(cxt, ["tarragon-envy-1337"])
+    test "creates manifest with one migration", %{tmp_dir: root} = ctx do
+      args = argv(ctx, ["tarragon-envy-1337"])
+      assert {{:ok, _output}, _} = run_cmd(args)
+
+      assert {:ok, %Config{app: app, directories: %{migrations: migrations_dir}}} = Config.load(root)
+      assert {:ok, %Manifest{migrations: migrations}} = Manifest.load(app, migrations_dir, false)
+
+      assert Enum.count(migrations) == 1
+    end
+
+    test "sets @config symlink", %{tmp_dir: root} = ctx do
+      args = argv(ctx, ["tarragon-envy-1337"])
       assert {{:ok, _output}, _} = run_cmd(args)
 
       assert {:ok,

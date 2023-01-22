@@ -16,14 +16,7 @@ defmodule ElectricCli.Apps do
       :ok
     else
       {:ok, %Req.Response{}} ->
-        {:error, "invalid credentials",
-         [
-           "Did you run ",
-           IO.ANSI.yellow(),
-           "electric auth login EMAIL",
-           IO.ANSI.reset(),
-           " on this machine?"
-         ]}
+        {:error, :invalid_credentials}
 
       {:error, {:invalid, _}} ->
         {:error, "invalid app id"}

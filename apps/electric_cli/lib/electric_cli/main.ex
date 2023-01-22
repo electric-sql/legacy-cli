@@ -192,6 +192,19 @@ defmodule ElectricCli.Main do
     halt(status)
   end
 
+  defp map_result({:error, :invalid_credentials}) do
+    hint = [
+      "Did you run ",
+      IO.ANSI.yellow(),
+      "electric auth login EMAIL",
+      IO.ANSI.reset(),
+      " on this machine?"
+    ]
+
+    {:error, "invalid credentials", hint}
+    |> map_result()
+  end
+
   defp map_result({:error, errors}),
     do:
       {:error,

@@ -8,9 +8,9 @@ defmodule ElectricCli.CommandCase do
     quote do
       import ExUnit.CaptureIO, only: [capture_io: 1, with_io: 1]
 
-      import ElectricCli.Commands.CommandFixtures
-      import ElectricCli.Commands.CommandHelpers
-      import ElectricCli.Commands.ConfigCommandHelpers
+      import ElectricCli.CommandFixtures
+      import ElectricCli.CommandHelpers
+      import ElectricCli.ConfigCommandHelpers
 
       @moduletag :tmp_dir
     end

@@ -65,12 +65,13 @@ defmodule ElectricCli.Commands.Migrations do
   end
 
   def list(%{options: %{env: env, root: root}}) do
-    with {:ok, %Config{} = config} <- Config.load(root),
+    with :ok <- Session.require_auth(),
+         {:ok, %Config{} = config} <- Config.load(root),
          {:ok, %Environment{} = environment} <- Config.target_environment(config, env) do
       Progress.run("Listing migrations", fn ->
         case Migrations.list_migrations(config, environment) do
-          {:ok, listing, _mismatched} ->
-            {:success, listing}
+          {:ok, {:results, rows, headings}, _mismatched} ->
+            {:results, rows, headings}
 
           {:error, errors} ->
             {:error, Util.format_messages("errors", errors)}
@@ -96,7 +97,8 @@ defmodule ElectricCli.Commands.Migrations do
   end
 
   def revert(%{options: %{env: env, migration_name: migration_name, root: root}}) do
-    with {:ok, %Config{} = config} <- Config.load(root),
+    with :ok <- Session.require_auth(),
+         {:ok, %Config{} = config} <- Config.load(root),
          {:ok, %Environment{} = environment} <- Config.target_environment(config, env) do
       Progress.run("Reverting migration", fn ->
         case Migrations.revert_migration(config, environment, migration_name) do

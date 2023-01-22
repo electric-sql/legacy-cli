@@ -3,7 +3,21 @@ defmodule ElectricCli.Commands.ResetTest do
 
   # alias ElectricCli.Config
 
+  describe "electric reset unauthenticated" do
+    setup do
+      [cmd: ["reset"]]
+    end
+
+    test "requires authentication", ctx do
+      args = argv(ctx, [])
+      assert {{:error, output}, _} = run_cmd(args)
+      assert output =~ "Couldn't find ElectricSQL credentials"
+    end
+  end
+
   describe "electric reset pre init" do
+    setup :login
+
     setup do
       [cmd: ["reset"]]
     end

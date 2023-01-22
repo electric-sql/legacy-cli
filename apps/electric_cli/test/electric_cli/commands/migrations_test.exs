@@ -1,8 +1,6 @@
 defmodule ElectricCli.Commands.MigrationsTest do
   use ElectricCli.CommandCase, async: false
 
-  # alias ElectricCli.Config
-  # alias ElectricCli.Config.Environment
   alias ElectricCli.Manifest
   alias ElectricCli.Manifest.Migration
 
@@ -96,12 +94,11 @@ defmodule ElectricCli.Commands.MigrationsTest do
       [cmd: ["migrations", "list"]]
     end
 
-    test "requires authentication"
-    # , cxt do
-    #   args = argv(cxt, [])
-    #   assert {{:error, output}, _} = run_cmd(args)
-    #   assert output =~ "electric auth login"
-    # end
+    test "requires authentication", ctx do
+      args = argv(ctx, [])
+      assert {{:error, output}, _} = run_cmd(args)
+      assert output =~ "electric auth login"
+    end
   end
 
   describe "electric migrations list post init" do
@@ -112,48 +109,48 @@ defmodule ElectricCli.Commands.MigrationsTest do
       [cmd: ["migrations", "list"]]
     end
 
-    test "lists initial migration"
-    # , cxt do
-    #   args = argv(cxt, [])
-    #   assert {{:ok, output}, _} = run_cmd(args)
-    #   assert output =~ "XXXXXXX"
-    # end
+    test "lists initial migration", ctx do
+      args = argv(ctx, [])
+      assert {{:ok, output}, _} = run_cmd(args)
+      assert output =~ ~r/Name\s+Title\s+Status/
+      assert output =~ ~r/[0-9_]+_init\s+init\s+[-]/
+    end
   end
 
-  describe "electric migrations list post build" do
+  describe "electric migrations list new migration" do
     setup :login
     setup :init
-    # setup :new_migration
-    # setup :build
+    setup :new_migration
 
     setup do
       [cmd: ["migrations", "list"]]
     end
 
-    test "lists as built"
-    # , cxt do
-    #   args = argv(cxt, [])
-    #   assert {{:ok, output}, _} = run_cmd(args)
-    #   assert output =~ "XXXXXXX"
-    # end
-  end
-
-  describe "electric migrations list post sync" do
-    setup :login
-    setup :init
-    # setup :new_migration
-    # setup :build
-    # setup :sync
-
-    setup do
-      [cmd: ["migrations", "list"]]
+    test "lists both migrations still as unsynced", ctx do
+      args = argv(ctx, [])
+      assert {{:ok, output}, _} = run_cmd(args)
+      assert output =~ ~r/[0-9_]+_init\s+init\s+[-]/
+      assert output =~ ~r/[0-9_]+_create_foos\s+create foos\s+[-]/
     end
-
-    test "lists as synced"
-    # , cxt do
-    #   args = argv(cxt, [])
-    #   assert {{:ok, output}, _} = run_cmd(args)
-    #   assert output =~ "XXXXXXX"
-    # end
   end
+
+  # describe "electric migrations list post sync" do
+  #   setup(ctx) do
+  #     ctx
+  #     |> Map.put(:app, "app-name-2")
+  #   end
+
+  #   setup :login
+  #   setup :init
+
+  #   setup do
+  #     [cmd: ["migrations", "list"]]
+  #   end
+
+  #   test "lists as applied", ctx do
+  #     args = argv(ctx, [])
+  #     assert {{:ok, output}, _} = run_cmd(args)
+  #     assert output =~ ~r/1666612306_test_migration\s+test migration\s+applied/
+  #   end
+  # end
 end
