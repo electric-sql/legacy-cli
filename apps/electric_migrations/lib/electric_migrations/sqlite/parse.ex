@@ -6,6 +6,7 @@ defmodule ElectricMigrations.Sqlite.Parse do
   alias ElectricMigrations.Sqlite.Introspect
 
   @allowed_sql_types ["integer", "real", "text", "blob"]
+  @default_sqlite_namespace "main"
 
   @type migration :: %{original_body: String.t(), name: String.t()}
 
@@ -16,7 +17,7 @@ defmodule ElectricMigrations.Sqlite.Parse do
   @spec sql_ast_from_migrations([migration(), ...], String.t()) ::
           {:ok, %{required(String.t()) => Ast.FullTableInfo.t()}, nil}
           | {:error, [String.t(), ...]}
-  def sql_ast_from_migrations(migrations, default_namespace \\ "main") do
+  def sql_ast_from_migrations(migrations, default_namespace \\ @default_sqlite_namespace) do
     case ast_from_ordered_migrations(migrations, default_namespace) do
       {ast, [], []} ->
         {:ok, ast, nil}
