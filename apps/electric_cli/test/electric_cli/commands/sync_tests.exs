@@ -12,7 +12,7 @@ defmodule ElectricCli.Commands.SyncTest do
     test "shows help text if --help passed", ctx do
       args = argv(ctx, ["--help"])
       assert {{:ok, output}, _} = run_cmd(args)
-      assert output =~ ~r/Sync local migrations with the backend/
+      assert output =~ ~r/Sync migrations upto the backend/
     end
 
     test "returns error if run before electric init in this root", ctx do

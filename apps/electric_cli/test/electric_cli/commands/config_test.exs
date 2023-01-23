@@ -13,7 +13,7 @@ defmodule ElectricCli.Commands.ConfigTest do
     test "shows help text if --help passed", ctx do
       args = argv(ctx, ["--help"])
       assert {{:ok, output}, _} = run_cmd(args)
-      assert output =~ ~r/Manage local application configuration/
+      assert output =~ ~r/Manage local configuration/
     end
   end
 

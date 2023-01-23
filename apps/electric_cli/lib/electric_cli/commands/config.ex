@@ -20,7 +20,7 @@ defmodule ElectricCli.Commands.Config do
 
   def about do
     """
-    Manage local application configuration.
+    Manage local configuration.
 
     Updates the local application configuration stored in your `electric.json` file.
     """
