@@ -1,6 +1,8 @@
 defmodule ElectricCli.Manifest.Migration do
+  alias __MODULE__
+
   @derive {Jason.Encoder, except: [:original_body, :satellite_raw, :status]}
-  @type t() :: %__MODULE__{
+  @type t() :: %Migration{
           encoding: binary(),
           name: binary(),
           original_body: binary(),
@@ -31,4 +33,17 @@ defmodule ElectricCli.Manifest.Migration do
   ]
 
   use ExConstructor
+
+  @upload_keys [
+    :name,
+    :original_body,
+    :satellite_body,
+    :sha256,
+    :title
+  ]
+
+  def upload_data(%Migration{} = migration) do
+    migration
+    |> Map.take(@upload_keys)
+  end
 end

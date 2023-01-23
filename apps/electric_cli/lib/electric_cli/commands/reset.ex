@@ -76,6 +76,8 @@ defmodule ElectricCli.Commands.Reset do
   end
 
   defp confirm_absolutely_sure(false, app, env) do
+    mode = Application.fetch_env!(:electric_cli, :mode)
+
     """
     You're about to reset:
 
@@ -90,7 +92,7 @@ defmodule ElectricCli.Commands.Reset do
     |> String.trim()
     |> Kernel.<>(" ")
     |> IO.gets()
-    |> handle_confirmation_input(Mix.env())
+    |> handle_confirmation_input(mode)
   end
 
   defp handle_confirmation_input(:eof, :test) do

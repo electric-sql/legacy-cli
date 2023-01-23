@@ -177,9 +177,9 @@ defmodule ElectricCli.Commands.MigrationsTest do
     end
 
     test "complains when missing", ctx do
-      args = argv(ctx, ["not a migration"])
+      args = argv(ctx, ["not_a_migration"])
       assert {{:error, output}, _} = run_cmd(args)
-      assert output =~ "not found"
+      assert output =~ "not found locally"
     end
 
     test "works when changed", %{tmp_dir: root} = ctx do

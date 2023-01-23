@@ -90,17 +90,12 @@ defmodule ElectricCli.Migrations do
         %Environment{slug: env},
         migration_name
       ) do
-    with {:ok, %Manifest{} = manifest} <- Manifest.load(app, migrations_dir, true),
-         {:ok, %Manifest{} = local_manifest, []} <- hydrate_manifest(manifest, migrations_dir),
-         {:local, %Migration{} = local_migration} <-
-           {:local, Manifest.named_migration(local_manifest, migration_name)},
-         {:ok, %Manifest{} = server_manifest} <- Api.get_server_migrations(app, env),
-         {:server, %Migration{} = server_migration} <-
-           {:server, Manifest.named_migration(server_manifest, migration_name)},
-         {:ok, _, mismatched} <- format_migration_listing(local_manifest, server_manifest),
-         _ <- IO.inspect({:mismatched, mismatched}),
-         _ <- IO.inspect({:local_migration, local_migration}),
-         true <- mismatched_has_target_migration(mismatched, local_migration),
+    with {:ok, %Manifest{} = local_manifest} <- Manifest.load(app, migrations_dir, true),
+         %Migration{} = local_migration <-
+           Manifest.named_migration(local_manifest, migration_name),
+         {:ok, %Migration{} = server_migration} <-
+           Api.get_full_server_migration(app, env, migration_name),
+         true <- local_migration.sha256 != server_migration.sha256,
          :ok <- revert_and_save_manifest(local_manifest, server_migration, migrations_dir) do
       overwrite_migration_sql(server_migration, migrations_dir)
     else
@@ -111,15 +106,13 @@ defmodule ElectricCli.Migrations do
              "with the same name applied to environment `#{env}`."
          ]}
 
-      {:local, nil} ->
+      nil ->
         {:error, "Migration `#{migration_name}` not found locally."}
 
-      {:server, nil} ->
+      {:error, :not_found} ->
         {:error, "Migration `#{migration_name}` not found at environment `#{env}`."}
 
       alt ->
-        IO.inspect({:alt, alt})
-
         alt
     end
   end
@@ -196,10 +189,10 @@ defmodule ElectricCli.Migrations do
             nil ->
               {"-", false}
 
-            %{"sha256" => ^sha256, "status" => status} ->
+            %{sha256: ^sha256, status: status} ->
               {IO.ANSI.green() <> status <> IO.ANSI.reset(), false}
 
-            _ ->
+            _alt ->
               {IO.ANSI.red() <> "different" <> IO.ANSI.reset(), true}
           end
 
@@ -219,13 +212,6 @@ defmodule ElectricCli.Migrations do
       end)
 
     {:ok, {:results, rows, ["Name", "Title", "Status"]}, mismatched}
-  end
-
-  defp mismatched_has_target_migration([], %Migration{}), do: false
-
-  defp mismatched_has_target_migration(mismatched_migrations, %Migration{name: target_name}) do
-    mismatched_migrations
-    |> Enum.any?(fn %Migration{name: name} -> name == target_name end)
   end
 
   def optionally_write_postgres(_, _, false), do: :ok

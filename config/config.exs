@@ -16,6 +16,9 @@ config :electric_cli,
   verbose: false
 
 if config_env() == :dev do
+  config :electric_cli,
+    mode: :dev
+
   # Git hooks for analysis and formatting.
   config :git_hooks,
     auto_install: true,
@@ -35,5 +38,13 @@ if config_env() == :dev do
 end
 
 if config_env() == :prod do
+  config :electric_cli,
+    mode: :prod
+
   config :logger, level: :emergency
+end
+
+if config_env() == :test do
+  config :electric_cli,
+    mode: :test
 end

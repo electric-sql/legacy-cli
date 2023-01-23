@@ -42,6 +42,8 @@ defmodule ElectricCli.Core do
         %Environment{slug: env} = environment
       ) do
     with {:ok, %Manifest{} = manifest} <- Manifest.load(app, migrations_dir, false),
+         {:ok, %Manifest{} = manifest, []} <-
+           Migrations.hydrate_manifest(manifest, migrations_dir),
          {:ok, dynamic_success_message} <- Sync.sync_migrations(manifest, environment),
          {:ok, %Manifest{} = server_manifest} <- Api.get_server_migrations(app, env, true),
          :ok <- Bundle.write(server_manifest, environment, output_dir, env) do

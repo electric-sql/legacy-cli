@@ -588,7 +588,6 @@ defmodule ElectricCli.MigrationsTest do
   def get_while(conn, statement, names) do
     case Exqlite.Sqlite3.step(conn, statement) do
       {:row, result} ->
-        #        IO.inspect(result)
         get_while(conn, statement, result ++ names)
 
       :done ->

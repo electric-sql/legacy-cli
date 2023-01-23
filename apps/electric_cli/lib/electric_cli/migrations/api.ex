@@ -43,11 +43,14 @@ defmodule ElectricCli.Migrations.Api do
     path = "apps/#{app}/environments/#{env}/migrations/#{migration_name}?body=all"
 
     case Client.get(path) do
-      {:ok, %Response{status: 200, body: data}} ->
+      {:ok, %Response{status: 200, body: %{"migration" => data}}} ->
         {:ok, Migration.new(data)}
 
       {:ok, %Response{status: status}} when status in [401, 403] ->
         {:error, :invalid_credentials}
+
+      {:ok, %Response{status: status}} when status in [404] ->
+        {:error, :not_found}
 
       {:ok, %Response{body: %{"errors" => %{"detail" => [msg]}}}} ->
         {:error, msg}
@@ -99,7 +102,11 @@ defmodule ElectricCli.Migrations.Api do
   def upload_new_migration(app, env, %Migration{} = migration) do
     path = "apps/#{app}/environments/#{env}/migrations"
 
-    case Client.post(path, %{"migration" => migration}) do
+    data = %{
+      "migration" => Migration.upload_data(migration)
+    }
+
+    case Client.post(path, data) do
       {:ok, %Response{status: 201}} ->
         {:ok, "ok"}
 

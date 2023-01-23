@@ -53,7 +53,7 @@ defmodule ElectricCli.Commands.Sync do
     with :ok <- Session.require_auth(),
          {:ok, %Config{} = config} <- Config.load(root),
          {:ok, %Environment{} = environment} <- Config.target_environment(config, env) do
-      Progress.run("Syncing", false, fn ->
+      Progress.run("Syncing", fn ->
         case Core.sync(config, environment) do
           {:ok, message} ->
             {:success, message}
