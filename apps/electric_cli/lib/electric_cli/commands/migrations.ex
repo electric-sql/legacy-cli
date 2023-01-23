@@ -96,20 +96,23 @@ defmodule ElectricCli.Commands.Migrations do
     end
   end
 
-  def revert(%{options: %{env: env, migration_name: migration_name, root: root}}) do
+  def revert(%{args: %{migration_name: migration_name}, options: %{env: env, root: root}}) do
     with :ok <- Session.require_auth(),
          {:ok, %Config{} = config} <- Config.load(root),
          {:ok, %Environment{} = environment} <- Config.target_environment(config, env) do
       Progress.run("Reverting migration", fn ->
         case Migrations.revert_migration(config, environment, migration_name) do
-          {:ok, nil} ->
+          :ok ->
             {:success, "Migration reverted successfully"}
 
           {:ok, warnings} ->
             {:success, Util.format_messages("warnings", warnings)}
 
-          {:error, errors} ->
+          {:error, errors} when is_list(errors) or is_binary(errors) ->
             {:error, Util.format_messages("errors", errors)}
+
+          alt ->
+            alt
         end
       end)
     end

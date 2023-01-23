@@ -79,11 +79,24 @@ defmodule ElectricCli.Util do
   end
 
   def format_messages(type_of_message, messages) when is_list(messages) do
-    "There were #{length(messages)} #{type_of_message}:\n" <> Enum.join(messages, "\n")
+    case length(messages) do
+      1 ->
+        message = Enum.at(messages, 0)
+
+        format_messages(type_of_message, message)
+
+      n ->
+        "There were #{n} #{type_of_message}:\n" <>
+          Enum.join(messages, "\n")
+    end
   end
 
-  def format_messages(type_of_message, messages) do
-    "There was 1 #{type_of_message}:\n" <> messages
+  def format_messages(type_of_message, message) do
+    type_of_message =
+      type_of_message
+      |> String.replace_trailing("s", "")
+
+    "There was an #{type_of_message}:\n" <> message
   end
 
   def format_success(message) do

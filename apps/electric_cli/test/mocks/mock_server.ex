@@ -58,6 +58,21 @@ defmodule ElectricCli.MockServer do
       %{
         "encoding" => "escaped",
         "name" => "second_migration_name",
+        "original_body" => """
+        /*
+        ElectricSQL Migration
+        name: REVERTED VERSION OF THIS FILE
+        title": another
+
+        When you build or sync these migrations we will add some triggers and metadata
+        so that ElectricSQL's Satellite component can sync your data.
+
+        Write your SQLite migration below.
+        */
+        CREATE TABLE IF NOT EXISTS cats (
+          value TEXT PRIMARY KEY
+        ) STRICT, WITHOUT ROWID;
+        """,
         "status" => "applied",
         "satellite_body" => ["other stuff"],
         "sha256" => "d0a52f739f137fc80fd67d9fd347cb4097bd6fb182e583f2c64d8de309393ad7",

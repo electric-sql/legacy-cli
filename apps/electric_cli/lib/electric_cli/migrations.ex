@@ -85,24 +85,80 @@ defmodule ElectricCli.Migrations do
     end
   end
 
-  def revert_migration(_env, _migration_name, _options) do
-    # template = Map.get(options, :template, @satellite_template)
+  def revert_migration(
+        %Config{app: app, directories: %{migrations: migrations_dir}},
+        %Environment{slug: env},
+        migration_name
+      ) do
+    with {:ok, %Manifest{} = manifest} <- Manifest.load(app, migrations_dir, true),
+         {:ok, %Manifest{} = local_manifest, []} <- hydrate_manifest(manifest, migrations_dir),
+         {:local, %Migration{} = local_migration} <-
+           {:local, Manifest.named_migration(local_manifest, migration_name)},
+         {:ok, %Manifest{} = server_manifest} <- Api.get_server_migrations(app, env),
+         {:server, %Migration{} = server_migration} <-
+           {:server, Manifest.named_migration(server_manifest, migration_name)},
+         {:ok, _, mismatched} <- format_migration_listing(local_manifest, server_manifest),
+         _ <- IO.inspect({:mismatched, mismatched}),
+         _ <- IO.inspect({:local_migration, local_migration}),
+         true <- mismatched_has_target_migration(mismatched, local_migration),
+         :ok <- revert_and_save_manifest(local_manifest, server_migration, migrations_dir) do
+      overwrite_migration_sql(server_migration, migrations_dir)
+    else
+      false ->
+        {:error, "Nothing to revert.",
+         [
+           "The local migration `#{migration_name}` matches the migration " <>
+             "with the same name applied to environment `#{env}`."
+         ]}
 
-    # with {:ok, src_folder} <- check_migrations_folder(options),
-    #      {:ok, app} <- check_app(src_folder),
-    #      {:ok, updated_manifest, _warnings} = update_manifest(src_folder, template),
-    #      {:ok, all_env_manifests} <-
-    #        Migrations.Sync.get_all_migrations_from_server(app) do
-    #   {_listing, mismatched} = format_listing(updated_manifest, all_env_manifests)
+      {:local, nil} ->
+        {:error, "Migration `#{migration_name}` not found locally."}
 
-    #   if Enum.member?(mismatched, {migration_name, env}) do
-    #     do_revert(src_folder, app, env, migration_name, updated_manifest)
-    #   else
-    #     {:error,
-    #      "The migration `#{migration_name}` in environment `#{env}` is not different. Nothing to revert."}
-    #   end
-    # end
-    raise RuntimeError, message: "Not implemented"
+      {:server, nil} ->
+        {:error, "Migration `#{migration_name}` not found at environment `#{env}`."}
+
+      alt ->
+        IO.inspect({:alt, alt})
+
+        alt
+    end
+  end
+
+  defp revert_and_save_manifest(
+         %Manifest{migrations: migrations} = local_manifest,
+         %Migration{} = server_migration,
+         migrations_dir
+       ) do
+    migrations =
+      migrations
+      |> Enum.map(&revert_matching_migration(&1, server_migration))
+
+    local_manifest
+    |> Map.put(:migrations, migrations)
+    |> Manifest.save(migrations_dir)
+  end
+
+  defp revert_matching_migration(
+         %Migration{name: name} = migration,
+         %Migration{name: target_name, satellite_body: satellite_body, sha256: sha256}
+       )
+       when name == target_name do
+    migration
+    |> Map.put(:satellite_body, satellite_body)
+    |> Map.put(:sha256, sha256)
+  end
+
+  defp revert_matching_migration(%Migration{} = migration, _, _, _) do
+    migration
+  end
+
+  defp overwrite_migration_sql(
+         %Migration{name: name, original_body: original_body},
+         migrations_dir
+       ) do
+    [migrations_dir, name, @migration_filename]
+    |> Path.join()
+    |> File.write(original_body)
   end
 
   defp init_manifest(_app, _migrations_dir, true) do
@@ -126,8 +182,6 @@ defmodule ElectricCli.Migrations do
          %Manifest{migrations: local_migrations},
          %Manifest{migrations: server_migrations}
        ) do
-    IO.inspect({:format_migration_listing, local_migrations, server_migrations})
-
     server_migration_map =
       server_migrations
       |> Enum.map(fn %Migration{name: name} = migration -> {name, migration} end)
@@ -164,40 +218,15 @@ defmodule ElectricCli.Migrations do
         {rows, mismatched}
       end)
 
-    IO.inspect({:results, rows, mismatched})
-
     {:ok, {:results, rows, ["Name", "Title", "Status"]}, mismatched}
   end
 
-  # defp do_revert(src_folder, app, env, migration_name, current_manifest) do
-  #   with {:ok, %{"migration" => server_migration}} <-
-  #          Api.get_full_server_migration(
-  #            app,
-  #            env,
-  #            migration_name
-  #          ) do
-  #     manifest_revisions = %{
-  #       "satellite_body" => server_migration["satellite_body"],
-  #       "sha256" => server_migration["sha256"]
-  #     }
+  defp mismatched_has_target_migration([], %Migration{}), do: false
 
-  #     updated_migrations =
-  #       for current_migration <- current_manifest["migrations"] do
-  #         case current_migration["name"] do
-  #           ^migration_name ->
-  #             Map.merge(current_migration, manifest_revisions)
-
-  #           _ ->
-  #             current_migration
-  #         end
-  #       end
-
-  #     reverted_manifest = Map.put(current_manifest, "migrations", updated_migrations)
-  #     write_manifest(src_folder, reverted_manifest)
-  #     write_migration_body(src_folder, migration_name, server_migration["original_body"])
-  #     {:ok, nil}
-  #   end
-  # end
+  defp mismatched_has_target_migration(mismatched_migrations, %Migration{name: target_name}) do
+    mismatched_migrations
+    |> Enum.any?(fn %Migration{name: name} -> name == target_name end)
+  end
 
   def optionally_write_postgres(_, _, false), do: :ok
 
@@ -334,18 +363,6 @@ defmodule ElectricCli.Migrations do
       {:ok, relative_filepath}
     end
   end
-
-  # defp write_migration_body(src_folder, migration_name, original_body) do
-  #   migration_path = Path.join([src_folder, migration_name, @migration_filename])
-
-  #   if File.exists?(migration_path) do
-  #     File.rm(migration_path)
-  #   end
-
-  #   verbose("Writing migration `#{migration_path}`")
-
-  #   File.write!(migration_path, original_body)
-  # end
 
   # XXX switch from typed to string keyed map.
   defp add_postgres_bodies(%Manifest{} = manifest, false) do

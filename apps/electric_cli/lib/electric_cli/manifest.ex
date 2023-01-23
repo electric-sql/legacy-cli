@@ -115,6 +115,14 @@ defmodule ElectricCli.Manifest do
     |> save(dir)
   end
 
+  @doc """
+  Return migration by name.
+  """
+  def named_migration(%Manifest{migrations: migrations}, name) do
+    migrations
+    |> Enum.find(fn %Migration{name: candidate} -> candidate == name end)
+  end
+
   defp filepath(dir) when is_binary(dir) do
     dir
     |> Path.join(@filename)
