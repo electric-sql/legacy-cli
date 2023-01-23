@@ -26,7 +26,7 @@ defmodule ElectricMigrations.Ast.ColumnInfo do
   ]
 
   @type t() :: %__MODULE__{
-          cid: integer(),
+          cid: non_neg_integer(),
           name: String.t(),
           type: String.t(),
           notnull: boolean(),

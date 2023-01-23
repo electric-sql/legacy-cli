@@ -18,7 +18,7 @@ defmodule ElectricMigrations.Ast.IndexInfo do
   ]
 
   @type t() :: %__MODULE__{
-          seq: integer(),
+          seq: non_neg_integer(),
           name: String.t(),
           origin: :create_index | :unique_constraint | :primary_key,
           unique?: boolean(),

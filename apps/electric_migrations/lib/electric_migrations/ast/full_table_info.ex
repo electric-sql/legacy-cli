@@ -40,7 +40,7 @@ defmodule ElectricMigrations.Ast.FullTableInfo do
           primary: [String.t(), ...],
           foreign_keys: [fk()],
           foreign_keys_info: [Ast.ForeignKeyInfo.t()],
-          validation_fails: [String.t()] | nil,
-          warning_messages: [String.t()] | nil
+          validation_fails: [String.t()],
+          warning_messages: [String.t()]
         }
 end
