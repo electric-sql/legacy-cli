@@ -27,6 +27,23 @@ defmodule ElectricCli.MixProject do
     |> application()
   end
 
+  # Avoid running the command twice when running with the
+  # local `mix dev` alias.
+  defp application(:dev) do
+    case System.get_env("RUNNING_AS_MIX_DEV") do
+      "true" ->
+        [
+          extra_applications: [:logger, :eex]
+        ]
+
+      _ ->
+        [
+          extra_applications: [:logger, :eex],
+          mod: {ElectricCli.Main, []}
+        ]
+    end
+  end
+
   defp application(:test) do
     [
       extra_applications: [:logger, :eex]
@@ -67,7 +84,7 @@ defmodule ElectricCli.MixProject do
 
   defp aliases do
     [
-      dev: "run dev.exs"
+      dev: "cmd RUNNING_AS_MIX_DEV=true mix run dev.exs"
     ]
   end
 
