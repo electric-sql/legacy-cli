@@ -5,6 +5,8 @@ defmodule ElectricMigrations.Postgres.Generation do
 
   alias ElectricMigrations.Sqlite.Parse
 
+  @default_postgres_namespace "public"
+
   @doc """
   Given an ordered list of SQLite migrations in the form of a List of Maps with %{original_body: <>, name: <>}
   creates PostgreSQL SQL for the last migration in the list
@@ -24,10 +26,11 @@ defmodule ElectricMigrations.Postgres.Generation do
   end
 
   defp before_and_after_ast(migrations) do
-    with {:ok, after_ast, after_warnings} <- Parse.sql_ast_from_migrations(migrations, "public"),
+    with {:ok, after_ast, after_warnings} <-
+           Parse.sql_ast_from_migrations(migrations, @default_postgres_namespace),
          all_but_last_migration_set = Enum.drop(migrations, -1),
          {:ok, before_ast, _warnings} <-
-           Parse.sql_ast_from_migrations(all_but_last_migration_set, "public") do
+           Parse.sql_ast_from_migrations(all_but_last_migration_set, @default_postgres_namespace) do
       {:ok, before_ast, after_ast, after_warnings}
     end
   end
