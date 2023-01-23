@@ -21,17 +21,20 @@ defmodule ElectricCli.Bundle do
   @type t() :: %Bundle{
           app: binary(),
           env: binary(),
+          build: :local | :server,
           migrations: [%Migration{}],
           replication: %Replication{}
         }
   @enforce_keys [
     :app,
     :env,
+    :build,
     :migrations
   ]
   defstruct [
     :app,
     :env,
+    :build,
     :migrations,
     :replication
   ]
@@ -61,9 +64,9 @@ defmodule ElectricCli.Bundle do
   @doc """
   Initialise a new bundle.
   """
-  @spec init(binary(), binary(), [%Migration{}], %Replication{}) :: %Bundle{}
-  def init(app, env, migrations, replication) do
-    %{app: app, env: env, migrations: migrations}
+  @spec init(binary(), binary(), :local | :server, [%Migration{}], %Replication{}) :: %Bundle{}
+  def init(app, env, build, migrations, replication) do
+    %{app: app, env: env, build: build, migrations: migrations}
     |> Util.map_put_if(:replication, replication, not is_nil(replication))
     |> Bundle.new()
   end
@@ -89,10 +92,20 @@ defmodule ElectricCli.Bundle do
   @doc """
   Saves the `%Bundle{}` into the manifest file.
   """
-  def save(%Bundle{app: app, env: env, migrations: migrations, replication: replication}, dir) do
+  def save(
+        %Bundle{
+          app: app,
+          env: env,
+          build: build,
+          migrations: migrations,
+          replication: replication
+        },
+        dir
+      ) do
     required = %{
       app: app,
       env: env,
+      build: build,
       migrations: migrations
     }
 
@@ -114,16 +127,17 @@ defmodule ElectricCli.Bundle do
   """
   def write(
         %Manifest{app: app, migrations: migrations},
-        %Environment{slug: target_env, replication: replication},
-        output_dir,
-        source_env
-      ) do
+        %Environment{slug: env, replication: replication},
+        build_type,
+        output_dir
+      )
+      when build_type in [:local, :server] do
     dist_folder =
-      [output_dir, app, target_env]
+      [output_dir, app, env]
       |> Path.join()
 
     app
-    |> init(source_env, migrations, replication)
+    |> init(env, build_type, migrations, replication)
     |> save(dist_folder)
   end
 
