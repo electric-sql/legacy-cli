@@ -44,6 +44,18 @@ defmodule ElectricCli.Bundle do
   def new(map) do
     struct = super(map)
 
+    build =
+      case struct.build do
+        x when x in [:local, :server] ->
+          x
+
+        "local" ->
+          :local
+
+        "server" ->
+          :server
+      end
+
     migrations =
       struct.migrations
       |> Enum.map(&Migration.new/1)
@@ -58,7 +70,7 @@ defmodule ElectricCli.Bundle do
           |> Replication.new()
       end
 
-    %{struct | migrations: migrations, replication: replication}
+    %{struct | build: build, migrations: migrations, replication: replication}
   end
 
   @doc """

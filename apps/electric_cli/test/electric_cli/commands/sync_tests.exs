@@ -68,7 +68,7 @@ defmodule ElectricCli.Commands.SyncTest do
                Config.load(root)
 
       bundle_path = Path.join(output_dir, "@config")
-      assert {:ok, %Bundle{env: "local"}} = Bundle.load(bundle_path)
+      assert {:ok, %Bundle{build: :local}} = Bundle.load(bundle_path)
 
       args = argv(ctx, [])
       assert {{:ok, _}, _} = run_cmd(args)

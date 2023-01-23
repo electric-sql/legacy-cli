@@ -58,7 +58,7 @@ defmodule ElectricCli.Commands.BuildTest do
       assert {:ok, %Config{app: app, defaultEnv: env, directories: %{output: output_dir}}} =
                Config.load(root)
 
-      assert {:ok, %Bundle{env: "local"}} =
+      assert {:ok, %Bundle{build: :local}} =
                [output_dir, app, env]
                |> Path.join()
                |> Bundle.load()
