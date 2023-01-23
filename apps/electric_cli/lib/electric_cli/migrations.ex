@@ -148,7 +148,7 @@ defmodule ElectricCli.Migrations do
     |> Map.put(:sha256, sha256)
   end
 
-  defp revert_matching_migration(%Migration{} = migration, _, _, _) do
+  defp revert_matching_migration(%Migration{} = migration, _) do
     migration
   end
 
