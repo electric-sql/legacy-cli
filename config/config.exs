@@ -3,12 +3,13 @@ import Config
 default_console_url =
   case config_env() do
     :prod -> "https://console.electric-sql.com"
-    :test -> "http://localhost:4003"
+    :test -> "http://localhost:4005"
     :dev -> "http://localhost:4000"
   end
 
-config :electric_sql_cli,
-  default_console_url: default_console_url
+config :electric_cli,
+  default_console_url: default_console_url,
+  verbose: false
 
 if config_env() == :dev do
   # Git hooks for analysis and formatting.

@@ -20,19 +20,7 @@ erl_crash.dump
 *.ez
 
 # Ignore package tarball (built via "mix hex.build").
-electric-*.tar
+electric_migrations-*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
-/apps/*/tmp/
-
-# Release artefacts
-/dist/
-/electric
-/migrations/
-
-# JetBrains project files
-.idea/
-
-# Mac thing
-.DS_Store
