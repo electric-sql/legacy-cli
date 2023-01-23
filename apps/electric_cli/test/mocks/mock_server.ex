@@ -230,9 +230,23 @@ defmodule ElectricCli.MockServer do
     end
   end
 
-  get "api/v1/apps/:app/environments/:env/migrations" do
-    IO.inspect({:XXX, app, get_migrations(app)})
+  get "api/v1/apps/:app/environments/:env" do
+    with {:ok, conn} <- authenticated(conn) do
+      env_info = %{
+        "data" => %{
+          "slug" => "default",
+          "name" => "Default",
+          "status" => "provisioned",
+          "type" => "postgres"
+        }
+      }
 
+      conn
+      |> json(200, env_info)
+    end
+  end
+
+  get "api/v1/apps/:app/environments/:env/migrations" do
     with {:ok, conn} <- authenticated(conn) do
       data = %{
         "migrations" => get_migrations(app)
@@ -278,6 +292,18 @@ defmodule ElectricCli.MockServer do
     with {:ok, conn} <- authenticated(conn) do
       conn
       |> json(200, "\"ok\"")
+    end
+  end
+
+  post "api/v1/apps/:app/environments/:env/reset" do
+    with {:ok, conn} <- authenticated(conn) do
+      data = %{
+        "status" => "OK",
+        "detail" => "Database reset initiated."
+      }
+
+      conn
+      |> json(200, data)
     end
   end
 end

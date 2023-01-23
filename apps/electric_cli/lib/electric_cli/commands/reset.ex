@@ -55,7 +55,7 @@ defmodule ElectricCli.Commands.Reset do
          true <- confirm_absolutely_sure(skip_confirmation, app, env_slug) do
       Progress.run("Resetting", fn ->
         case Core.reset(config, environment) do
-          {:ok, nil} ->
+          :ok ->
             {:success, "Reset #{app}/#{env_slug} successfully"}
 
           {:error, errors} ->
@@ -90,6 +90,15 @@ defmodule ElectricCli.Commands.Reset do
     |> String.trim()
     |> Kernel.<>(" ")
     |> IO.gets()
+    |> handle_confirmation_input(Mix.env())
+  end
+
+  defp handle_confirmation_input(:eof, :test) do
+    true
+  end
+
+  defp handle_confirmation_input(s, _env) when is_binary(s) do
+    s
     |> String.trim_leading()
     |> String.downcase()
     |> String.starts_with?("y")

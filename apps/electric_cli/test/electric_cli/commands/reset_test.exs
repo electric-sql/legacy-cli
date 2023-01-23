@@ -43,8 +43,24 @@ defmodule ElectricCli.Commands.ResetTest do
       [cmd: ["reset"]]
     end
 
-    test "prompts for confirmation"
-    test "resets"
-    test "allows migrations to be re-synced"
+    test "prompts for confirmation", ctx do
+      args = argv(ctx, [])
+      assert {{:ok, _output}, logged} = run_cmd(args)
+      assert logged =~ "Are you sure you want to continue?"
+    end
+
+    test "resets", %{app: app} = ctx do
+      args = argv(ctx, [])
+      assert {{:ok, output}, _logged} = run_cmd(args)
+      assert output =~ "Reset #{app}/default successfully"
+    end
+
+    test "allows migrations to be re-synced", ctx do
+      args = argv(ctx, [])
+      assert {{:ok, _output}, _} = run_cmd(args)
+
+      assert {{:ok, output}, _} = run_cmd("sync")
+      assert output =~ "Synced 1 new migration"
+    end
   end
 end

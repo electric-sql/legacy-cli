@@ -3,6 +3,7 @@ defmodule ElectricCli.Core do
   The context for the core `build`, `sync` and `reset commands.
   """
   alias ElectricCli.Bundle
+  alias ElectricCli.Client
   alias ElectricCli.Config
   alias ElectricCli.Config.Environment
   alias ElectricCli.Manifest
@@ -45,11 +46,6 @@ defmodule ElectricCli.Core do
          {:ok, %Manifest{} = server_manifest} <- Api.get_server_migrations(app, env, true),
          :ok <- Bundle.write(server_manifest, environment, output_dir, env) do
       {:ok, dynamic_success_message}
-    else
-      alt ->
-        IO.inspect({:alt, alt})
-
-        alt
     end
   end
 
@@ -68,10 +64,76 @@ defmodule ElectricCli.Core do
     end
   end
 
-  defp reset_backend(_app, _env) do
-    # XXX use the client to hit the reset endpoint.
-    # then poll the status until done.
+  # Use the client to hit the reset endpoint.
+  # then poll the status until done.
+  defp reset_backend(app, env) do
+    path = "apps/#{app}/environments/#{env}/reset"
 
-    throw(:NotImplemented)
+    with {:ok, %Req.Response{status: 200, body: %{"status" => "OK"}}} <- Client.post(path, %{}) do
+      app
+      |> poll_backend(env)
+    else
+      {:ok, %Req.Response{status: 400, body: %{"reason" => error_message}}} ->
+        {:error, error_message}
+
+      {:ok, %Req.Response{status: status}} when status in [401, 403] ->
+        {:error, :invalid_credentials}
+
+      {:error, _exception} ->
+        {:error, "couldn't connect to ElectricSQL servers"}
+    end
+  end
+
+  defp poll_backend(
+         app,
+         env,
+         num_attempts \\ 1,
+         delay_ms \\ 1_000,
+         max_attempts \\ 50,
+         max_delay_ms \\ 5_000,
+         backoff_factor \\ 1.1
+       ) do
+    path = "apps/#{app}/environments/#{env}"
+
+    with true <- num_attempts <= max_attempts,
+         {:ok, %Req.Response{status: 200, body: %{"data" => %{"status" => status}}}} <-
+           Client.get(path) do
+      case status do
+        val when val in ["provisioned", "migrating"] ->
+          :ok
+
+        "provisioning" ->
+          :ok = Process.sleep(delay_ms)
+
+          delay_ms =
+            delay_ms
+            |> increment_delay(max_delay_ms, backoff_factor)
+
+          app
+          |> poll_backend(env, delay_ms)
+
+        "failed" ->
+          {:error, "Provisioning failed", ["You may need to try again?"]}
+
+        unknown_status ->
+          {:error, "Unknown status: #{unknown_status}"}
+      end
+    else
+      false ->
+        {:error, "Provisioning timed out (exceeded #{max_attempts} retries)"}
+
+      alt ->
+        alt
+    end
+  end
+
+  defp increment_delay(delay, max_delay, backoff_factor) do
+    case round(delay * backoff_factor) do
+      val when val <= max_delay ->
+        val
+
+      _alt ->
+        max_delay
+    end
   end
 end
