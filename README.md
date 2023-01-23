@@ -137,15 +137,13 @@ This adds a new migration to the `migrations` folder with a name automatically d
 electric migrations build [--postgres] [--satellite]
 ```
 
-Builds a bundled javascript file at `dist/index.js` that can be imported into your local application. The metadata in this file will have a `"env": "local" to indicate the it was built from your local files rather that one of the named app environments.
-
-This file is automatically imported into your local application when using `electricConfig`:
+Builds a bundled javascript file at `.electric/:app/:env/index.js` that can be imported into your local application using the `@config` or `@app/:env` symlinks, e.g.:
 
 ```ts
-import { electricConfig } from 'electric-sql/config'
-
-const config = await electricConfig('../electric.json', {})
+import config from '.electric/@config'
 ```
+
+See the [configuration guide](https://electric-sql.com/docs/usage/configure) for more details.
 
 The optional flag `--postgres` will also build a `postgres.sql` file in each migrations' folder with the PostgreSQL formatted migrations. This is useful for applying migrations manually to Postgres.
 
@@ -154,12 +152,12 @@ The optional flag `--satellite` will also build a `satellite.sql` file in each m
 ### sync
 
 ```sh
-electric migrations sync [--env ENVIRONMENT]
+electric sync [--env ENV]
 ```
 
-Synchronises changes you have made to migration SQL files in your local `migrations` folder up to the ElectricSQl servers, and builds a new javascript file at `dist/index.js` that matches the newly synchronised set of migrations. The metadata in this file will have a `"env": ENVIRONMENT` to indicate that it was built directly from and matches the named app environment.
+Synchronises changes you have made to migration SQL files in your local `migrations` folder up to the ElectricSQl servers, and builds a new javascript file at `.electric/:app/:env/index.js` that matches the newly synchronised set of migrations. The metadata in this file will have a `"build": "server"` to indicate that it was built directly from the named backend environment.
 
-By default this will sync to the `default` environment for your app. If you want to use a different one give its name with `--env ENVIRONMENT`.
+By default this will sync to the `default` environment for your app. If you want to use a different one give its name with `--env ENV`.
 
 If the app environment on our servers already has a migration with the same name but different sha256 then this synchronisation will fail because a migration cannot be modified once it has been applied. If this happens you have two options, either revert the local changes you have made to the conflicted migration using the `revert` command below or, if you are working in a development environment that you are happy to reset, you can reset the whole environment's DB using the web control panel.
 
@@ -176,10 +174,20 @@ Will show a list of all the migrations and their status in every env in the app.
 ### revert
 
 ```sh
-electric migrations revert MIGRATION_NAME [--env ENVIRONMENT]
+electric migrations revert MIGRATION_NAME [--env ENV]
 ```
 
-This will copy the named migration from the ElectricSQL server to replace the local one. By default this will use the `default` environment, if you want to use a different one you can specify it with `--env ENVIRONMENT`.
+This will copy the named migration from the ElectricSQL server to replace the local one. By default this will use the `default` environment, if you want to use a different one you can specify it with `--env ENV`.
+
+### reset
+
+If you get stuck in local development and need to reset your backend, you can wipe and re-provision your environment using:
+
+```sh
+electric reset [--env ENV]
+```
+
+Use this with care (and only in development) as it explicitly causes data loss.
 
 ## Contributing
 
