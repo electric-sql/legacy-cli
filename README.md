@@ -100,24 +100,20 @@ Where your `EMAIL` is the email address associated with your ElectricSQL account
 ### Init
 
 ```sh
-electric init APP [--env ENV] [--dir MIGRATIONS_DIR]
+electric init APP [--env ENV] [--migrations-dir MIGRATIONS_DIR] [--output-dir OUTPUT_DIR]
 ```
 
-Creates a new folder for migrations in your current directory called 'migrations' and adds a new migration  folder to it with a name automatically derived from the current time in UTC and the title `init` e.g. `20221116162204816_init`
-
-Inside this folder will be a file called `migration.sql`. You should write your initial SQLite DDL SQL into this file.
+Creates a new folder for migrations in your current directory called 'migrations' and adds a new migration  folder to it with a name automatically derived from the current time in UTC and the title `init` e.g. `20221116162204816_init`. Inside this folder will be a file called `migration.sql`. You should write your initial SQLite DDL SQL into this file.
 
 The `APP` and optinally `ENV` you give should be copied from the sync service connection details provided by the ElectricSQL console. You specify here once, and the CLI stores in an `electric.json` file so you don't have to keep re-typing it.
 
-The optional `MIGRATIONS_DIR` allows you to create the migration folder somewhere other than the current working directory. `MIGRATIONS_DIR` must end with the folder name `migrations`
-
 ### Update
 
-```sh
-electric config update [--app APP] [--env ENV] [--dir MIGRATIONS_DIR]
-```
+You can update your config using `electric config update`. See the options with:
 
-Updates the configured `APP`, `ENV` or `MIGRATIONS_DIR`.
+```sh
+electric config update --help
+```
 
 ## Migrations command
 
@@ -126,15 +122,15 @@ The `migrations` command lets you create new migrations, build electrified javas
 ### new
 
 ```sh
-electric migrations new MIGRATION_NAME
+electric migrations new NAME
 ```
 
-This adds a new migration to the `migrations` folder with a name automatically derived from the current time in UTC and the given `MIGRATION_NAME`, which should be a short human readable description of the new migration.
+This adds a new migration to the `migrations` folder with a name automatically derived from the current time in UTC and the given `NAME`, which should be a short human readable description of the new migration.
 
 ### build
 
 ```sh
-electric migrations build [--postgres] [--satellite]
+electric migrations build [--env ENV] [--postgres] [--satellite]
 ```
 
 Builds a bundled javascript file at `.electric/:app/:env/index.js` that can be imported into your local application using the `@config` or `@app/:env` symlinks, e.g.:
@@ -155,18 +151,23 @@ The optional flag `--satellite` will also build a `satellite.sql` file in each m
 electric sync [--env ENV]
 ```
 
-Synchronises changes you have made to migration SQL files in your local `migrations` folder up to the ElectricSQl servers, and builds a new javascript file at `.electric/:app/:env/index.js` that matches the newly synchronised set of migrations. The metadata in this file will have a `"build": "server"` to indicate that it was built directly from the named backend environment.
+Synchronises changes you have made to migration SQL files in your local `migrations` folder up to the backend servers, and builds a new javascript file at `.electric/:app/:env/index.js` that matches the newly synchronised set of migrations. The metadata in this file will have a `"build": "server"` to indicate that it was built directly from the named backend environment.
 
 By default this will sync to the `default` environment for your app. If you want to use a different one give its name with `--env ENV`.
 
-If the app environment on our servers already has a migration with the same name but different sha256 then this synchronisation will fail because a migration cannot be modified once it has been applied. If this happens you have two options, either revert the local changes you have made to the conflicted migration using the `revert` command below or, if you are working in a development environment that you are happy to reset, you can reset the whole environment's DB using the web control panel.
+If the app environment on our servers already has a migration with the same name but different sha256 then this synchronisation will fail because a migration cannot be modified once it has been applied.
 
-Also if a migration has a name that is lower in sort order than one already applied on the server this sync will fail.
+If this happens you have two options, either:
+
+1. revert the local changes you've made to the conflicted migration using `electric migrations revert NAME`; or
+2. reset and re-provision the whole environment using `electric reset` (warning: causes data loss)
+
+See below for information on both commands. Note also that if a migration has a name that is lower in sort order than one already applied on the server this will also error.
 
 ### list
 
 ```sh
-electric migrations list
+electric migrations list [--env ENV]
 ```
 
 Will show a list of all the migrations and their status in every env in the app.
@@ -174,7 +175,7 @@ Will show a list of all the migrations and their status in every env in the app.
 ### revert
 
 ```sh
-electric migrations revert MIGRATION_NAME [--env ENV]
+electric migrations revert NAME [--env ENV]
 ```
 
 This will copy the named migration from the ElectricSQL server to replace the local one. By default this will use the `default` environment, if you want to use a different one you can specify it with `--env ENV`.
@@ -187,7 +188,7 @@ If you get stuck in local development and need to reset your backend, you can wi
 electric reset [--env ENV]
 ```
 
-Use this with care (and only in development) as it explicitly causes data loss.
+WARNING: Use this with care (and usually only in development) as it explicitly causes data loss.
 
 ## Contributing
 

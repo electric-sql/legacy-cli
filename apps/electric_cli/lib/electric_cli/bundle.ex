@@ -102,7 +102,8 @@ defmodule ElectricCli.Bundle do
   end
 
   @doc """
-  Saves the `%Bundle{}` into the manifest file.
+  Saves the `%Bundle{}` into the `:dir/index.js` file where
+  `dir` is `:output_dir/:app/:env`.
   """
   def save(
         %Bundle{
