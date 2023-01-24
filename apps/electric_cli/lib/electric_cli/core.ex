@@ -71,7 +71,7 @@ defmodule ElectricCli.Core do
   defp reset_backend(app, env) do
     path = "apps/#{app}/environments/#{env}/reset"
 
-    with {:ok, %Req.Response{status: 200, body: %{"status" => "OK"}}} <- Client.post(path, %{}) do
+    with {:ok, %Req.Response{status: 200}} <- Client.post(path, %{}) do
       app
       |> poll_backend(env)
     else

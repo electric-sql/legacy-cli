@@ -313,7 +313,6 @@ defmodule ElectricCli.MockServer do
   post "api/v1/apps/:app/environments/:env/reset" do
     with {:ok, conn} <- authenticated(conn) do
       data = %{
-        "status" => "OK",
         "detail" => "Database reset initiated."
       }
 
