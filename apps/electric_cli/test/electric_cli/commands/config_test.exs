@@ -1,189 +1,451 @@
 defmodule ElectricCli.Commands.ConfigTest do
-  use ExUnit.Case, async: false
+  use ElectricCli.CommandCase, async: false
 
-  import ExUnit.CaptureIO
+  alias ElectricCli.Config
+  alias ElectricCli.Config.Environment
+  alias ElectricCli.Config.Replication
 
-  @moduletag :tmp_dir
-
-  setup %{tmp_dir: dir} = context do
-    start_link_supervised!(ElectricCli.MockServer.spec())
-    System.put_env("ELECTRIC_STATE_HOME", Path.join(dir, ".electric_credentials"))
-    on_exit(fn -> System.delete_env("ELECTRIC_STATE_HOME") end)
-
-    if context[:cd] do
-      saved = File.cwd!()
-      File.cd!(dir)
-      on_exit(fn -> File.cd!(saved) end)
+  describe "electric config" do
+    setup do
+      [cmd: ["config"]]
     end
 
-    if context[:logged_in] do
-      log_in()
-    end
-
-    :ok
-  end
-
-  defp assert_config(root, expected) do
-    rc_file = Path.join(root, "electric.json")
-    migrations_dir = Path.expand(expected.migrations_dir, root)
-    assert File.exists?(rc_file)
-
-    assert {:ok, config} = Jason.decode(File.read!(rc_file), keys: :atoms)
-
-    assert config == expected
-
-    # ensure that migrations directory exists and has been initialised
-    assert File.dir?(migrations_dir)
-
-    migrations =
-      Path.join(migrations_dir, "*")
-      |> Path.wildcard()
-      |> Enum.filter(&File.dir?/1)
-
-    assert File.exists?(Path.join(migrations_dir, "manifest.json"))
-
-    # match on a length-1 array to assert that only one init migration has been created
-    assert [init_migration] =
-             migrations |> Enum.filter(fn path -> Path.basename(path) =~ ~r/^[\d_]+_init/ end)
-
-    assert File.exists?(Path.join(init_migration, "migration.sql"))
-  end
-
-  def argv(cxt, args) do
-    cxt.cmd ++ args
-  end
-
-  # both these commands do the same thing so test that
-  commands = [["init"], ["config", "init"]]
-
-  for cmd <- commands do
-    describe "`electric #{Enum.join(cmd, " ")}`" do
-      setup do
-        {:ok, cmd: unquote(cmd)}
-      end
-
-      test "shows help text if --help passed", cxt do
-        args = argv(cxt, ["--help"])
-        assert {:ok, output} = ElectricCli.Main.run(args)
-        assert output =~ ~r/electric.json/
-      end
-
-      test "returns error and shows usage if app id not specified", cxt do
-        args = argv(cxt, [])
-        assert {:error, output} = ElectricCli.Main.run(args)
-        assert output =~ ~r/Usage: /
-      end
-
-      test "Doesn't initialize the app if you're not logged in", cxt do
-        on_exit(fn -> Application.put_env(:electric_cli, :verbose, false) end)
-
-        args = argv(cxt, ["cranberry-soup-1337", "--verbose"])
-        assert {{:error, output}, _} = with_io(fn -> ElectricCli.Main.run(args) end)
-        assert output =~ "electric auth login <email>"
-      end
-
-      @tag :cd
-      @tag :logged_in
-      test "creates an electric.json file in the pwd", cxt do
-        args = argv(cxt, ["cranberry-soup-1337"])
-
-        capture_io(fn ->
-          assert {:ok, _output} = ElectricCli.Main.run(args)
-        end)
-
-        assert_config(cxt.tmp_dir, %{
-          migrations_dir: "migrations",
-          app_id: "cranberry-soup-1337",
-          env: "default"
-        })
-      end
-
-      @tag :cd
-      @tag :logged_in
-      test "should be idempotent", cxt do
-        args = argv(cxt, ["cranberry-soup-1337"])
-
-        assert {:ok, _output} = ElectricCli.Main.run(args)
-        assert {:ok, _output} = ElectricCli.Main.run(args)
-
-        assert_config(cxt.tmp_dir, %{
-          migrations_dir: "migrations",
-          app_id: "cranberry-soup-1337",
-          env: "default"
-        })
-      end
-
-      @tag :cd
-      @tag :logged_in
-      test "should error if the existing migrations belong to another app", cxt do
-        args1 = argv(cxt, ["cranberry-soup-1337"])
-        assert {:ok, _output} = ElectricCli.Main.run(args1)
-
-        args2 = argv(cxt, ["test"])
-        assert {:error, _output} = ElectricCli.Main.run(args2)
-
-        assert_config(cxt.tmp_dir, %{
-          migrations_dir: "migrations",
-          app_id: "cranberry-soup-1337",
-          env: "default"
-        })
-      end
-
-      @tag :cd
-      @tag :logged_in
-      test "can use a custom migrations directory", cxt do
-        args = argv(cxt, ["--migrations-dir", "browser/migrations", "cranberry-soup-1337"])
-        assert {:ok, _output} = ElectricCli.Main.run(args)
-
-        assert_config(cxt.tmp_dir, %{
-          migrations_dir: "browser/migrations",
-          app_id: "cranberry-soup-1337",
-          env: "default"
-        })
-      end
-
-      @tag :cd
-      @tag :logged_in
-      test "can use an absolute migrations directory", cxt do
-        # I'm choosing to have the arg specify the full path to the migrations, rather than point
-        # to the base and then we add "migrations".
-
-        migrations_dir =
-          Path.join([System.tmp_dir!(), "/home/me/application/platform/my-migrations"])
-
-        on_exit(fn -> File.rm_rf!(migrations_dir) end)
-
-        args = argv(cxt, ["--migrations-dir", migrations_dir, "cranberry-soup-1337"])
-
-        assert {:ok, _output} = ElectricCli.Main.run(args)
-
-        assert_config(cxt.tmp_dir, %{
-          migrations_dir: migrations_dir,
-          app_id: "cranberry-soup-1337",
-          env: "default"
-        })
-      end
-
-      @tag :cd
-      @tag :logged_in
-      test "allows for setting a custom default env", cxt do
-        args = argv(cxt, ["--dir", cxt.tmp_dir, "--env", "prod", "cranberry-soup-1337"])
-
-        assert {:ok, _output} = ElectricCli.Main.run(args)
-
-        assert_config(cxt.tmp_dir, %{
-          migrations_dir: "migrations",
-          app_id: "cranberry-soup-1337",
-          env: "prod"
-        })
-      end
+    test "shows help text if --help passed", ctx do
+      args = argv(ctx, ["--help"])
+      assert {{:ok, output}, _} = run_cmd(args)
+      assert output =~ ~r/Manage local configuration/
     end
   end
 
-  defp log_in() do
-    capture_io(fn ->
-      assert {:ok, _} =
-               ElectricCli.Main.run(~w|auth login test@electric-sql.com --password password|)
-    end)
+  describe "electric config update pre init" do
+    setup do
+      [cmd: ["config", "update"]]
+    end
+
+    test "shows help text if --help passed", ctx do
+      args = argv(ctx, ["--help"])
+      assert {{:ok, output}, _} = run_cmd(args)
+      assert output =~ ~r/Update your configuration/
+    end
+
+    test "returns error if run before electric init in this root", ctx do
+      args = argv(ctx, [])
+      assert {{:error, output}, _} = run_cmd(args)
+      assert output =~ "file is missing in this directory"
+    end
+  end
+
+  describe "electric config update unauthenticated" do
+    setup [
+      :login,
+      :init,
+      :logout
+    ]
+
+    setup do
+      [cmd: ["config", "update"]]
+    end
+
+    test "doesn't update the app if you're not logged in", ctx do
+      args = argv(ctx, ["--app", "french-onion-1234"])
+      assert {{:error, output}, _} = run_cmd(args)
+      assert output =~ "electric auth login"
+    end
+  end
+
+  describe "electric config update" do
+    setup [
+      :login,
+      :init
+    ]
+
+    setup do
+      [cmd: ["config", "update"]]
+    end
+
+    test "unchanged says so", ctx do
+      args = argv(ctx, ["--app", "tarragon-envy-1337"])
+      assert {{:ok, output}, _} = run_cmd(args)
+      assert output =~ "Nothing to update"
+    end
+
+    test "updates the app", %{tmp_dir: root} = ctx do
+      args = argv(ctx, ["--app", "french-onion-1234"])
+      assert {{:ok, _output}, _} = run_cmd(args)
+
+      assert_config(root, %{
+        migrations_dir: "migrations",
+        app: "french-onion-1234",
+        env: "default"
+      })
+    end
+
+    test "setting app updates @app symlink", %{tmp_dir: root} = ctx do
+      args = argv(ctx, ["--app", "french-onion-1234"])
+      assert {{:ok, _output}, _} = run_cmd(args)
+      assert {:ok, %Config{directories: %{output: output_dir}}} = Config.load(root)
+
+      assert {:ok, "french-onion-1234"} =
+               output_dir
+               |> Path.join("@app")
+               |> File.read_link()
+    end
+
+    test "setting app updates @config symlink", %{tmp_dir: root} = ctx do
+      args = argv(ctx, ["--app", "french-onion-1234"])
+      assert {{:ok, _output}, _} = run_cmd(args)
+
+      assert {:ok, %Config{defaultEnv: default_env, directories: %{output: output_dir}}} =
+               Config.load(root)
+
+      assert {:ok, link_target} =
+               output_dir
+               |> Path.join("@config")
+               |> File.read_link()
+
+      assert link_target == Path.join("french-onion-1234", default_env)
+    end
+
+    test "env must exists when updating the default env", ctx do
+      args = argv(ctx, ["--env", "staging"])
+      assert {{:error, output}, _} = run_cmd(args)
+      assert output =~ "env `staging` not found"
+      assert output =~ "electric config add_env"
+    end
+
+    test "updates default env", %{tmp_dir: root} = ctx do
+      %{env: env} = add_env(ctx)
+
+      args = argv(ctx, ["--env", env])
+      assert {{:ok, _output}, _} = run_cmd(args)
+
+      assert_config(root, %{
+        migrations_dir: "migrations",
+        app: "tarragon-envy-1337",
+        env: env
+      })
+    end
+
+    test "setting env updates @config symlink", %{tmp_dir: root} = ctx do
+      %{env: env} = add_env(ctx)
+
+      args = argv(ctx, ["--env", env])
+      assert {{:ok, _output}, _} = run_cmd(args)
+      assert {:ok, %Config{app: app, directories: %{output: output_dir}}} = Config.load(root)
+
+      assert {:ok, link_target} =
+               output_dir
+               |> Path.join("@config")
+               |> File.read_link()
+
+      assert link_target == Path.join(app, env)
+    end
+
+    test "changes the migrations path", %{tmp_dir: root} = ctx do
+      args = argv(ctx, ["--migrations-dir", "timbuktu"])
+      assert {{:ok, _output}, _} = run_cmd(args)
+
+      assert_config(root, %{
+        migrations_dir: "timbuktu",
+        app: "tarragon-envy-1337",
+        env: "default"
+      })
+    end
+
+    test "sets replication data if provided", %{tmp_dir: root} = ctx do
+      args =
+        argv(ctx, [
+          "--replication-disable-ssl",
+          "--replication-host",
+          "localhost",
+          "--replication-port",
+          "5133"
+        ])
+
+      assert {{:ok, _output}, _} = run_cmd(args)
+      assert {:ok, %Config{environments: environments}} = Config.load(root)
+      assert %Environment{replication: replication} = Map.get(environments, :default)
+      assert %Replication{host: "localhost", port: 5133, ssl: false} = replication
+    end
+  end
+
+  describe "electric config add_env pre init" do
+    setup do
+      [cmd: ["config", "add_env"]]
+    end
+
+    test "shows help text if --help passed", ctx do
+      args = argv(ctx, ["--help"])
+      assert {{:ok, output}, _} = run_cmd(args)
+      assert output =~ ~r/Add a new environment/
+    end
+
+    test "returns error if run before electric init in this root", ctx do
+      args = argv(ctx, ["some-env"])
+      assert {{:error, output}, _} = run_cmd(args)
+      assert output =~ "file is missing in this directory"
+    end
+  end
+
+  describe "electric config add_env" do
+    setup [
+      :login,
+      :init
+    ]
+
+    setup do
+      [cmd: ["config", "add_env"]]
+    end
+
+    test "errors if env already exists", ctx do
+      args = argv(ctx, ["default"])
+      assert {{:error, output}, _} = run_cmd(args)
+      assert output =~ "already exists"
+    end
+
+    test "adds the env", %{tmp_dir: root} = ctx do
+      args = argv(ctx, ["staging"])
+      assert {{:ok, _output}, _} = run_cmd(args)
+      assert {:ok, %Config{environments: %{staging: %Environment{}}}} = Config.load(root)
+    end
+
+    test "defaults to not setting as default", %{tmp_dir: root} = ctx do
+      args = argv(ctx, ["staging"])
+      assert {{:ok, _output}, _} = run_cmd(args)
+      assert {:ok, %Config{defaultEnv: default_env}} = Config.load(root)
+      assert default_env != "staging"
+    end
+
+    test "sets as default if instructed", %{tmp_dir: root} = ctx do
+      args = argv(ctx, ["staging", "--set-as-default"])
+      assert {{:ok, _output}, _} = run_cmd(args)
+      assert {:ok, %Config{defaultEnv: "staging"}} = Config.load(root)
+    end
+
+    test "doesn't updates @config symlink if not set as default", %{tmp_dir: root} = ctx do
+      args = argv(ctx, ["staging"])
+      assert {{:ok, _output}, _} = run_cmd(args)
+      assert {:ok, %Config{app: app, directories: %{output: output_dir}}} = Config.load(root)
+
+      assert {:ok, link_target} =
+               output_dir
+               |> Path.join("@config")
+               |> File.read_link()
+
+      assert link_target != Path.join(app, "staging")
+    end
+
+    test "updates @config symlink if set as default", %{tmp_dir: root} = ctx do
+      args = argv(ctx, ["staging", "--set-as-default"])
+      assert {{:ok, _output}, _} = run_cmd(args)
+      assert {:ok, %Config{app: app, directories: %{output: output_dir}}} = Config.load(root)
+
+      assert {:ok, link_target} =
+               output_dir
+               |> Path.join("@config")
+               |> File.read_link()
+
+      assert link_target == Path.join(app, "staging")
+    end
+
+    test "sets replication data if provided", %{tmp_dir: root} = ctx do
+      args =
+        argv(ctx, [
+          "staging",
+          "--replication-disable-ssl",
+          "--replication-host",
+          "localhost",
+          "--replication-port",
+          "5133"
+        ])
+
+      assert {{:ok, _output}, _} = run_cmd(args)
+
+      assert {:ok,
+              %Config{
+                environments: %{
+                  staging: %Environment{
+                    replication: %Replication{host: "localhost", port: 5133, ssl: false}
+                  }
+                }
+              }} = Config.load(root)
+    end
+  end
+
+  describe "electric config update_env pre init" do
+    setup do
+      [cmd: ["config", "update_env"]]
+    end
+
+    test "shows help text if --help passed", ctx do
+      args = argv(ctx, ["--help"])
+      assert {{:ok, output}, _} = run_cmd(args)
+      assert output =~ ~r/Update the configuration of an environment/
+    end
+
+    test "returns error if run before electric init in this root", ctx do
+      args = argv(ctx, ["some-env"])
+      assert {{:error, output}, _} = run_cmd(args)
+      assert output =~ "file is missing in this directory"
+    end
+  end
+
+  describe "electric config update_env" do
+    setup [
+      :login,
+      :init
+    ]
+
+    setup do
+      [cmd: ["config", "update_env"]]
+    end
+
+    test "errors if env does not exist", ctx do
+      args = argv(ctx, ["staging"])
+      assert {{:error, output}, _} = run_cmd(args)
+      assert output =~ "not found"
+    end
+
+    test "sets replication data if provided", %{tmp_dir: root} = ctx do
+      args =
+        argv(ctx, [
+          "default",
+          "--replication-disable-ssl",
+          "--replication-host",
+          "localhost",
+          "--replication-port",
+          "5133"
+        ])
+
+      assert {{:ok, _output}, _} = run_cmd(args)
+
+      assert {:ok,
+              %Config{
+                environments: %{
+                  default: %Environment{
+                    replication: %Replication{host: "localhost", port: 5133, ssl: false}
+                  }
+                }
+              }} = Config.load(root)
+    end
+  end
+
+  describe "electric config update_env --set-as-default" do
+    setup [
+      :login,
+      :init,
+      :add_env
+    ]
+
+    setup do
+      [cmd: ["config", "update_env"]]
+    end
+
+    test "defaults to not setting as default", %{tmp_dir: root} = ctx do
+      args = argv(ctx, ["staging"])
+      assert {{:ok, _output}, _} = run_cmd(args)
+      assert {:ok, %Config{defaultEnv: default_env}} = Config.load(root)
+      assert default_env != "staging"
+    end
+
+    test "sets as default if instructed", %{tmp_dir: root} = ctx do
+      args = argv(ctx, ["staging", "--set-as-default"])
+      assert {{:ok, _output}, _} = run_cmd(args)
+      assert {:ok, %Config{defaultEnv: "staging"}} = Config.load(root)
+    end
+
+    test "doesn't updates @config symlink if not set as default", %{tmp_dir: root} = ctx do
+      args = argv(ctx, ["staging"])
+      assert {{:ok, _output}, _} = run_cmd(args)
+      assert {:ok, %Config{app: app, directories: %{output: output_dir}}} = Config.load(root)
+
+      assert {:ok, link_target} =
+               output_dir
+               |> Path.join("@config")
+               |> File.read_link()
+
+      assert link_target != Path.join(app, "staging")
+    end
+
+    test "updates @config symlink if set as default", %{tmp_dir: root} = ctx do
+      args = argv(ctx, ["staging", "--set-as-default"])
+      assert {{:ok, _output}, _} = run_cmd(args)
+      assert {:ok, %Config{app: app, directories: %{output: output_dir}}} = Config.load(root)
+
+      assert {:ok, link_target} =
+               output_dir
+               |> Path.join("@config")
+               |> File.read_link()
+
+      assert link_target == Path.join(app, "staging")
+    end
+  end
+
+  describe "electric config remove_env pre init" do
+    setup do
+      [cmd: ["config", "remove_env"]]
+    end
+
+    test "shows help text if --help passed", ctx do
+      args = argv(ctx, ["--help"])
+      assert {{:ok, output}, _} = run_cmd(args)
+      assert output =~ ~r/Remove an environment/
+    end
+
+    test "returns error if run before electric init in this root", ctx do
+      args = argv(ctx, ["some-env"])
+      assert {{:error, output}, _} = run_cmd(args)
+      assert output =~ "file is missing in this directory"
+    end
+  end
+
+  describe "electric config remove_env invalid" do
+    setup [
+      :login,
+      :init
+    ]
+
+    setup do
+      [cmd: ["config", "remove_env"]]
+    end
+
+    test "errors if env does not exist", ctx do
+      args = argv(ctx, ["staging"])
+      assert {{:error, output}, _} = run_cmd(args)
+      assert output =~ "not found"
+    end
+
+    test "errors if env is the default env", ctx do
+      args = argv(ctx, ["default"])
+      assert {{:error, output}, _} = run_cmd(args)
+      assert output =~ "can't remove your default env."
+    end
+  end
+
+  describe "electric config remove_env" do
+    setup [
+      :login,
+      :init,
+      :add_env
+    ]
+
+    setup do
+      [cmd: ["config", "remove_env"]]
+    end
+
+    test "can't remove the env if added as default", %{env: env} = ctx do
+      set_default_env(%{default_env: env})
+
+      args = argv(ctx, [env])
+      assert {{:error, output}, _} = run_cmd(args)
+      assert output =~ "can't remove your default env."
+    end
+
+    test "removes env", %{env: env, tmp_dir: root} = ctx do
+      args = argv(ctx, [env])
+      assert {{:ok, _output}, _} = run_cmd(args)
+      assert {:ok, %Config{environments: environments}} = Config.load(root)
+      assert not Map.has_key?(environments, String.to_existing_atom(env))
+    end
   end
 end

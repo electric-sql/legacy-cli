@@ -48,29 +48,29 @@ defmodule ElectricCli.SessionTest do
     end
 
     @tag :tmp_dir
-    test "should use $HOME if set", cxt do
-      with_env([{"HOME", cxt.tmp_dir}]) do
-        assert Session.state_path() == Path.join([cxt.tmp_dir, ".local", "state", "electric"])
+    test "should use $HOME if set", ctx do
+      with_env([{"HOME", ctx.tmp_dir}]) do
+        assert Session.state_path() == Path.join([ctx.tmp_dir, ".local", "state", "electric"])
       end
     end
 
     @tag :tmp_dir
-    test "should use $XDG_STATE_HOME as root if set", cxt do
-      with_env([{"XDG_STATE_HOME", cxt.tmp_dir}]) do
-        assert Session.state_path() == Path.join(cxt.tmp_dir, "electric")
+    test "should use $XDG_STATE_HOME as root if set", ctx do
+      with_env([{"XDG_STATE_HOME", ctx.tmp_dir}]) do
+        assert Session.state_path() == Path.join(ctx.tmp_dir, "electric")
       end
     end
 
     @tag :tmp_dir
-    test "should use $ELECTRIC_STATE_HOME if set", cxt do
-      with_env([{"ELECTRIC_STATE_HOME", cxt.tmp_dir}]) do
-        assert Session.state_path() == cxt.tmp_dir
+    test "should use $ELECTRIC_STATE_HOME if set", ctx do
+      with_env([{"ELECTRIC_STATE_HOME", ctx.tmp_dir}]) do
+        assert Session.state_path() == ctx.tmp_dir
       end
     end
 
     @tag :tmp_dir
-    test "should raise if $ELECTRIC_STATE_HOME is a file", cxt do
-      path = Path.join(cxt.tmp_dir, "electric")
+    test "should raise if $ELECTRIC_STATE_HOME is a file", ctx do
+      path = Path.join(ctx.tmp_dir, "electric")
       File.write!(path, "oh dear")
 
       with_env([{"ELECTRIC_STATE_HOME", path}]) do

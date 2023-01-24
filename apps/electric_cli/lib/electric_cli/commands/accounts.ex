@@ -2,13 +2,12 @@ defmodule ElectricCli.Commands.Accounts do
   @moduledoc """
   The `Accounts` command.
   """
-  alias ElectricCli.Session
   use ElectricCli, :command
 
   def spec do
     [
       name: "accounts",
-      about: "Manage accounts",
+      about: "Manage accounts.",
       subcommands: [
         list: [
           name: "list",
@@ -32,13 +31,14 @@ defmodule ElectricCli.Commands.Accounts do
 
       case result do
         {:ok, %Req.Response{status: 200, body: %{"data" => data}}} ->
-          {:result,
-           data
-           |> Enum.map(&[IO.ANSI.green(), "* ", IO.ANSI.reset(), &1["name"]])
-           |> Enum.join("\n")}
+          rows =
+            data
+            |> Enum.map(fn %{"name" => name, "slug" => slug} -> [slug, name] end)
+
+          {:results, rows, ["ID", "Name"]}
 
         {:ok, %Req.Response{status: 403}} ->
-          {:error, "invalid credentials"}
+          {:error, :invalid_credentials}
 
         {:error, _exception} ->
           {:error, "couldn't connect to ElectricSQL servers"}

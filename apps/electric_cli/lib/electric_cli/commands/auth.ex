@@ -7,7 +7,7 @@ defmodule ElectricCli.Commands.Auth do
   def spec do
     [
       name: "auth",
-      about: "Sign up, log in and manage authentication status.",
+      about: "Log-in and manage authentication status.",
       flags: default_flags(),
       subcommands: [
         login: [
@@ -60,14 +60,10 @@ defmodule ElectricCli.Commands.Auth do
   # *** Login ***
 
   def login(%{args: %{email: email}, options: %{password: password}}) do
-    case handle_password(password) do
-      {:ok, password} ->
-        Progress.run("Authenticating", fn ->
-          perform_login(email, password)
-        end)
-
-      _ ->
-        {:error, "failed to read password"}
+    with {:ok, password} <- handle_password(password) do
+      Progress.run("Authenticating", fn ->
+        perform_login(email, password)
+      end)
     end
   end
 
@@ -124,6 +120,9 @@ defmodule ElectricCli.Commands.Auth do
       :ok ->
         {:success, "Logged out successfully"}
 
+      {:error, :enoent} ->
+        {:success, "You are logged out"}
+
       _ ->
         {:error, "failed to clear authentication token"}
     end
@@ -134,7 +133,7 @@ defmodule ElectricCli.Commands.Auth do
   def whoami(_cmd) do
     case Session.get() do
       %Session.Credentials{email: email} ->
-        {:result, "You are #{email}"}
+        {:result, "You are logged in as #{email}"}
 
       nil ->
         {:error, "you're not logged in"}

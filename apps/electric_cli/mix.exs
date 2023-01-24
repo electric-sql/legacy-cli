@@ -6,7 +6,7 @@ defmodule ElectricCli.MixProject do
   def project do
     [
       app: :electric_cli,
-      version: "0.2.1",
+      version: "0.3.0",
       elixir: "~> 1.14",
       build_path: "../../_build",
       config_path: "../../config/config.exs",
@@ -27,6 +27,23 @@ defmodule ElectricCli.MixProject do
     |> application()
   end
 
+  # Avoid running the command twice when running with the
+  # local `mix dev` alias.
+  defp application(:dev) do
+    case System.get_env("RUNNING_AS_MIX_DEV") do
+      "true" ->
+        [
+          extra_applications: [:logger, :eex]
+        ]
+
+      _ ->
+        [
+          extra_applications: [:logger, :eex],
+          mod: {ElectricCli.Main, []}
+        ]
+    end
+  end
+
   defp application(:test) do
     [
       extra_applications: [:logger, :eex]
@@ -40,7 +57,8 @@ defmodule ElectricCli.MixProject do
     ]
   end
 
-  defp elixirc_paths(:test), do: ["lib", "test/mocks"]
+  # Specifies which paths to compile per environment.
+  defp elixirc_paths(:test), do: ["lib", "test/mocks", "test/support"]
   defp elixirc_paths(_), do: ["lib"]
 
   # Run "mix help deps" to learn about dependencies.
@@ -66,7 +84,7 @@ defmodule ElectricCli.MixProject do
 
   defp aliases do
     [
-      dev: "run dev.exs"
+      dev: "cmd RUNNING_AS_MIX_DEV=true mix run dev.exs"
     ]
   end
 

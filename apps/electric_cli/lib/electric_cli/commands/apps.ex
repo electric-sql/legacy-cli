@@ -4,9 +4,9 @@ defmodule ElectricCli.Commands.Apps do
   """
   use ElectricCli, :command
 
-  @app_id [
-    app_id: [
-      value_name: "APP_ID",
+  @app [
+    app: [
+      value_name: "APP",
       help: "App ID (e.g.: from `electric apps list`)",
       required: true,
       parser: :string
@@ -16,7 +16,7 @@ defmodule ElectricCli.Commands.Apps do
   def spec do
     [
       name: "apps",
-      about: "Manage applications",
+      about: "Manage backend applications.",
       subcommands: [
         # create: [
         #   name: "create",
@@ -64,7 +64,7 @@ defmodule ElectricCli.Commands.Apps do
 
           Show informatiom about a specific application.
           """,
-          args: @app_id,
+          args: @app,
           flags: default_flags()
         ]
         # resume
@@ -108,7 +108,7 @@ defmodule ElectricCli.Commands.Apps do
           {:results, rows, ["ID", "Name", "Environment", "Status"]}
 
         {:ok, %Req.Response{}} ->
-          {:error, "invalid credentials"}
+          {:error, :invalid_credentials}
 
         {:error, _exception} ->
           {:error, "couldn't connect to ElectricSQL servers"}
@@ -131,9 +131,9 @@ defmodule ElectricCli.Commands.Apps do
   #   throw(:NotImplemented)
   # end
 
-  def show(%{args: %{app_id: app_id}}) do
+  def show(%{args: %{app: app}}) do
     with :ok <- Session.require_auth() do
-      path = "apps/#{app_id}"
+      path = "apps/#{app}"
 
       result =
         Progress.run("Getting app", false, fn ->
@@ -142,10 +142,23 @@ defmodule ElectricCli.Commands.Apps do
 
       case result do
         {:ok, %Req.Response{status: 200, body: %{"data" => data}}} ->
-          {:result, data}
+          rows =
+            Enum.flat_map(
+              [data],
+              &Enum.map(&1["databases"], fn db ->
+                [
+                  &1["id"],
+                  &1["name"],
+                  db["slug"],
+                  colorize_status(db["status"]) |> IO.iodata_to_binary()
+                ]
+              end)
+            )
+
+          {:results, rows, ["ID", "Name", "Environment", "Status"]}
 
         {:ok, %Req.Response{}} ->
-          {:error, "invalid credentials"}
+          {:error, :invalid_credentials}
 
         {:error, _exception} ->
           {:error, "couldn't connect to ElectricSQL servers"}

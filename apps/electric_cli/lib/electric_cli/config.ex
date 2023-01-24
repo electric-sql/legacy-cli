@@ -1,61 +1,102 @@
 defmodule ElectricCli.Config do
-  alias ElectricCli.Migrations
-  alias ElectricCli.Session
-  alias ElectricCli.Client
+  @moduledoc """
+  Manages the `electric.json` configuration file.
+  """
+  alias ElectricCli.Util
+  alias ElectricCli.Validate
+  alias ElectricCli.Config.Directories
+  alias ElectricCli.Config.Environment
 
-  @derive Jason.Encoder
+  alias __MODULE__
 
-  @keys [
-    :root,
-    :app_id,
-    :migrations_dir,
-    :env
+  @filename Application.compile_env!(:electric_cli, :config_filename)
+
+  @app_symlink_name "@app"
+  @config_symlink_name "@config"
+
+  @derive {Jason.Encoder, except: [:root]}
+  @type t() :: %Config{
+          app: binary(),
+          debug: boolean(),
+          defaultEnv: binary(),
+          directories: %Directories{},
+          environments: %{
+            binary() => %Environment{}
+          },
+          root: binary()
+        }
+  @enforce_keys [
+    :app,
+    :defaultEnv,
+    :directories,
+    :environments,
+    :root
+  ]
+  defstruct [
+    :app,
+    :debug,
+    :defaultEnv,
+    :directories,
+    :environments,
+    :root
   ]
 
-  @rc_filename "electric.json"
+  use ExConstructor
 
-  @enforce_keys @keys
+  def new(map) do
+    struct = super(map)
 
-  defstruct @keys
+    directories =
+      struct.directories
+      |> Directories.new()
 
-  @type t() :: %__MODULE__{
-          root: binary(),
-          app_id: binary(),
-          migrations_dir: binary(),
-          env: binary()
-        }
+    environments =
+      struct.environments
+      |> Enum.map(fn {k, v} -> {k, Environment.create(v, "#{k}")} end)
+      |> Enum.into(%{})
 
-  def new(args) do
-    config = struct(__MODULE__, args)
-
-    Map.update!(config, :migrations_dir, &Path.expand(&1, config.root))
+    %{struct | directories: directories, environments: environments}
   end
 
-  def keys do
-    @keys
+  @doc """
+  Checks whether the config file already exists in the `dir` provided.
+
+  If so, returns `{true, filepath}`. Otherwise returns `false`.
+  """
+  def exists?(dir) do
+    path = filepath(dir)
+
+    with true <- File.exists?(path) do
+      {true, path}
+    end
   end
 
-  def cwd, do: File.cwd!()
+  @doc """
+  Load the config file into a `%Config{}` struct.
 
-  def path(dir \\ cwd()) do
-    Path.join(dir, @rc_filename)
-  end
-
+  Also adds the current `root` dir and expands the `directories`
+  so they're full paths rather than relative to the config file.
+  """
   def load(dir) do
-    current_dir = dir || cwd()
-    path = path(current_dir)
+    dir = Path.expand(dir)
 
-    with {:exists, true} <- {:exists, File.exists?(path)},
-         {:ok, json} <- File.read(path),
-         {:ok, map} <- Jason.decode(json, keys: :atoms!) do
-      {:ok, new(Map.put(map, :root, current_dir))}
+    with {:exists, {true, path}} <- {:exists, exists?(dir)},
+         {:ok, json_str} <- File.read(path),
+         {:ok, data} <- Jason.decode(json_str, keys: :atoms) do
+      config =
+        data
+        |> Map.update!(:directories, &expand_directories(&1, dir))
+        |> Map.put(:root, dir)
+        |> Config.new()
+
+      {:ok, config}
     else
       {:exists, false} ->
-        {:error, "electric.json file is missing in this directory",
+        {:error, "`#{@filename}` file is missing in this directory",
          [
            "Did you run ",
            IO.ANSI.yellow(),
-           "electric init <app_id>",
+           "electric init APP",
            IO.ANSI.reset(),
            " to make this project work with ElectricSQL?"
          ]}
@@ -65,82 +106,117 @@ defmodule ElectricCli.Config do
     end
   end
 
-  def merge(config, options) do
-    Enum.reduce(@keys, %{}, fn key, acc ->
-      value = options[key] || Map.fetch!(config, key)
-      Map.put(acc, key, value)
-    end)
+  @doc """
+  Saves the `%Config{}` into the config file.
+
+  Contracts the `directories` so that they're stored relative to
+  the config file (so they're easier to read and edit manually).
+  """
+  def save(
+        %Config{
+          app: app,
+          defaultEnv: default_env,
+          directories: %Directories{output: output_dir},
+          root: root
+        } = config
+      ) do
+    config =
+      config
+      |> Map.update!(:directories, &contract_directories(&1, root))
+      |> Map.update!(:environments, &contract_environments/1)
+
+    config_filepath =
+      root
+      |> filepath()
+
+    with {:ok, json} <- Jason.encode(config, pretty: true),
+         :ok <- File.write(config_filepath, json <> "\n"),
+         :ok <- update_symlinks(app, default_env, output_dir) do
+      :ok
+    end
   end
 
   @doc """
-  Initialize the `electric.json` config file according to the provided settings
-
-  `no_verify` argument, if true, disables connection to the Console that makes sure
-  that the app exist to prevent typos. This is an escape hatch for E2E tests to minimize
-  external interactions.
+  Lookup a configured environment by `env` name.
   """
-  def init(config, no_verify \\ false)
+  def target_environment(%Config{defaultEnv: default_env} = config, nil) do
+    config
+    |> target_environment(default_env)
+  end
 
-  def init(%__MODULE__{} = config, true) do
-    file_contents =
-      config
-      |> Map.from_struct()
-      |> Map.drop([:root])
-      |> Map.update!(:migrations_dir, &Path.relative_to(&1, config.root))
+  def target_environment(%Config{environments: environments}, env) do
+    msg = "env `#{env}` not found; see `electric configure --help`"
 
-    with {:ok, json} <- Jason.encode(file_contents, pretty: true),
-         {:ok, _} <- Migrations.init_migrations(config.app_id, config),
-         path = path(config.root),
-         :ok <- File.write(path, json <> "\n") do
-      {:ok, path}
+    with :ok <- Validate.validate_slug(env),
+         {:ok, key} <- Util.get_existing_atom(env, {:error, msg}),
+         %Environment{} = environment <- Map.get(environments, key, {:error, msg}) do
+      {:ok, environment}
+    else
+      {:error, {:invalid, _}} ->
+        {:error, "invalid env `#{env}`"}
+
+      _ ->
+        {:error, "env `#{env}` not found. See `electric config add_env`."}
     end
   end
 
-  def init(%__MODULE__{} = config, false) do
-    with :ok <- Session.require_auth(),
-         :ok <- check_if_app_exists(config.app_id) do
-      init(config, true)
+  def contract_directories(%Directories{} = directories, root) do
+    directories
+    |> Map.from_struct()
+    |> Enum.map(fn {key, path} -> {key, Path.relative_to(path, root)} end)
+    |> Directories.new()
+  end
+
+  defp contract_environments(%{} = environments) do
+    environments
+    |> Enum.map(fn {key, %Environment{} = environment} ->
+      {key, contract_environment(environment)}
+    end)
+    |> Enum.into(%{})
+  end
+
+  defp contract_environment(%Environment{replication: nil} = environment) do
+    environment
+    |> Map.from_struct()
+    |> Map.drop([:replication])
+  end
+
+  defp contract_environment(%Environment{} = environment) do
+    environment
+  end
+
+  defp expand_directories(%{} = directories, root) do
+    directories
+    |> Enum.map(fn {key, path} -> {key, Path.expand(path, root)} end)
+    |> Enum.into(%{})
+  end
+
+  defp filepath(nil) do
+    File.cwd!()
+    |> filepath()
+  end
+
+  defp filepath(dir) when is_binary(dir) do
+    dir
+    |> Path.join(@filename)
+  end
+
+  defp update_symlinks(app, default_env, output_dir) do
+    app_link_path = Path.join(output_dir, @app_symlink_name)
+    config_link_path = Path.join(output_dir, @config_symlink_name)
+    config_target = Path.join(app, default_env)
+
+    with :ok <- File.mkdir_p(output_dir),
+         :ok <- overwrite_symlink(app_link_path, app),
+         :ok <- overwrite_symlink(config_link_path, config_target) do
+      :ok
     end
   end
 
-  defp check_if_app_exists(app_id) do
-    with {:ok, apps} <- list_available_apps() do
-      if app_id in apps do
-        :ok
-      else
-        suggestion = Enum.max_by(apps, &String.jaro_distance(&1, app_id))
-
-        error = "couldn't find app with id '#{app_id}'"
-
-        error =
-          if String.jaro_distance(suggestion, app_id) > 0.6,
-            do: error <> ". Did you mean '#{suggestion}'?",
-            else: error
-
-        {:error, error,
-         [
-           "Did you create the app already? You can check with ",
-           IO.ANSI.yellow(),
-           "electric apps list",
-           IO.ANSI.reset(),
-           " to see all available apps"
-         ]}
-      end
-    end
-  end
-
-  defp list_available_apps() do
-    result = Client.get("apps")
-
-    case result do
-      {:ok, %Req.Response{status: 200, body: %{"data" => data}}} ->
-        {:ok, Enum.map(data, & &1["id"])}
-
-      {:ok, %Req.Response{}} ->
-        {:error, "invalid credentials"}
-
-      {:error, _exception} ->
-        {:error, "couldn't connect to ElectricSQL servers"}
+  defp overwrite_symlink(path, target) do
+    with {:ok, _} <- File.rm_rf(path) do
+      target
+      |> File.ln_s(path)
     end
   end
 end

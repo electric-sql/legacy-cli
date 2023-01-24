@@ -1,5 +1,6 @@
 defmodule ElectricCli.MockServer do
   use Plug.Router
+  alias Plug.Conn
 
   def spec do
     {Plug.Cowboy, scheme: :http, plug: ElectricCli.MockServer, options: [port: 4005]}
@@ -57,6 +58,21 @@ defmodule ElectricCli.MockServer do
       %{
         "encoding" => "escaped",
         "name" => "second_migration_name",
+        "original_body" => """
+        /*
+        ElectricSQL Migration
+        name: REVERTED VERSION OF THIS FILE
+        title": another
+
+        When you build or sync these migrations we will add some triggers and metadata
+        so that ElectricSQL's Satellite component can sync your data.
+
+        Write your SQLite migration below.
+        */
+        CREATE TABLE IF NOT EXISTS cats (
+          value TEXT PRIMARY KEY
+        ) STRICT, WITHOUT ROWID;
+        """,
         "status" => "applied",
         "satellite_body" => ["other stuff"],
         "sha256" => "d0a52f739f137fc80fd67d9fd347cb4097bd6fb182e583f2c64d8de309393ad7",
@@ -79,7 +95,7 @@ defmodule ElectricCli.MockServer do
       title": another
 
       When you build or sync these migrations we will add some triggers and metadata
-      so that ElectricSQL Satellite can sync your data.
+      so that ElectricSQL's Satellite component can sync your data.
 
       Write your SQLite migration below.
       */
@@ -92,44 +108,44 @@ defmodule ElectricCli.MockServer do
     }
   }
 
-  defp get_some_migrations(app_id) do
-    looked_up = @fixtures[app_id]
-    #    IO.inspect(looked_up)
-    if looked_up == nil do
-      []
-    else
-      looked_up
+  defp get_migrations(app) do
+    case @fixtures[app] do
+      nil ->
+        []
+
+      alt ->
+        alt
     end
   end
 
-  defp get_a_migration(migration_name) do
-    @migration_fixtures[migration_name]
+  defp get_migration(name) do
+    @migration_fixtures[name]
   end
 
-  get "api/v1/apps" do
-    default_env = %{
-      name: "Default",
-      slug: "default",
-      status: "provisioned",
-      type: "postgres"
-    }
+  defp authenticated(conn) do
+    case Enum.find(conn.req_headers, fn {k, _v} -> k == "authorization" end) do
+      {"authorization", "Bearer " <> _token} ->
+        {:ok, conn}
 
-    app_list = %{
-      data: [
-        %{id: "test", name: "test", slug: "test", databases: [default_env]},
-        %{id: "test2", name: "test2", slug: "test2", databases: [default_env]},
-        %{id: "app-name-2", name: "app-name-2", slug: "app-name-2", databases: [default_env]},
-        %{
-          id: "cranberry-soup-1337",
-          name: "app-name-2",
-          slug: "app-name-2",
-          databases: [default_env]
+      _alt ->
+        data = %{
+          error: %{
+            details: "unauthenticated"
+          }
         }
-      ]
-    }
 
-    Plug.Conn.resp(conn, 200, Jason.encode!(app_list))
-    |> Plug.Conn.put_resp_header("Content-Type", "application/json")
+        conn
+        |> json(401, data)
+        |> Conn.send_resp()
+    end
+  end
+
+  defp json(conn, status, data) when is_integer(status) do
+    json_str = Jason.encode!(data)
+
+    conn
+    |> Conn.resp(status, json_str)
+    |> Conn.put_resp_header("Content-Type", "application/json")
   end
 
   post "api/v1/auth/login" do
@@ -143,76 +159,165 @@ defmodule ElectricCli.MockServer do
         }
 
         conn
-        |> Plug.Conn.resp(200, Jason.encode!(%{data: data}))
-        |> Plug.Conn.put_resp_header("Content-Type", "application/json")
-        |> Plug.Conn.send_resp()
+        |> json(200, %{data: data})
 
       _ ->
         conn
-        |> Plug.Conn.resp(401, Jason.encode!(%{error: %{details: "no account with this email"}}))
-        |> Plug.Conn.put_resp_header("Content-Type", "application/json")
-        |> Plug.Conn.send_resp()
+        |> json(401, %{error: %{details: "no account with this email"}})
     end
   end
 
-  get "api/v1/apps/:app_id/environments/:environment/migrations" do
-    server_manifest = %{
-      "migrations" => get_some_migrations(app_id)
-    }
-
-    Plug.Conn.resp(conn, 200, Jason.encode!(server_manifest))
-    |> Plug.Conn.put_resp_header("Content-Type", "application/json")
-    |> Plug.Conn.send_resp()
-  end
-
-  get "api/v1/apps/:app_id/environments/:environment/migrations/:migration_name" do
-    server_manifest = %{
-      "migration" => get_a_migration(migration_name)
-    }
-
-    Plug.Conn.resp(conn, 200, Jason.encode!(server_manifest))
-    |> Plug.Conn.put_resp_header("Content-Type", "application/json")
-    |> Plug.Conn.send_resp()
-  end
-
-  post "api/v1/apps/status-422/environments/:environment/migrations" do
-    Plug.Conn.resp(
-      conn,
-      422,
-      Jason.encode!(%{errors: %{original_body: ["The table items is not STRICT."]}})
-    )
-    |> Plug.Conn.put_resp_header("Content-Type", "application/json")
-    |> Plug.Conn.send_resp()
-  end
-
-  post "api/v1/apps/:app_id/environments/:environment/migrations" do
-    Plug.Conn.resp(conn, 201, "\"ok\"")
-    |> Plug.Conn.put_resp_header("Content-Type", "application/json")
-    |> Plug.Conn.send_resp()
-  end
-
-  post "api/v1/apps/:app_id/environments/:environment/migrate" do
-    Plug.Conn.resp(conn, 200, "\"ok\"")
-    |> Plug.Conn.put_resp_header("Content-Type", "application/json")
-    |> Plug.Conn.send_resp()
-  end
-
-  get "api/v1/apps/:app_id" do
-    app_info = %{
-      "data" => %{
-        "databases" => [
-          %{
-            "slug" => "default"
-          }
-        ],
-        "id" => "tame-cut-4121",
-        "name" => "Example App",
-        "slug" => "example-app"
+  get "api/v1/accounts" do
+    with {:ok, conn} <- authenticated(conn) do
+      accounts_list = %{
+        data: [
+          %{id: "277f2cae-98e2-11ed-aa13-1778becde5cf", name: "Personal", slug: "personal"},
+          %{id: "2ef337c8-98e2-11ed-bd07-f378edb7fd12", name: "Work", slug: "work"}
+        ]
       }
-    }
 
-    Plug.Conn.resp(conn, 200, Jason.encode!(app_info))
-    |> Plug.Conn.put_resp_header("Content-Type", "application/json")
-    |> Plug.Conn.send_resp()
+      conn
+      |> json(200, accounts_list)
+    end
+  end
+
+  get "api/v1/apps" do
+    with {:ok, conn} <- authenticated(conn) do
+      default_env = %{
+        name: "Default",
+        slug: "default",
+        status: "provisioned",
+        type: "postgres"
+      }
+
+      staging_env = %{
+        name: "Staging",
+        slug: "staging",
+        status: "provisioned",
+        type: "postgres"
+      }
+
+      apps_list = %{
+        data: [
+          %{id: "test", name: "test", slug: "test", databases: [default_env]},
+          %{id: "test2", name: "test2", slug: "test2", databases: [default_env]},
+          %{id: "app-name-2", name: "app-name-2", slug: "app-name-2", databases: [default_env]},
+          %{
+            id: "cranberry-soup-1337",
+            name: "app-name-2",
+            slug: "app-name-2",
+            databases: [default_env, staging_env]
+          },
+          %{
+            id: "french-onion-1234",
+            name: "french-onion-1234",
+            slug: "french-onion-1234",
+            databases: [default_env]
+          }
+        ]
+      }
+
+      conn
+      |> json(200, apps_list)
+    end
+  end
+
+  get "api/v1/apps/:app" do
+    with {:ok, conn} <- authenticated(conn) do
+      app_info = %{
+        "data" => %{
+          "databases" => [
+            %{
+              "slug" => "default",
+              "name" => "Default",
+              "status" => "provisioned",
+              "type" => "postgres"
+            }
+          ],
+          "id" => app,
+          "name" => "Example App",
+          "slug" => "example-app"
+        }
+      }
+
+      conn
+      |> json(200, app_info)
+    end
+  end
+
+  get "api/v1/apps/:app/environments/:env" do
+    with {:ok, conn} <- authenticated(conn) do
+      env_info = %{
+        "data" => %{
+          "slug" => "default",
+          "name" => "Default",
+          "status" => "provisioned",
+          "type" => "postgres"
+        }
+      }
+
+      conn
+      |> json(200, env_info)
+    end
+  end
+
+  get "api/v1/apps/:app/environments/:env/migrations" do
+    with {:ok, conn} <- authenticated(conn) do
+      data = %{
+        "migrations" => get_migrations(app)
+      }
+
+      conn
+      |> json(200, data)
+    end
+  end
+
+  get "api/v1/apps/:app/environments/:env/migrations/:name" do
+    with {:ok, conn} <- authenticated(conn) do
+      data = %{
+        "migration" => get_migration(name)
+      }
+
+      conn
+      |> json(200, data)
+    end
+  end
+
+  post "api/v1/apps/status-422/environments/:env/migrations" do
+    with {:ok, conn} <- authenticated(conn) do
+      data = %{
+        errors: %{
+          original_body: ["The table items is not STRICT."]
+        }
+      }
+
+      conn
+      |> json(422, data)
+    end
+  end
+
+  post "api/v1/apps/:app/environments/:env/migrations" do
+    with {:ok, conn} <- authenticated(conn) do
+      conn
+      |> json(201, "\"ok\"")
+    end
+  end
+
+  post "api/v1/apps/:app/environments/:env/migrate" do
+    with {:ok, conn} <- authenticated(conn) do
+      conn
+      |> json(200, "\"ok\"")
+    end
+  end
+
+  post "api/v1/apps/:app/environments/:env/reset" do
+    with {:ok, conn} <- authenticated(conn) do
+      data = %{
+        "detail" => "Database reset initiated."
+      }
+
+      conn
+      |> json(200, data)
+    end
   end
 end

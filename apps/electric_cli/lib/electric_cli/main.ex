@@ -3,6 +3,7 @@ defmodule ElectricCli.Main do
 
   require Logger
 
+  alias ElectricCli.Output.Formatting
   alias ElectricCli.Commands
   alias ElectricCli.Util
 
@@ -10,9 +11,19 @@ defmodule ElectricCli.Main do
     accounts: Commands.Accounts,
     apps: Commands.Apps,
     auth: Commands.Auth,
-    init: Commands.Config.Init,
+    build: Commands.Build,
     config: Commands.Config,
-    migrations: Commands.Migrations
+    init: Commands.Init,
+    migrations: Commands.Migrations,
+    reset: Commands.Reset,
+    sync: Commands.Sync
+  ]
+
+  @top_level_commands [
+    :build,
+    :init,
+    :reset,
+    :sync
   ]
 
   @project Mix.Project.config()
@@ -27,14 +38,14 @@ defmodule ElectricCli.Main do
       name: "electric",
       description: "ElectricSQL CLI",
       version: @project[:version],
-      about: "...",
+      about: "Command line interface to the https://electric-sql.com service.",
       allow_unknown_args: false,
       parse_double_dash: true,
       flags: [
         verbose: [
           long: "--verbose",
           short: "-v",
-          help: "Output more information about the CLI actions",
+          help: "Output more information about the CLI actions.",
           required: false,
           global: true
         ]
@@ -43,6 +54,9 @@ defmodule ElectricCli.Main do
     )
   end
 
+  @doc """
+  Run the command, print the output and exit.
+  """
   @impl Bakeware.Script
   def main(argv \\ []) do
     case run(argv) do
@@ -61,34 +75,48 @@ defmodule ElectricCli.Main do
     end
   end
 
-  # allows for running the command without handling the result and causing the system to exit
-  @doc false
+  @doc """
+  Run the command and return the result (without exiting).
+  """
   def run(argv \\ []) do
     argv
     |> prepend_help_flag()
     |> parse()
     |> case do
       :version ->
-        spec() |> Optimus.Title.title() |> join_lines()
+        spec()
+        |> Optimus.Title.title()
+        |> join_lines()
 
       :help ->
-        spec() |> Optimus.Help.help([], columns()) |> join_lines()
+        spec()
+        |> Optimus.Help.help([], columns())
+        |> join_lines()
 
       {:help, subcommand} ->
-        spec() |> Optimus.Help.help(subcommand, columns()) |> join_lines()
+        spec()
+        |> Optimus.Help.help(subcommand, columns())
+        |> join_lines()
 
       {:error, errors} ->
-        {:error, ElectricCli.Output.Formatting.format_errors(spec(), errors) |> Enum.join("\n")}
+        formatted_errors =
+          spec()
+          |> Formatting.format_errors(errors)
+          |> Enum.join("\n")
+
+        {:error, formatted_errors}
 
       {:error, subcommand, errors} ->
-        {:error,
-         ElectricCli.Output.Formatting.format_errors(spec(), subcommand, errors)
-         |> Enum.join("\n")}
+        formatted_errors =
+          spec()
+          |> Formatting.format_errors(subcommand, errors)
+          |> Enum.join("\n")
+
+        {:error, formatted_errors}
 
       ok_tuple ->
-        request = get_subcommand_and_result(ok_tuple)
-
-        request
+        ok_tuple
+        |> get_subcommand_and_result()
         |> set_verbosity()
         |> execute()
         |> map_result()
@@ -113,9 +141,14 @@ defmodule ElectricCli.Main do
   end
 
   defp execute({[], _}), do: Optimus.parse!(spec(), ["--help"], &halt/1)
-  defp execute({[:init], options}), do: apply(Commands.Config, :init, [options])
-  defp execute({[key], _}), do: Optimus.parse!(spec(), ["help", "#{key}"], &halt/1)
   defp execute({[key, command], options}), do: apply(@commands[key], command, [options])
+
+  defp execute({[key], options}) when key in @top_level_commands do
+    @commands[key]
+    |> apply(key, [options])
+  end
+
+  defp execute({[key], _options}), do: Optimus.parse!(spec(), ["help", "#{key}"], &halt/1)
 
   defp map_result({:result, data}) when is_binary(data) do
     {:ok, data}
@@ -157,6 +190,19 @@ defmodule ElectricCli.Main do
     |> IO.puts()
 
     halt(status)
+  end
+
+  defp map_result({:error, :invalid_credentials}) do
+    hint = [
+      "Did you run ",
+      IO.ANSI.yellow(),
+      "electric auth login EMAIL",
+      IO.ANSI.reset(),
+      " on this machine?"
+    ]
+
+    {:error, "invalid credentials", hint}
+    |> map_result()
   end
 
   defp map_result({:error, errors}),

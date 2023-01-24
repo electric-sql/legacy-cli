@@ -68,119 +68,127 @@ And run it:
 This creates a binary at `./dist/electric` and needs to be run on the OS you are targetting.
 See also https://github.com/bake-bake-bake/bakeware#static-compiling-openssl-into-erlang-distribution
 
+The following examples assume that you have the `./dist/electric` binary on your path.
+
 ## Usage
 
 ```sh
-./dist/electric --help
+electric --help
 ```
 
 The optional `--verbose` flag can be added to any command to output some useful
 information about what the client is doing.
 
+Prefixing a command or sub command with `help` will print detailed usage information. For example:
+
+```sh
+electric help auth whoami
+```
+
+## Authentication
+
+Login using:
+
+```sh
+electric auth login EMAIL [--password PASSWORD]
+```
+
+Where your `EMAIL` is the email address associated with your ElectricSQL account. You will be prompted to enter your password if not provided.
+
+## Configuration
+
+### Init
+
+```sh
+electric init APP [--env ENV] [--migrations-dir MIGRATIONS_DIR] [--output-dir OUTPUT_DIR]
+```
+
+Creates a new folder for migrations in your current directory called 'migrations' and adds a new migration  folder to it with a name automatically derived from the current time in UTC and the title `init` e.g. `20221116162204816_init`. Inside this folder will be a file called `migration.sql`. You should write your initial SQLite DDL SQL into this file.
+
+The `APP` and optinally `ENV` you give should be copied from the sync service connection details provided by the ElectricSQL console. You specify here once, and the CLI stores in an `electric.json` file so you don't have to keep re-typing it.
+
+### Update
+
+You can update your config using `electric config update`. See the options with:
+
+```sh
+electric config update --help
+```
+
 ## Migrations command
 
-The `migrations` command lets you create new migrations, build electrified javascript distributions of the migrations 
-to use in your project, and sync your migrations to our cloud service.
-
-### init
-
-`migrations init APP_ID [--verbose] [--dir MIGRATIONS_DIR]`
-
-Creates a new folder for migrations in your current directory called 'migrations' and adds a new migration 
-folder to it with a name automatically derived from the current time in UTC and the title `init` e.g. `20221116162204816_init`
-
-Inside this folder will be a file called `migration.sql`. You should write your initial SQLite DDL SQL into this file.
-
-The APP_ID you give should be the slug of the app previous created in the web console. 
-You give it once here and the CLI stores it in the `migrations/manifest.json` so you don't have to keep re-typing it.
-
-The optional `MIGRATIONS_DIR` allows you to create the migration folder somewhere other than the current working directory.
-
-`MIGRATIONS_DIR` must end with the folder name `migrations`
-
-### app
-`migrations app APP_ID [--verbose] [--dir MIGRATIONS_DIR]`
-
-Changes the stored `APP_ID` that is used by all the other CLI migrations commands.
-
-The optional `MIGRATIONS_DIR` allows you to specify which migration directory to use other than one in the 
-current working directory.
+The `migrations` command lets you create new migrations, build electrified javascript distributions of the migrations to use in your project, and sync your migrations to our cloud service.
 
 ### new
 
-`migrations new [--help] [--verbose] [--dir MIGRATIONS_DIR] MIGRATION_TITLE`
+```sh
+electric migrations new NAME
+```
 
-MIGRATION_TITLE should be a short human readable description of the new migration.
-
-This adds a new migration to the `migrations` folder with a name automatically derived from the current
-time in UTC and the given title.
-
-The optional `MIGRATIONS_DIR` allows you to specify which migration directory to use other than one in the 
-current working directory.
+This adds a new migration to the `migrations` folder with a name automatically derived from the current time in UTC and the given `NAME`, which should be a short human readable description of the new migration.
 
 ### build
 
-`migrations build [--help] [--verbose] [--postgres] [--satellite] [--dir MIGRATIONS_DIR]`
+```sh
+electric migrations build [--env ENV] [--postgres] [--satellite]
+```
 
-Builds a javascript file at `dist/index.js` that contains all your migrations with ElectricSQL DB's added 
-DDL and some metadata.  
+Builds a bundled javascript file at `.electric/:app/:env/index.js` that can be imported into your local application using the `@config` or `@app/:env` symlinks, e.g.:
 
-The metadata in this file will have a `"env": "local" to indicate the it was built from your local files
-rather that one of the named app environments.
+```ts
+import config from '.electric/@config'
+```
 
-Add this file to your mobile or web project to configure your SQLite database.
+See the [configuration guide](https://electric-sql.com/docs/usage/configure) for more details.
 
-The optional `MIGRATIONS_DIR` allows you to specify which migration directory to use other than one in the 
-current working directory.
+The optional flag `--postgres` will also build a `postgres.sql` file in each migrations' folder with the PostgreSQL formatted migrations. This is useful for applying migrations manually to Postgres.
 
-The optional flag `--postgres` will also build a `postgres.sql` file in each migrations' folder with the PostgreSQL
-
-The optional flag `--satellite` will also build a `satellite.sql` file in each migrations' folder.
+The optional flag `--satellite` will also build a `satellite.sql` file in each migrations' folder that's designed to be applied to SQLite. This is primarily useful for testing and advanced debugging.
 
 ### sync
 
-`migrations sync [--verbose] [--env ENVIRONMENT_NAME] [--dir MIGRATIONS_DIR]`
+```sh
+electric sync [--env ENV]
+```
 
-Synchronises changes you have made to migration SQL files in your local `migrations` folder up to the ElectricSQL servers, 
-and builds a new javascript file at `dist/index.js` that matches the newly synchronised set of migrations.
+Synchronises changes you have made to migration SQL files in your local `migrations` folder up to the backend servers, and builds a new javascript file at `.electric/:app/:env/index.js` that matches the newly synchronised set of migrations. The metadata in this file will have a `"build": "server"` to indicate that it was built directly from the named backend environment.
 
-The metadata in this file will have a `"env": ENVIRONMENT_NAME to indicate that it was built directly from and matches
-the named app environment.
+By default this will sync to the `default` environment for your app. If you want to use a different one give its name with `--env ENV`.
 
-By default this will sync to the `default` environment for your app. If you want to use a different one give its name 
-with `--env ENVIRONMENT_NAME`
+If the app environment on our servers already has a migration with the same name but different sha256 then this synchronisation will fail because a migration cannot be modified once it has been applied.
 
-If the app environment on our servers already has a migration with the same name but different sha256 then this 
-synchronisation will fail because a migration cannot be modified once it has been applied. 
-If this happens you have two options, either revert the local changes you have made to the conflicted migration using 
-the `revert` command below or, if you are working in a development environment that you are happy to reset, 
-you can reset the whole environment's DB using the web control panel.
+If this happens you have two options, either:
 
-Also if a migration has a name that is lower in sort order than one already applied on the server this sync will fail.
+1. revert the local changes you've made to the conflicted migration using `electric migrations revert NAME`; or
+2. reset and re-provision the whole environment using `electric reset` (warning: causes data loss)
 
-The optional `MIGRATIONS_DIR` allows you to specify which migration directory to use other than one in the 
-current working directory.
+See below for information on both commands. Note also that if a migration has a name that is lower in sort order than one already applied on the server this will also error.
 
 ### list
 
-`migrations list [--help] [--verbose] [--dir MIGRATIONS_DIR]`
+```sh
+electric migrations list [--env ENV]
+```
 
 Will show a list of all the migrations and their status in every env in the app.
 
-The optional `MIGRATIONS_DIR` allows you to specify which migration directory to use other than one in the 
-current working directory.
-
 ### revert
 
-`migrations revert [--help] [--verbose] [--dir MIGRATIONS_DIR] [--env ENVIRONMENT_NAME] MIGRATION_NAME`
+```sh
+electric migrations revert NAME [--env ENV]
+```
 
-This will copy the named migration from the ElectricSQL server to replace the local one. 
+This will copy the named migration from the ElectricSQL server to replace the local one. By default this will use the `default` environment, if you want to use a different one you can specify it with `--env ENV`.
 
-By default this will use the `default` environment, if you want to use a different one you can specify it with 
-`--env ENVIRONMENT_NAME`
+### reset
 
-The optional `MIGRATIONS_DIR` allows you to specify which migration directory to use other than one in the 
-current working directory.
+If you get stuck in local development and need to reset your backend, you can wipe and re-provision your environment using:
+
+```sh
+electric reset [--env ENV]
+```
+
+WARNING: Use this with care (and usually only in development) as it explicitly causes data loss.
 
 ## Contributing
 
