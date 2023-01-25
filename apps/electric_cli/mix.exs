@@ -65,6 +65,7 @@ defmodule ElectricCli.MixProject do
   defp deps do
     [
       {:bakeware, "~> 0.2.4", runtime: false},
+      {:burrito, github: "burrito-elixir/burrito"},
       {:cli_spinners, [github: "thruflo/elixir_cli_spinners"]},
       {:dialyxir, "~> 1.0", only: :dev, runtime: false},
       {:ex_doc, "~> 0.28", only: :dev, runtime: false},
@@ -91,21 +92,15 @@ defmodule ElectricCli.MixProject do
   def releases do
     [
       electric: [
-        bakeware: [
-          compression_level: compression(Mix.env()),
-          start_command: "start"
-        ],
-        overwrite: true,
-        quiet: true,
-        steps: [
-          :assemble,
-          &Bakeware.assemble/1
-        ],
-        strip_beams: Mix.env() == :prod
+        steps: [:assemble, &Burrito.wrap/1],
+        burrito: [
+          targets: [
+            # macos: [os: :darwin, cpu: :x86_64],
+            linux: [os: :linux, cpu: :x86_64]
+            # windows: [os: :windows, cpu: :x86_64]
+          ]
+        ]
       ]
     ]
   end
-
-  defp compression(:prod), do: 19
-  defp compression(_), do: 1
 end
