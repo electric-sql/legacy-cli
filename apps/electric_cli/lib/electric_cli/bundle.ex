@@ -20,21 +20,24 @@ defmodule ElectricCli.Bundle do
   @derive Jason.Encoder
   @type t() :: %Bundle{
           app: binary(),
-          env: binary(),
           build: :local | :server,
+          debug: boolean(),
+          env: binary(),
           migrations: [%Migration{}],
           replication: %Replication{}
         }
   @enforce_keys [
     :app,
-    :env,
     :build,
+    :debug,
+    :env,
     :migrations
   ]
   defstruct [
     :app,
-    :env,
     :build,
+    :debug,
+    :env,
     :migrations,
     :replication
   ]
@@ -76,9 +79,10 @@ defmodule ElectricCli.Bundle do
   @doc """
   Initialise a new bundle.
   """
-  @spec init(binary(), binary(), :local | :server, [%Migration{}], %Replication{}) :: %Bundle{}
-  def init(app, env, build, migrations, replication) do
-    %{app: app, env: env, build: build, migrations: migrations}
+  @spec init(binary(), binary(), :local | :server, boolean(), [%Migration{}], %Replication{}) ::
+          %Bundle{}
+  def init(app, env, build, debug, migrations, replication) do
+    %{app: app, build: build, debug: debug, env: env, migrations: migrations}
     |> Util.map_put_if(:replication, replication, not is_nil(replication))
     |> Bundle.new()
   end
@@ -108,8 +112,9 @@ defmodule ElectricCli.Bundle do
   def save(
         %Bundle{
           app: app,
-          env: env,
           build: build,
+          debug: debug,
+          env: env,
           migrations: migrations,
           replication: replication
         },
@@ -117,8 +122,9 @@ defmodule ElectricCli.Bundle do
       ) do
     required = %{
       app: app,
-      env: env,
       build: build,
+      debug: debug,
+      env: env,
       migrations: migrations
     }
 
@@ -142,6 +148,7 @@ defmodule ElectricCli.Bundle do
         %Manifest{app: app, migrations: migrations},
         %Environment{slug: env, replication: replication},
         build_type,
+        debug_flag,
         output_dir
       )
       when build_type in [:local, :server] do
@@ -150,7 +157,7 @@ defmodule ElectricCli.Bundle do
       |> Path.join()
 
     app
-    |> init(env, build_type, migrations, replication)
+    |> init(env, build_type, debug_flag, migrations, replication)
     |> save(dist_folder)
   end
 
