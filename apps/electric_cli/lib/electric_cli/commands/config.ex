@@ -212,8 +212,8 @@ defmodule ElectricCli.Commands.Config do
         |> Map.put(:directories, directories)
         |> Map.put(:environments, environments)
 
-      with true <- new_config != config,
-           :ok <- Config.save(new_config),
+      with :ok <- Config.save(new_config),
+           true <- new_config != config,
            :ok <- Migrations.init_migrations(new_config, false),
            :ok <- Migrations.update_app(new_config) do
         {:success, ["ElectricCli configuration written to `#{relative_root}/`\n"]}

@@ -91,19 +91,36 @@ defmodule ElectricCli.Commands.ConfigTest do
                |> File.read_link()
     end
 
-    test "setting app updates @config symlink", %{tmp_dir: root} = ctx do
-      args = argv(ctx, ["--app", "french-onion-1234"])
-      assert {{:ok, _output}, _} = run_cmd(args)
+    test "setting app updates @app symlink even when not changed", %{tmp_dir: root} = ctx do
+      filepath = Path.join(root, "electric.json")
 
-      assert {:ok, %Config{defaultEnv: default_env, directories: %{output: output_dir}}} =
+      :ok =
+        filepath
+        |> File.read!()
+        |> String.replace("tarragon-envy-1337", "french-onion-1234")
+        |> then(&File.write(filepath, &1))
+
+      assert {:ok, %Config{app: "french-onion-1234", directories: %{output: output_dir}}} =
                Config.load(root)
 
-      assert {:ok, link_target} =
+      assert {:ok, "tarragon-envy-1337"} =
+               output_dir
+               |> Path.join("@app")
+               |> File.read_link()
+
+      args = argv(ctx, ["--app", "french-onion-1234"])
+      assert {{:ok, output}, _} = run_cmd(args)
+      assert output =~ "Nothing to update"
+
+      assert {:ok, "french-onion-1234"} =
+               output_dir
+               |> Path.join("@app")
+               |> File.read_link()
+
+      assert {:ok, "french-onion-1234/default"} =
                output_dir
                |> Path.join("@config")
                |> File.read_link()
-
-      assert link_target == Path.join("french-onion-1234", default_env)
     end
 
     test "env must exists when updating the default env", ctx do
@@ -124,6 +141,26 @@ defmodule ElectricCli.Commands.ConfigTest do
         app: "tarragon-envy-1337",
         env: env
       })
+    end
+
+    test "setting app updates @app and @config symlinks", %{tmp_dir: root} = ctx do
+      args = argv(ctx, ["--app", "lala-som-1234"])
+      assert {{:ok, _output}, _} = run_cmd(args)
+
+      assert {:ok, %Config{app: app, defaultEnv: env, directories: %{output: output_dir}}} =
+               Config.load(root)
+
+      assert {:ok, ^app} =
+               output_dir
+               |> Path.join("@app")
+               |> File.read_link()
+
+      assert {:ok, link_target} =
+               output_dir
+               |> Path.join("@config")
+               |> File.read_link()
+
+      assert link_target == Path.join(app, env)
     end
 
     test "setting env updates @config symlink", %{tmp_dir: root} = ctx do
