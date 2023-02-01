@@ -64,6 +64,24 @@ defmodule ElectricCli.Commands.BuildTest do
                |> Bundle.load()
     end
 
+    test "the index.js file has the debug flag", %{tmp_dir: root} = ctx do
+      args = argv(ctx, [])
+      assert {{:ok, _output}, _} = run_cmd(args)
+
+      assert {:ok,
+              %Config{app: app, debug: false, defaultEnv: env, directories: %{output: output_dir}}} =
+               Config.load(root)
+
+      bundle_path = Path.join([output_dir, app, env])
+      assert {:ok, %Bundle{debug: false}} = Bundle.load(bundle_path)
+
+      assert {{:ok, _output}, _} = run_cmd(["config", "update", "--debug"])
+      assert {:ok, %Config{debug: true}} = Config.load(root)
+
+      assert {{:ok, _output}, _} = run_cmd(args)
+      assert {:ok, %Bundle{debug: true}} = Bundle.load(bundle_path)
+    end
+
     test "default manifest unchanged without flags", %{tmp_dir: root} = ctx do
       assert {:ok, %Manifest{migrations: migrations} = manifest} = load_manifest(root)
       assert [%Migration{satellite_body: [], postgres_body: nil}] = migrations

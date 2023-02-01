@@ -27,6 +27,7 @@ defmodule ElectricCli.Config do
         }
   @enforce_keys [
     :app,
+    :debug,
     :defaultEnv,
     :directories,
     :environments,

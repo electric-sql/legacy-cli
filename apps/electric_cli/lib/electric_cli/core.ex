@@ -16,7 +16,11 @@ defmodule ElectricCli.Core do
   files and bundle an importable js config module.
   """
   def build(
-        %Config{app: app, directories: %{migrations: migrations_dir, output: output_dir}},
+        %Config{
+          app: app,
+          debug: debug,
+          directories: %{migrations: migrations_dir, output: output_dir}
+        },
         %Environment{} = environment,
         has_postgres,
         has_satellite
@@ -27,7 +31,7 @@ defmodule ElectricCli.Core do
          :ok <- Manifest.save(manifest, migrations_dir),
          :ok <- Migrations.optionally_write_postgres(manifest, migrations_dir, has_postgres),
          :ok <- Migrations.optionally_write_satellite(manifest, migrations_dir, has_satellite),
-         :ok <- Bundle.write(manifest, environment, :local, output_dir),
+         :ok <- Bundle.write(manifest, environment, :local, debug, output_dir),
          {:warning, []} <- {:warning, warnings} do
       :ok
     end
@@ -38,7 +42,11 @@ defmodule ElectricCli.Core do
   importable js config bundle to use the server migrations.
   """
   def sync(
-        %Config{app: app, directories: %{migrations: migrations_dir, output: output_dir}},
+        %Config{
+          app: app,
+          debug: debug,
+          directories: %{migrations: migrations_dir, output: output_dir}
+        },
         %Environment{slug: env} = environment
       ) do
     with {:ok, %Manifest{} = manifest} <- Manifest.load(app, migrations_dir, false),
@@ -46,7 +54,7 @@ defmodule ElectricCli.Core do
            Migrations.hydrate_manifest(manifest, migrations_dir),
          {:ok, dynamic_success_message} <- Sync.sync_migrations(manifest, environment),
          {:ok, %Manifest{} = server_manifest} <- Api.get_server_migrations(app, env, true),
-         :ok <- Bundle.write(server_manifest, environment, :server, output_dir) do
+         :ok <- Bundle.write(server_manifest, environment, :server, debug, output_dir) do
       {:ok, dynamic_success_message}
     end
   end
@@ -56,13 +64,17 @@ defmodule ElectricCli.Core do
   config bundle from the local files.
   """
   def reset(
-        %Config{app: app, directories: %{migrations: migrations_dir, output: output_dir}},
+        %Config{
+          app: app,
+          debug: debug,
+          directories: %{migrations: migrations_dir, output: output_dir}
+        },
         %Environment{slug: env} = environment
       ) do
     with {:ok, %Manifest{} = manifest} <- Manifest.load(app, migrations_dir, false),
          :ok <- reset_backend(app, env) do
       manifest
-      |> Bundle.write(environment, :local, output_dir)
+      |> Bundle.write(environment, :local, debug, output_dir)
     end
   end
 
