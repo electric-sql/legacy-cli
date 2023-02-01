@@ -4,6 +4,7 @@ defmodule ElectricCli.Bundle do
   """
   alias __MODULE__
 
+  alias ElectricCli.Config.Console
   alias ElectricCli.Config.Environment
   alias ElectricCli.Config.Replication
 
@@ -21,6 +22,7 @@ defmodule ElectricCli.Bundle do
   @type t() :: %Bundle{
           app: binary(),
           build: :local | :server,
+          console: %Console{},
           debug: boolean(),
           env: binary(),
           migrations: [%Migration{}],
@@ -36,6 +38,7 @@ defmodule ElectricCli.Bundle do
   defstruct [
     :app,
     :build,
+    :console,
     :debug,
     :env,
     :migrations,
@@ -63,6 +66,16 @@ defmodule ElectricCli.Bundle do
       struct.migrations
       |> Enum.map(&Migration.new/1)
 
+    console =
+      case struct.console do
+        nil ->
+          nil
+
+        alt ->
+          alt
+          |> Console.new()
+      end
+
     replication =
       case struct.replication do
         nil ->
@@ -73,16 +86,25 @@ defmodule ElectricCli.Bundle do
           |> Replication.new()
       end
 
-    %{struct | build: build, migrations: migrations, replication: replication}
+    %{struct | build: build, console: console, migrations: migrations, replication: replication}
   end
 
   @doc """
   Initialise a new bundle.
   """
-  @spec init(binary(), binary(), :local | :server, boolean(), [%Migration{}], %Replication{}) ::
+  @spec init(
+          binary(),
+          binary(),
+          :local | :server,
+          boolean(),
+          [%Migration{}],
+          %Console{},
+          %Replication{}
+        ) ::
           %Bundle{}
-  def init(app, env, build, debug, migrations, replication) do
+  def init(app, env, build, debug, migrations, console, replication) do
     %{app: app, build: build, debug: debug, env: env, migrations: migrations}
+    |> Util.map_put_if(:console, console, not is_nil(console))
     |> Util.map_put_if(:replication, replication, not is_nil(replication))
     |> Bundle.new()
   end
@@ -113,6 +135,7 @@ defmodule ElectricCli.Bundle do
         %Bundle{
           app: app,
           build: build,
+          console: console,
           debug: debug,
           env: env,
           migrations: migrations,
@@ -130,6 +153,7 @@ defmodule ElectricCli.Bundle do
 
     config =
       required
+      |> Util.map_put_if(:console, console, not is_nil(console))
       |> Util.map_put_if(:replication, replication, not is_nil(replication))
 
     with {:ok, json_str} <- Jason.encode(config, pretty: true),
@@ -146,7 +170,7 @@ defmodule ElectricCli.Bundle do
   """
   def write(
         %Manifest{app: app, migrations: migrations},
-        %Environment{slug: env, replication: replication},
+        %Environment{console: console, slug: env, replication: replication},
         build_type,
         debug_flag,
         output_dir
@@ -157,7 +181,7 @@ defmodule ElectricCli.Bundle do
       |> Path.join()
 
     app
-    |> init(env, build_type, debug_flag, migrations, replication)
+    |> init(env, build_type, debug_flag, migrations, console, replication)
     |> save(dist_folder)
   end
 

@@ -3,6 +3,7 @@ defmodule ElectricCli.Commands.Init do
 
   alias ElectricCli.Apps
   alias ElectricCli.Migrations
+  alias ElectricCli.Config.Environment
 
   @options [
     env: [
@@ -39,11 +40,13 @@ defmodule ElectricCli.Commands.Init do
       flags:
         merge_flags(
           config_flags() ++
+            console_flags() ++
             replication_flags()
         ),
       options:
         merge_options(
           @options ++
+            console_options() ++
             directory_options() ++
             replication_options()
         ),
@@ -77,37 +80,36 @@ defmodule ElectricCli.Commands.Init do
          {:app, :ok} <- {:app, Validate.validate_slug(app)},
          {:env, :ok} <- {:env, Validate.validate_slug(env)},
          :ok <- Apps.can_show_app(app, should_verify_app) do
-      replication =
-        %{}
-        |> Util.map_put_if("host", options.replication_host, not is_nil(options.replication_host))
-        |> Util.map_put_if("port", options.replication_port, not is_nil(options.replication_port))
-        |> Util.map_put_if(
-          "ssl",
-          not flags.replication_disable_ssl,
-          not is_nil(options.replication_host)
-        )
-
       environment =
         %{slug: String.to_atom(env)}
-        |> Util.map_put_if("replication", replication, not Enum.empty?(replication))
-
-      attrs = %{
-        "app" => app,
-        "debug" => debug,
-        "defaultEnv" => env,
-        "directories" => %{
-          "migrations" => migrations_dir,
-          "output" => output_dir
-        },
-        "environments" => %{
-          env => environment
-        },
-        "root" => root
-      }
+        |> Environment.new()
+        |> Environment.put_optional(
+          :console,
+          options.console_host,
+          options.console_port,
+          flags.console_disable_ssl
+        )
+        |> Environment.put_optional(
+          :replication,
+          options.replication_host,
+          options.replication_port,
+          flags.replication_disable_ssl
+        )
 
       config =
-        attrs
-        |> Config.new()
+        Config.new(%{
+          "app" => app,
+          "debug" => debug,
+          "defaultEnv" => env,
+          "directories" => %{
+            "migrations" => migrations_dir,
+            "output" => output_dir
+          },
+          "environments" => %{
+            env => environment
+          },
+          "root" => root
+        })
 
       with :ok <- Config.save(config),
            :ok <- Migrations.init_migrations(config) do

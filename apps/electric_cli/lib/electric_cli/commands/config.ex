@@ -2,10 +2,7 @@ defmodule ElectricCli.Commands.Config do
   use ElectricCli, :command
 
   alias ElectricCli.Apps
-
   alias ElectricCli.Config.Environment
-  alias ElectricCli.Config.Replication
-
   alias ElectricCli.Migrations
 
   @options [
@@ -43,13 +40,15 @@ defmodule ElectricCli.Commands.Config do
           flags:
             merge_flags(
               config_flags() ++
+                console_flags() ++
                 replication_flags()
             ),
           options:
             merge_options(
               @options ++
-                env_options() ++
+                console_options() ++
                 directory_options(false) ++
+                env_options() ++
                 replication_options()
             )
         ],
@@ -80,9 +79,14 @@ defmodule ElectricCli.Commands.Config do
                   required: false
                 ]
               ] ++
+                console_flags() ++
                 replication_flags()
             ),
-          options: merge_options(replication_options())
+          options:
+            merge_options(
+              console_options() ++
+                replication_options()
+            )
         ],
         update_env: [
           name: "update_env",
@@ -109,9 +113,14 @@ defmodule ElectricCli.Commands.Config do
                   required: false
                 ]
               ] ++
+                console_flags() ++
                 replication_flags()
             ),
-          options: merge_options(replication_options())
+          options:
+            merge_options(
+              console_options() ++
+                replication_options()
+            )
         ],
         remove_env: [
           name: "remove_env",
@@ -167,31 +176,20 @@ defmodule ElectricCli.Commands.Config do
          {:ok, %Environment{slug: env_slug} = environment} <-
            Config.target_environment(config, env),
          :ok <- Apps.can_show_app(app, should_verify_app) do
-      replication =
-        case environment.replication do
-          nil ->
-            %Replication{}
-
-          %Replication{} = value ->
-            value
-        end
-        |> Util.map_put_if(:host, options.replication_host, not is_nil(options.replication_host))
-        |> Util.map_put_if(:port, options.replication_port, not is_nil(options.replication_port))
-        |> Util.map_put_if(
-          :ssl,
-          not flags.replication_disable_ssl,
-          not is_nil(options.replication_host)
-        )
-
-      replication_empty? =
-        replication
-        |> Map.from_struct()
-        |> Enum.reject(fn {_key, value} -> is_nil(value) end)
-        |> Enum.empty?()
-
       environment =
         environment
-        |> Util.map_put_if(:replication, replication, not replication_empty?)
+        |> Environment.put_optional(
+          :console,
+          options.console_host,
+          options.console_port,
+          flags.console_disable_ssl
+        )
+        |> Environment.put_optional(
+          :replication,
+          options.replication_host,
+          options.replication_port,
+          flags.replication_disable_ssl
+        )
 
       env_atom = String.to_existing_atom(env_slug)
 
@@ -236,27 +234,21 @@ defmodule ElectricCli.Commands.Config do
     with {:ok, %Config{environments: environments} = config} <- Config.load(root),
          :ok <- Validate.validate_slug(env),
          nil <- Map.get(environments, env_atom) do
-      replication =
-        %{}
-        |> Util.map_put_if(:host, options.replication_host, not is_nil(options.replication_host))
-        |> Util.map_put_if(:port, options.replication_port, not is_nil(options.replication_port))
-        |> Util.map_put_if(
-          :ssl,
-          not flags.replication_disable_ssl,
-          not is_nil(options.replication_host)
-        )
-        |> Replication.new()
-
-      replication_empty? =
-        replication
-        |> Map.from_struct()
-        |> Enum.reject(fn {_key, value} -> is_nil(value) end)
-        |> Enum.empty?()
-
       environment =
         %{slug: env}
-        |> Util.map_put_if(:replication, replication, not replication_empty?)
         |> Environment.new()
+        |> Environment.put_optional(
+          :console,
+          options.console_host,
+          options.console_port,
+          flags.console_disable_ssl
+        )
+        |> Environment.put_optional(
+          :replication,
+          options.replication_host,
+          options.replication_port,
+          flags.replication_disable_ssl
+        )
 
       environments =
         environments
@@ -287,34 +279,22 @@ defmodule ElectricCli.Commands.Config do
     should_set_default = flags.default
 
     with {:ok, %Config{environments: environments} = config} <- Config.load(root),
-         {:ok, %Environment{replication: replication, slug: env_slug} = environment} <-
+         {:ok, %Environment{slug: env_slug} = environment} <-
            Config.target_environment(config, env) do
-      replication =
-        case replication do
-          nil ->
-            %Replication{}
-
-          %Replication{} = value ->
-            value
-        end
-        |> Util.map_put_if(:host, options.replication_host, not is_nil(options.replication_host))
-        |> Util.map_put_if(:port, options.replication_port, not is_nil(options.replication_port))
-        |> Util.map_put_if(
-          :ssl,
-          not flags.replication_disable_ssl,
-          not is_nil(options.replication_host)
-        )
-
-      replication_empty? =
-        replication
-        |> Map.from_struct()
-        |> Enum.reject(fn {_key, value} -> is_nil(value) end)
-        |> Enum.empty?()
-
       environment =
         environment
-        |> Util.map_put_if(:replication, replication, not replication_empty?)
-        |> Environment.new()
+        |> Environment.put_optional(
+          :console,
+          options.console_host,
+          options.console_port,
+          flags.console_disable_ssl
+        )
+        |> Environment.put_optional(
+          :replication,
+          options.replication_host,
+          options.replication_port,
+          flags.replication_disable_ssl
+        )
 
       env_atom = String.to_existing_atom(env_slug)
 
