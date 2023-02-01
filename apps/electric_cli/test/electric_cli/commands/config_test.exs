@@ -2,6 +2,7 @@ defmodule ElectricCli.Commands.ConfigTest do
   use ElectricCli.CommandCase, async: false
 
   alias ElectricCli.Config
+  alias ElectricCli.Config.Console
   alias ElectricCli.Config.Environment
   alias ElectricCli.Config.Replication
 
@@ -189,6 +190,22 @@ defmodule ElectricCli.Commands.ConfigTest do
       })
     end
 
+    test "sets console data if provided", %{tmp_dir: root} = ctx do
+      args =
+        argv(ctx, [
+          "--console-disable-ssl",
+          "--console-host",
+          "localhost",
+          "--console-port",
+          "8080"
+        ])
+
+      assert {{:ok, _output}, _} = run_cmd(args)
+
+      {:ok, %Config{environments: %{default: %Environment{} = environment}}} = Config.load(root)
+      assert %{console: %Console{host: "localhost", port: 8080, ssl: false}} = environment
+    end
+
     test "sets replication data if provided", %{tmp_dir: root} = ctx do
       args =
         argv(ctx, [
@@ -200,9 +217,9 @@ defmodule ElectricCli.Commands.ConfigTest do
         ])
 
       assert {{:ok, _output}, _} = run_cmd(args)
-      assert {:ok, %Config{environments: environments}} = Config.load(root)
-      assert %Environment{replication: replication} = Map.get(environments, :default)
-      assert %Replication{host: "localhost", port: 5133, ssl: false} = replication
+
+      {:ok, %Config{environments: %{default: %Environment{} = environment}}} = Config.load(root)
+      assert %{replication: %Replication{host: "localhost", port: 5133, ssl: false}} = environment
     end
   end
 
@@ -285,6 +302,23 @@ defmodule ElectricCli.Commands.ConfigTest do
       assert link_target == Path.join(app, "staging")
     end
 
+    test "sets console data if provided", %{tmp_dir: root} = ctx do
+      args =
+        argv(ctx, [
+          "staging",
+          "--console-disable-ssl",
+          "--console-host",
+          "localhost",
+          "--console-port",
+          "8080"
+        ])
+
+      assert {{:ok, _output}, _} = run_cmd(args)
+
+      {:ok, %Config{environments: %{staging: %Environment{} = environment}}} = Config.load(root)
+      assert %{console: %Console{host: "localhost", port: 8080, ssl: false}} = environment
+    end
+
     test "sets replication data if provided", %{tmp_dir: root} = ctx do
       args =
         argv(ctx, [
@@ -298,14 +332,8 @@ defmodule ElectricCli.Commands.ConfigTest do
 
       assert {{:ok, _output}, _} = run_cmd(args)
 
-      assert {:ok,
-              %Config{
-                environments: %{
-                  staging: %Environment{
-                    replication: %Replication{host: "localhost", port: 5133, ssl: false}
-                  }
-                }
-              }} = Config.load(root)
+      {:ok, %Config{environments: %{staging: %Environment{} = environment}}} = Config.load(root)
+      assert %{replication: %Replication{host: "localhost", port: 5133, ssl: false}} = environment
     end
   end
 
@@ -343,6 +371,23 @@ defmodule ElectricCli.Commands.ConfigTest do
       assert output =~ "not found"
     end
 
+    test "sets console data if provided", %{tmp_dir: root} = ctx do
+      args =
+        argv(ctx, [
+          "default",
+          "--console-disable-ssl",
+          "--console-host",
+          "localhost",
+          "--console-port",
+          "8080"
+        ])
+
+      assert {{:ok, _output}, _} = run_cmd(args)
+
+      {:ok, %Config{environments: %{default: %Environment{} = environment}}} = Config.load(root)
+      assert %{console: %Console{host: "localhost", port: 8080, ssl: false}} = environment
+    end
+
     test "sets replication data if provided", %{tmp_dir: root} = ctx do
       args =
         argv(ctx, [
@@ -356,14 +401,8 @@ defmodule ElectricCli.Commands.ConfigTest do
 
       assert {{:ok, _output}, _} = run_cmd(args)
 
-      assert {:ok,
-              %Config{
-                environments: %{
-                  default: %Environment{
-                    replication: %Replication{host: "localhost", port: 5133, ssl: false}
-                  }
-                }
-              }} = Config.load(root)
+      {:ok, %Config{environments: %{default: %Environment{} = environment}}} = Config.load(root)
+      assert %{replication: %Replication{host: "localhost", port: 5133, ssl: false}} = environment
     end
   end
 

@@ -53,6 +53,33 @@ defmodule ElectricCli.Options do
     ]
   end
 
+  def console_flags do
+    [
+      console_disable_ssl: [
+        long: "--console-disable-ssl",
+        help: "Connect to the console service without using SSL.",
+        required: false
+      ]
+    ]
+  end
+
+  def console_options do
+    [
+      console_host: [
+        long: "--console-host",
+        value_name: "ADDRESS",
+        help: "Console service host.",
+        parser: :string
+      ],
+      console_port: [
+        long: "--console-port",
+        value_name: "PORT",
+        help: "Console service port. Defaults to 443 if not specified.",
+        parser: :integer
+      ]
+    ]
+  end
+
   def directory_options(populate_defaults \\ true) do
     default_migrations_dir =
       case populate_defaults do

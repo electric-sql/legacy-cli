@@ -2,6 +2,7 @@ defmodule ElectricCli.Commands.InitTest do
   use ElectricCli.CommandCase, async: false
 
   alias ElectricCli.Config
+  alias ElectricCli.Config.Console
   alias ElectricCli.Config.Environment
   alias ElectricCli.Config.Replication
   alias ElectricCli.Manifest
@@ -117,6 +118,23 @@ defmodule ElectricCli.Commands.InitTest do
       assert %Environment{replication: nil} = Map.get(environments, :default)
     end
 
+    test "sets console data if provided", %{tmp_dir: root} = ctx do
+      args =
+        argv(ctx, [
+          "tarragon-envy-1337",
+          "--console-host",
+          "localhost",
+          "--console-port",
+          "8080",
+          "--console-disable-ssl"
+        ])
+
+      assert {{:ok, _output}, _} = run_cmd(args)
+
+      {:ok, %Config{environments: %{default: %Environment{} = environment}}} = Config.load(root)
+      assert %{console: %Console{host: "localhost", port: 8080, ssl: false}} = environment
+    end
+
     test "sets replication data if provided", %{tmp_dir: root} = ctx do
       args =
         argv(ctx, [
@@ -130,9 +148,8 @@ defmodule ElectricCli.Commands.InitTest do
 
       assert {{:ok, _output}, _} = run_cmd(args)
 
-      assert {:ok, %Config{environments: environments}} = Config.load(root)
-      assert %Environment{replication: replication} = Map.get(environments, :default)
-      assert %Replication{host: "localhost", port: 5133, ssl: false} = replication
+      {:ok, %Config{environments: %{default: %Environment{} = environment}}} = Config.load(root)
+      assert %{replication: %Replication{host: "localhost", port: 5133, ssl: false}} = environment
     end
 
     test "creates manifest with one migration", %{tmp_dir: root} = ctx do
