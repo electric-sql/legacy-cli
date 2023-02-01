@@ -126,9 +126,7 @@ defmodule ElectricCli.Config do
       |> Map.update!(:directories, &contract_directories(&1, root))
       |> Map.update!(:environments, &contract_environments/1)
 
-    config_filepath =
-      root
-      |> filepath()
+    config_filepath = filepath(root)
 
     with {:ok, json} <- Jason.encode(config, pretty: true),
          :ok <- File.write(config_filepath, json <> "\n"),

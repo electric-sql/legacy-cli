@@ -5,12 +5,20 @@ defmodule ElectricCli.Commands.Init do
   alias ElectricCli.Migrations
   alias ElectricCli.Config.Environment
 
+  @flags [
+    sync_down: [
+      long: "--sync-down",
+      help: "Sync down the current migrations from the server.",
+      required: false
+    ]
+  ]
+
   @options [
     env: [
       short: "-e",
       long: "--env",
       value_name: "ENV",
-      help: "Name of the app environment.",
+      help: "Name of the target environment.",
       parser: :string,
       default: Application.compile_env!(:electric_cli, :default_env)
     ]
@@ -27,9 +35,18 @@ defmodule ElectricCli.Commands.Init do
     You can update your config and add environments using the `electric config`
     command. See `electric config --help` for details.
 
-    Examples:
+    Standard usage:
+
         electric init APP
+
+    Specify a target environment:
+
         electric init APP --env ENV
+
+    Sync down and bootstrap the local folder with the existing migrations
+    from the server:
+
+        electric init APP --sync-down
     """
   end
 
@@ -39,7 +56,8 @@ defmodule ElectricCli.Commands.Init do
       about: about(),
       flags:
         merge_flags(
-          config_flags() ++
+          @flags ++
+            config_flags() ++
             console_flags() ++
             replication_flags()
         ),
@@ -71,6 +89,7 @@ defmodule ElectricCli.Commands.Init do
     env = options.env
 
     debug = flags.debug
+    should_sync_down = flags.sync_down
     should_verify_app = not flags.no_verify
 
     migrations_dir = Path.relative_to(options.migrations_dir, root)
@@ -112,7 +131,8 @@ defmodule ElectricCli.Commands.Init do
         })
 
       with :ok <- Config.save(config),
-           :ok <- Migrations.init_migrations(config) do
+           {:ok, %Config{} = config} <- Config.load(root),
+           :ok <- init_migrations(config, environment, should_sync_down, should_verify_app) do
         {:success, ["ElectricCli configuration written to `#{relative_root}/`\n"]}
       else
         _err ->
@@ -132,5 +152,13 @@ defmodule ElectricCli.Commands.Init do
       alt ->
         alt
     end
+  end
+
+  defp init_migrations(%Config{} = config, %Environment{}, false, should_verify_app) do
+    Migrations.init_migrations(config, should_verify_app)
+  end
+
+  defp init_migrations(%Config{} = config, %Environment{} = environment, true, _should_verify) do
+    Migrations.sync_down_migrations(config, environment)
   end
 end

@@ -78,6 +78,26 @@ defmodule ElectricCli.MockServer do
         "sha256" => "d0a52f739f137fc80fd67d9fd347cb4097bd6fb182e583f2c64d8de309393ad7",
         "title" => "another"
       }
+    ],
+    "sync-from-1234" => [
+      %{
+        "encoding" => "escaped",
+        "name" => "first_migration_name",
+        "status" => "applied",
+        "original_body" => "",
+        "satellite_body" => ["something random"],
+        "sha256" => "2a97d825e41ae70705381016921c55a3b086a813649e4da8fcba040710055747",
+        "title" => "init"
+      },
+      %{
+        "encoding" => "escaped",
+        "name" => "second_migration_name",
+        "original_body" => "ORIGINAL",
+        "status" => "applied",
+        "satellite_body" => ["other stuff"],
+        "sha256" => "d0a52f739f137fc80fd67d9fd347cb4097bd6fb182e583f2c64d8de309393ad7",
+        "title" => "another"
+      }
     ]
   }
 

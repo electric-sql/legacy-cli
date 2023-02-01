@@ -6,7 +6,7 @@ defmodule ElectricCli.Commands.Sync do
 
   def about() do
     """
-    Sync migrations upto the backend.
+    Sync migrations upto and down from the backend.
 
     This synchronises your local changes up to your ElectricSQL sync service
     and builds a new javascript file at `:output_dir/:app/:env/index.js` that

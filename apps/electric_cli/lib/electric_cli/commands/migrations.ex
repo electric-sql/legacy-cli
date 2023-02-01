@@ -55,10 +55,40 @@ defmodule ElectricCli.Commands.Migrations do
           Copies the named migration from the server to replace the local one.
 
           Uses your `defaultEnv` unless you specify `--env ENV`.
+
+          ## Examples
+
+          To revert a migration by name:
+
+              electric migrations revert NAME
+
+          Or revert all of your local migrations to match the migrations on
+          the server:
+
+          electric migrations revert --all
           """,
-          args: @migration_arg,
+          args: [
+            migration_name: [
+              value_name: "NAME",
+              help: "Name of the migration",
+              required: false,
+              parser: :string
+            ]
+          ],
           options: merge_options(env_options()),
-          flags: default_flags()
+          flags:
+            merge_flags(
+              all: [
+                long: "--all",
+                help: "Revert all local migrations and replace with migrations from the server.",
+                required: false
+              ],
+              force: [
+                long: "--force",
+                help: "Force revert the named migration.",
+                required: false
+              ]
+            )
         ]
       ]
     ]
@@ -96,25 +126,48 @@ defmodule ElectricCli.Commands.Migrations do
     end
   end
 
-  def revert(%{args: %{migration_name: migration_name}, options: %{env: env, root: root}}) do
+  def revert(%{args: args, flags: flags, options: %{env: env, root: root}}) do
     with :ok <- Session.require_auth(),
          {:ok, %Config{} = config} <- Config.load(root),
          {:ok, %Environment{} = environment} <- Config.target_environment(config, env) do
-      Progress.run("Reverting migration", fn ->
-        case Migrations.revert_migration(config, environment, migration_name) do
-          :ok ->
-            {:success, "Migration reverted successfully"}
+      case {args, flags} do
+        {%{migration_name: name}, %{all: false}} when is_binary(name) and name != "" ->
+          Progress.run("Reverting migration", fn ->
+            case Migrations.revert_migration(config, environment, name, flags.force) do
+              :ok ->
+                {:success, "Migration reverted successfully"}
 
-          {:ok, warnings} ->
-            {:success, Util.format_messages("warnings", warnings)}
+              {:ok, warnings} ->
+                {:success, Util.format_messages("warnings", warnings)}
 
-          {:error, errors} when is_list(errors) or is_binary(errors) ->
-            {:error, Util.format_messages("errors", errors)}
+              {:error, errors} when is_list(errors) or is_binary(errors) ->
+                {:error, Util.format_messages("errors", errors)}
 
-          alt ->
-            alt
-        end
-      end)
+              alt ->
+                alt
+            end
+          end)
+
+        {%{migration_name: nil}, %{all: true}} ->
+          Progress.run("Reverting all migrations", fn ->
+            case Migrations.sync_down_migrations(config, environment) do
+              :ok ->
+                {:success, "Migrations reverted successfully"}
+
+              {:ok, warnings} ->
+                {:success, Util.format_messages("warnings", warnings)}
+
+              {:error, errors} when is_list(errors) or is_binary(errors) ->
+                {:error, Util.format_messages("errors", errors)}
+
+              alt ->
+                alt
+            end
+          end)
+
+        _ ->
+          {:error, "You must specify a migration NAME or use the --all flag."}
+      end
     end
   end
 end
