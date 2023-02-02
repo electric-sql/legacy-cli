@@ -4,6 +4,7 @@ defmodule ElectricCli.Commands.MigrationsTest do
   alias ElectricCli.Config
   alias ElectricCli.Manifest
   alias ElectricCli.Manifest.Migration
+  alias ElectricCli.Migrations
 
   describe "electric migrations" do
     setup do
@@ -176,6 +177,12 @@ defmodule ElectricCli.Commands.MigrationsTest do
       [cmd: ["migrations", "revert"]]
     end
 
+    test "requires NAME or --all", ctx do
+      args = argv(ctx, [])
+      assert {{:error, output}, _} = run_cmd(args)
+      assert output =~ "specify a migration NAME or use the --all flag"
+    end
+
     test "complains when missing", ctx do
       args = argv(ctx, ["not_a_migration"])
       assert {{:error, output}, _} = run_cmd(args)
@@ -208,6 +215,87 @@ defmodule ElectricCli.Commands.MigrationsTest do
       args = argv(ctx, [new_name])
       assert {{:ok, output}, _} = run_cmd(args)
       assert output =~ "Migration reverted successfully"
+    end
+
+    test "reports when unchanged", %{tmp_dir: root} = ctx do
+      {:ok, %Config{directories: %{migrations: migrations_dir}}} = Config.load(root)
+      {:ok, %Manifest{migrations: [%Migration{} = migration]} = manifest} = load_manifest(root)
+
+      matching_name = "second_migration_name"
+      matching_sha256 = "d0a52f739f137fc80fd67d9fd347cb4097bd6fb182e583f2c64d8de309393ad7"
+
+      migration =
+        migration
+        |> Map.put(:name, matching_name)
+        |> Map.put(:sha256, matching_sha256)
+
+      :ok =
+        manifest
+        |> Map.put(:migrations, [migration])
+        |> Manifest.save(migrations_dir)
+
+      args = argv(ctx, [matching_name])
+
+      assert {{:error, output}, _} = run_cmd(args)
+      assert output =~ "Nothing to revert"
+    end
+
+    test "unless forced", %{tmp_dir: root} = ctx do
+      {:ok, %Config{directories: %{migrations: migrations_dir}}} = Config.load(root)
+      {:ok, %Manifest{migrations: [%Migration{} = migration]} = manifest} = load_manifest(root)
+
+      matching_name = "second_migration_name"
+      matching_sha256 = "d0a52f739f137fc80fd67d9fd347cb4097bd6fb182e583f2c64d8de309393ad7"
+
+      migration =
+        migration
+        |> Map.put(:name, matching_name)
+        |> Map.put(:sha256, matching_sha256)
+
+      :ok =
+        manifest
+        |> Map.put(:migrations, [migration])
+        |> Manifest.save(migrations_dir)
+
+      args = argv(ctx, [matching_name, "--force"])
+
+      assert {{:ok, output}, _} = run_cmd(args)
+      assert output =~ "Migration reverted successfully"
+    end
+  end
+
+  describe "electric migrations revert --all" do
+    setup(ctx) do
+      ctx
+      |> Map.put(:app, "sync-from-1234")
+    end
+
+    setup :login
+    setup :init
+
+    setup do
+      [cmd: ["migrations", "revert", "--all"]]
+    end
+
+    test "revert all", %{tmp_dir: root} = ctx do
+      {:ok, %Config{directories: %{migrations: migrations_dir}}} = Config.load(root)
+
+      args = argv(ctx, [])
+
+      assert {{:ok, output}, _} = run_cmd(args)
+      assert output =~ "Migrations reverted successfully"
+
+      {:ok, %Manifest{} = manifest} = load_manifest(root)
+      {:ok, %Manifest{} = manifest, []} = Migrations.hydrate_manifest(manifest, migrations_dir)
+
+      Enum.each(manifest.migrations, fn %Migration{name: name, original_body: body} ->
+        {:ok, contents} =
+          [migrations_dir, name, "migration.sql"]
+          |> Path.join()
+          |> File.read()
+
+        assert contents == body
+      end)
     end
   end
 end
