@@ -6,6 +6,7 @@ defmodule ElectricCli.Commands.InitTest do
   alias ElectricCli.Config.Environment
   alias ElectricCli.Config.Replication
   alias ElectricCli.Manifest
+  alias ElectricCli.Manifest.Migration
 
   describe "electric init unauthenticated" do
     setup do
@@ -192,6 +193,28 @@ defmodule ElectricCli.Commands.InitTest do
                output_dir
                |> Path.join("@app")
                |> File.read_link()
+    end
+  end
+
+  describe "electric init --sync-down" do
+    setup :login
+
+    setup do
+      [cmd: ["init"]]
+    end
+
+    test "syncs down server migrations", %{tmp_dir: root} = ctx do
+      dir = Path.join(root, "some-other-folder")
+      File.mkdir_p!(dir)
+
+      args = argv(ctx, ["sync-from-1234", "--sync-down", "--root", dir])
+      assert {{:ok, output}, _} = run_cmd(args)
+      assert output =~ "configuration written"
+
+      {:ok, %Config{app: app, directories: %{migrations: migrations_dir}}} = Config.load(dir)
+      {:ok, %Manifest{migrations: migrations}} = Manifest.load(app, migrations_dir, false)
+
+      assert [%Migration{}, %Migration{}] = migrations
     end
   end
 end

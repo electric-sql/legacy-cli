@@ -35,22 +35,56 @@ defmodule ElectricCli.Migrations do
   @doc """
   Creates the migrations folder and adds an initial migration to it.
   """
-  def init_migrations(
-        %Config{app: app, directories: %{migrations: migrations_dir}},
-        should_verify_app \\ true
-      ) do
-    verbose("Using migrations directory `#{migrations_dir}`")
-
-    exists = File.exists?(migrations_dir)
-
-    with :ok <- init_manifest(app, migrations_dir, exists),
-         {:ok, %Manifest{} = manifest} <- Manifest.load(app, migrations_dir, should_verify_app),
+  def init_migrations(%Config{directories: %{migrations: dir}} = config, should_verify_app) do
+    with {:ok, %Manifest{} = manifest} <- init_migrations_folder(config, should_verify_app),
          false <- has_init_migration(manifest),
-         {:ok, _path} <- add_migration(manifest, migrations_dir, "init") do
+         {:ok, _path} <- add_migration(manifest, dir, "init") do
       :ok
     else
       true ->
         :ok
+    end
+  end
+
+  @doc """
+  Creates the migrations folder. Returns `{:ok, %Manifest{} = manifest}`.
+  """
+  def init_migrations_folder(
+        %Config{app: app, directories: %{migrations: dir}},
+        should_verify_app
+      ) do
+    verbose("Using migrations directory `#{dir}`")
+
+    exists = File.exists?(dir)
+
+    with :ok <- init_manifest(app, dir, exists) do
+      Manifest.load(app, dir, should_verify_app)
+    end
+  end
+
+  @doc """
+  Sync migrations down from the server and overwrite the local migrations.
+  """
+  def sync_down_migrations(
+        %Config{app: app, directories: %{migrations: dir}},
+        %Environment{slug: env}
+      ) do
+    verbose("Fetching migrations from `#{app}/#{env}`")
+
+    with {:ok, %Manifest{migrations: migrations} = manifest} <-
+           Api.get_server_migrations(app, env, :original) do
+      verbose("Overwriting local migrations")
+
+      with tmp_dir when is_binary(tmp_dir) <- System.tmp_dir(),
+           working_dir <- Path.join([tmp_dir, ".sync-down", "migrations"]),
+           :ok <- File.mkdir_p(dir),
+           :ok <- File.mkdir_p(working_dir),
+           :ok <- Manifest.save(manifest, working_dir),
+           :ok <- Enum.reduce(migrations, :ok, &write_migration(&2, &1, working_dir)),
+           {:ok, _} <- File.rm_rf(dir),
+           :ok <- File.rename(working_dir, dir) do
+        :ok
+      end
     end
   end
 
@@ -88,14 +122,15 @@ defmodule ElectricCli.Migrations do
   def revert_migration(
         %Config{app: app, directories: %{migrations: migrations_dir}},
         %Environment{slug: env},
-        migration_name
+        migration_name,
+        should_force
       ) do
     with {:ok, %Manifest{} = local_manifest} <- Manifest.load(app, migrations_dir, true),
          %Migration{} = local_migration <-
            Manifest.named_migration(local_manifest, migration_name),
          {:ok, %Migration{} = server_migration} <-
            Api.get_full_server_migration(app, env, migration_name),
-         true <- local_migration.sha256 != server_migration.sha256,
+         true <- local_migration.sha256 != server_migration.sha256 or should_force,
          :ok <- revert_and_save_manifest(local_manifest, server_migration, migrations_dir) do
       overwrite_migration_sql(server_migration, migrations_dir)
     else
@@ -103,7 +138,8 @@ defmodule ElectricCli.Migrations do
         {:error, "Nothing to revert.",
          [
            "The local migration `#{migration_name}` matches the migration " <>
-             "with the same name applied to environment `#{env}`."
+             "with the same name applied to environment `#{env}`.",
+           "\n\nUse `--force` to override.\n"
          ]}
 
       nil ->
@@ -145,13 +181,27 @@ defmodule ElectricCli.Migrations do
     migration
   end
 
+  defp write_migration(:ok, %Migration{name: name, original_body: original_body}, migrations_dir) do
+    dir = Path.join(migrations_dir, name)
+    :ok = File.mkdir_p(dir)
+
+    filepath = Path.join(dir, @migration_filename)
+    File.write(filepath, original_body)
+  end
+
+  defp write_migration(err, %Migration{}, _dir) do
+    err
+  end
+
   defp overwrite_migration_sql(
          %Migration{name: name, original_body: original_body},
          migrations_dir
        ) do
-    [migrations_dir, name, @migration_filename]
-    |> Path.join()
-    |> File.write(original_body)
+    dir = Path.join(migrations_dir, name)
+    :ok = File.mkdir_p(dir)
+
+    filepath = Path.join(dir, @migration_filename)
+    File.write(filepath, original_body)
   end
 
   defp init_manifest(_app, _migrations_dir, true) do

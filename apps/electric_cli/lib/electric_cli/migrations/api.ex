@@ -63,12 +63,14 @@ defmodule ElectricCli.Migrations.Api do
     end
   end
 
-  def get_server_migrations(app, env, with_satellite \\ false) do
+  def get_server_migrations(app, env, body \\ nil) do
     path =
-      if with_satellite do
-        "apps/#{app}/environments/#{env}/migrations?body=satellite"
-      else
-        "apps/#{app}/environments/#{env}/migrations"
+      case body do
+        nil ->
+          "apps/#{app}/environments/#{env}/migrations"
+
+        param ->
+          "apps/#{app}/environments/#{env}/migrations?body=#{param}"
       end
 
     case Client.get(path) do
