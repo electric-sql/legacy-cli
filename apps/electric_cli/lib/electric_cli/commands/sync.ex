@@ -6,7 +6,7 @@ defmodule ElectricCli.Commands.Sync do
 
   def about() do
     """
-    Sync migrations upto and down from the backend.
+    Sync migrations up-to the backend.
 
     This synchronises your local changes up to your ElectricSQL sync service
     and builds a new javascript file at `:output_dir/:app/:env/index.js` that
@@ -37,6 +37,9 @@ defmodule ElectricCli.Commands.Sync do
 
     The sync will also fail if the migration has a name that is lower in sort order
     than one already applied on the server.
+
+    If you want to sync migrations down from the backend without uploading
+    and matching your local migrations, use `electric revert [NAME] [--all]`.
     """
   end
 
