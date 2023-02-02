@@ -107,6 +107,12 @@ Creates a new folder for migrations in your current directory called 'migrations
 
 The `APP` and optinally `ENV` you give should be copied from the sync service connection details provided by the ElectricSQL console. You specify here once, and the CLI stores in an `electric.json` file so you don't have to keep re-typing it.
 
+Note that you can also sync down migrations from an existing app using:
+
+```sh
+electric init APP --sync-down
+```
+
 ### Update
 
 You can update your config using `electric config update`. See the options with:
@@ -180,15 +186,31 @@ electric migrations revert NAME [--env ENV]
 
 This will copy the named migration from the ElectricSQL server to replace the local one. By default this will use the `default` environment, if you want to use a different one you can specify it with `--env ENV`.
 
+If you're having problems with your local migrations, you can force revert:
+
+```sh
+electric migrations revert NAME --force
+```
+
+And you can revert all of the local migrations to match the migrations that have been applied on the server. This is like a force reset of the local migrations folder:
+
+```sh
+electric migrations revert --all
+```
+
+Remeber to `electric build` after resetting before importing into your local app.
+
 ### reset
 
-If you get stuck in local development and need to reset your backend, you can wipe and re-provision your environment using:
+> WARNING: Use `reset` with extreme care (and usually only in development) as it explicitly causes data loss.
+
+If you get stuck and need to reset the migrations that have been applied on the server, you can wipe and re-provision your environment using:
 
 ```sh
 electric reset [--env ENV]
 ```
 
-WARNING: Use this with care (and usually only in development) as it explicitly causes data loss.
+This is like a force reset of the server migrations. Remember to `electric sync` to upload your local migrations to the new server environment before restarting replication.
 
 ## Contributing
 
