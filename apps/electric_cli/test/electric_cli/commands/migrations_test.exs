@@ -101,6 +101,16 @@ defmodule ElectricCli.Commands.MigrationsTest do
       assert {{:error, output}, _} = run_cmd(args)
       assert output =~ "electric auth login"
     end
+
+    test "--local does not require authentication", ctx do
+      args = argv(ctx, ["--local"])
+
+      # XXX the test server still requires auth, so we treat this error
+      # as an indication that the request was run happily without the
+      # user being prompted to login.
+      assert {{:error, output}, _} = run_cmd(args)
+      assert output =~ "invalid_credentials"
+    end
   end
 
   describe "electric migrations list post init" do
@@ -161,6 +171,13 @@ defmodule ElectricCli.Commands.MigrationsTest do
       args = argv(ctx, ["some_name"])
       assert {{:error, output}, _} = run_cmd(args)
       assert output =~ "electric auth login"
+    end
+
+    test "--local does not require authentication", ctx do
+      args = argv(ctx, ["some_name", "--local"])
+
+      assert {{:error, output}, _} = run_cmd(args)
+      assert output =~ "not found locally"
     end
   end
 

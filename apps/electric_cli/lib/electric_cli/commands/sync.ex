@@ -47,13 +47,13 @@ defmodule ElectricCli.Commands.Sync do
     [
       name: "sync",
       about: about(),
-      flags: default_flags(),
+      flags: merge_flags(local_flags()),
       options: merge_options(env_options())
     ]
   end
 
-  def sync(%{options: %{env: env, root: root}}) do
-    with :ok <- Session.require_auth(),
+  def sync(%{options: %{env: env, root: root}, flags: %{local: local}}) do
+    with :ok <- Session.require_auth(local_stack?: local),
          {:ok, %Config{} = config} <- Config.load(root),
          {:ok, %Environment{} = environment} <- Config.target_environment(config, env) do
       Progress.run("Syncing", fn ->

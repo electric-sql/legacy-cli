@@ -31,7 +31,7 @@ defmodule ElectricCli.Commands.Migrations do
 
           Uses your `defaultEnv` unless you specify `--env ENV`.
           """,
-          flags: default_flags(),
+          flags: merge_flags(local_flags()),
           options: merge_options(env_options())
         ],
         new: [
@@ -78,24 +78,28 @@ defmodule ElectricCli.Commands.Migrations do
           options: merge_options(env_options()),
           flags:
             merge_flags(
-              all: [
-                long: "--all",
-                help: "Revert all local migrations and replace with migrations from the server.",
-                required: false
-              ],
-              force: [
-                long: "--force",
-                help: "Force revert the named migration.",
-                required: false
-              ]
+              [
+                all: [
+                  long: "--all",
+                  help:
+                    "Revert all local migrations and replace with migrations from the server.",
+                  required: false
+                ],
+                force: [
+                  long: "--force",
+                  help: "Force revert the named migration.",
+                  required: false
+                ]
+              ] ++
+                local_flags()
             )
         ]
       ]
     ]
   end
 
-  def list(%{options: %{env: env, root: root}}) do
-    with :ok <- Session.require_auth(),
+  def list(%{options: %{env: env, root: root}, flags: %{local: local}}) do
+    with :ok <- Session.require_auth(local_stack?: local),
          {:ok, %Config{} = config} <- Config.load(root),
          {:ok, %Environment{} = environment} <- Config.target_environment(config, env) do
       Progress.run("Listing migrations", fn ->
@@ -126,8 +130,8 @@ defmodule ElectricCli.Commands.Migrations do
     end
   end
 
-  def revert(%{args: args, flags: flags, options: %{env: env, root: root}}) do
-    with :ok <- Session.require_auth(),
+  def revert(%{args: args, flags: %{local: local} = flags, options: %{env: env, root: root}}) do
+    with :ok <- Session.require_auth(local_stack?: local),
          {:ok, %Config{} = config} <- Config.load(root),
          {:ok, %Environment{} = environment} <- Config.target_environment(config, env) do
       case {args, flags} do

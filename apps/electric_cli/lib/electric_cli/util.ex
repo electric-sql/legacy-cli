@@ -91,6 +91,10 @@ defmodule ElectricCli.Util do
     end
   end
 
+  def format_messages(type_of_message, message) when is_atom(message) do
+    format_messages(type_of_message, "#{message}")
+  end
+
   def format_messages(type_of_message, message) do
     type_of_message =
       type_of_message

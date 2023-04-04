@@ -4,7 +4,7 @@ defmodule ElectricCli.Commands.SyncTest do
   alias ElectricCli.Bundle
   alias ElectricCli.Config
 
-  describe "electric sync pre init" do
+  describe "electric sync pre login" do
     setup do
       [cmd: ["sync"]]
     end
@@ -12,7 +12,27 @@ defmodule ElectricCli.Commands.SyncTest do
     test "shows help text if --help passed", ctx do
       args = argv(ctx, ["--help"])
       assert {{:ok, output}, _} = run_cmd(args)
-      assert output =~ ~r/Sync migrations upto the backend/
+      assert output =~ ~r/Sync migrations up-to the backend/
+    end
+
+    test "returns error if run before electric auth login", ctx do
+      args = argv(ctx, [])
+      assert {{:error, output}, _} = run_cmd(args)
+      assert output =~ "Couldn't find ElectricSQL credentials"
+    end
+  end
+
+  describe "electric sync pre init" do
+    setup :login
+
+    setup do
+      [cmd: ["sync"]]
+    end
+
+    test "shows help text if --help passed", ctx do
+      args = argv(ctx, ["--help"])
+      assert {{:ok, output}, _} = run_cmd(args)
+      assert output =~ ~r/Sync migrations up-to the backend/
     end
 
     test "returns error if run before electric init in this root", ctx do
@@ -35,6 +55,31 @@ defmodule ElectricCli.Commands.SyncTest do
       assert {{:ok, output}, _} = run_cmd(args)
 
       assert output =~ "Synced 1 new migration"
+    end
+  end
+
+  describe "electric sync no auth" do
+    setup :init_no_verify
+    setup :build
+
+    setup do
+      [cmd: ["sync"]]
+    end
+
+    test "sync requires auth", ctx do
+      args = argv(ctx, ["--verbose"])
+      assert {{:error, output}, _} = run_cmd(args)
+      assert output =~ "electric auth login"
+    end
+
+    test "sync --local does not require auth", ctx do
+      args = argv(ctx, ["--local"])
+
+      # XXX the test server still requires auth, so we treat this error
+      # as an indication that the request was run happily without the
+      # user being prompted to login.
+      assert {{:error, output}, _} = run_cmd(args)
+      assert output =~ "invalid_credentials"
     end
   end
 
