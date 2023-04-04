@@ -135,7 +135,7 @@ defmodule ElectricCli.Session do
     end
   end
 
-  def require_auth(true), do: :ok
+  def require_auth(local_stack?: true), do: :ok
   def require_auth(_alt), do: require_auth()
 
   def require_auth do

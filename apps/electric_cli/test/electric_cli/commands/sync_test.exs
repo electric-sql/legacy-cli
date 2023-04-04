@@ -76,7 +76,7 @@ defmodule ElectricCli.Commands.SyncTest do
       args = argv(ctx, ["--local"])
 
       # XXX the test server still requires auth, so we treat this error
-      # and an indication that the request was run happily without the
+      # as an indication that the request was run happily without the
       # user being prompted to login.
       assert {{:error, output}, _} = run_cmd(args)
       assert output =~ "invalid_credentials"

@@ -99,7 +99,7 @@ defmodule ElectricCli.Commands.Migrations do
   end
 
   def list(%{options: %{env: env, root: root}, flags: %{local: local}}) do
-    with :ok <- Session.require_auth(local),
+    with :ok <- Session.require_auth(local_stack?: local),
          {:ok, %Config{} = config} <- Config.load(root),
          {:ok, %Environment{} = environment} <- Config.target_environment(config, env) do
       Progress.run("Listing migrations", fn ->
@@ -131,7 +131,7 @@ defmodule ElectricCli.Commands.Migrations do
   end
 
   def revert(%{args: args, flags: %{local: local} = flags, options: %{env: env, root: root}}) do
-    with :ok <- Session.require_auth(local),
+    with :ok <- Session.require_auth(local_stack?: local),
          {:ok, %Config{} = config} <- Config.load(root),
          {:ok, %Environment{} = environment} <- Config.target_environment(config, env) do
       case {args, flags} do
