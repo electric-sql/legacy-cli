@@ -23,6 +23,18 @@ defmodule ElectricCli.CommandFixtures do
     ctx
   end
 
+  def init_no_verify(%{} = ctx) when not is_map_key(ctx, :app) do
+    ctx
+    |> Map.put(:app, @default_app)
+    |> init_no_verify()
+  end
+
+  def init_no_verify(%{app: app} = ctx) do
+    {{:ok, _output}, _} = run_cmd("init #{app} --no-verify")
+
+    ctx
+  end
+
   def add_env(%{} = ctx) when not is_map_key(ctx, :env) do
     ctx
     |> Map.put(:env, @additional_env)

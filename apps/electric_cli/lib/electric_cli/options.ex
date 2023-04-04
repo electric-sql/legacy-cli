@@ -20,6 +20,16 @@ defmodule ElectricCli.Options do
     @default_flags
   end
 
+  def local_flags do
+    [
+      local: [
+        long: "--local",
+        help: "Disable authentication check for commands executed against the local console.",
+        required: false
+      ]
+    ]
+  end
+
   def merge_flags(flags \\ [], sort \\ true) when is_list(flags) and is_boolean(sort) do
     @default_flags
     |> Keyword.merge(flags)
