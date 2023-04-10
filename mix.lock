@@ -1,6 +1,7 @@
 %{
   "bakeware": {:hex, :bakeware, "0.2.4", "0aaf49b34f4bab2aa433f9ff1485d9401e421603160abd6d269c469fc7b65212", [:make, :mix], [{:elixir_make, "~> 0.6", [hex: :elixir_make, repo: "hexpm", optional: false]}], "hexpm", "7b97bcf6fbeee53bb32441d6c495bf478d26f9575633cfef6831e421e86ada6d"},
   "blankable": {:hex, :blankable, "1.0.0", "89ab564a63c55af117e115144e3b3b57eb53ad43ba0f15553357eb283e0ed425", [:mix], [], "hexpm", "7cf11aac0e44f4eedbee0c15c1d37d94c090cb72a8d9fddf9f7aec30f9278899"},
+  "burrito": {:git, "https://github.com/burrito-elixir/burrito.git", "02f5871c750a9605f4b33e65c867317cf9701c92", []},
   "castore": {:hex, :castore, "0.1.20", "62a0126cbb7cb3e259257827b9190f88316eb7aa3fdac01fd6f2dfd64e7f46e9", [:mix], [], "hexpm", "a020b7650529c986c454a4035b6b13a328e288466986307bea3aadb4c95ac98a"},
   "cli_spinners": {:git, "https://github.com/thruflo/elixir_cli_spinners.git", "a29e72239025afefa85426cb05722f05a20bdd6e", []},
   "connection": {:hex, :connection, "1.1.0", "ff2a49c4b75b6fb3e674bfc5536451607270aac754ffd1bdfe175abe4a6d7a68", [:mix], [], "hexpm", "722c1eb0a418fbe91ba7bd59a47e28008a189d47e37e0e7bb85585a016b2869c"},
@@ -37,5 +38,6 @@
   "req": {:hex, :req, "0.3.3", "885d5d93d6101f126a8636ef1cabeffc694ecc236231cce221a3f873d54c6614", [:mix], [{:brotli, "~> 0.3.1", [hex: :brotli, repo: "hexpm", optional: true]}, {:ezstd, "~> 1.0", [hex: :ezstd, repo: "hexpm", optional: true]}, {:finch, "~> 0.9", [hex: :finch, repo: "hexpm", optional: false]}, {:jason, "~> 1.0", [hex: :jason, repo: "hexpm", optional: false]}, {:mime, "~> 1.6 or ~> 2.0", [hex: :mime, repo: "hexpm", optional: false]}, {:nimble_csv, "~> 1.0", [hex: :nimble_csv, repo: "hexpm", optional: true]}, {:plug, "~> 1.0", [hex: :plug, repo: "hexpm", optional: true]}], "hexpm", "7d3d1c6600684bc36d2f58b5e40e7d279f69c44bf85573268fb52da5e2437ec9"},
   "table_rex": {:hex, :table_rex, "3.1.1", "0c67164d1714b5e806d5067c1e96ff098ba7ae79413cc075973e17c38a587caa", [:mix], [], "hexpm", "678a23aba4d670419c23c17790f9dcd635a4a89022040df7d5d772cb21012490"},
   "telemetry": {:hex, :telemetry, "1.1.0", "a589817034a27eab11144ad24d5c0f9fab1f58173274b1e9bae7074af9cbee51", [:rebar3], [], "hexpm", "b727b2a1f75614774cff2d7565b64d0dfa5bd52ba517f16543e6fc7efcc0df48"},
+  "typed_struct": {:hex, :typed_struct, "0.3.0", "939789e3c1dca39d7170c87f729127469d1315dcf99fee8e152bb774b17e7ff7", [:mix], [], "hexpm", "c50bd5c3a61fe4e198a8504f939be3d3c85903b382bde4865579bc23111d1b6d"},
   "uuid": {:hex, :uuid, "1.1.8", "e22fc04499de0de3ed1116b770c7737779f226ceefa0badb3592e64d5cfb4eb9", [:mix], [], "hexpm", "c790593b4c3b601f5dc2378baae7efaf5b3d73c4c6456ba85759905be792f2ac"},
 }
